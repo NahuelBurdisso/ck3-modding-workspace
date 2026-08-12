@@ -25,6 +25,95 @@ this machine.
 - Prefix every key you invent with your mod slug. Two mods defining the same
   scripted effect name = the later one silently wins.
 
+## The user directory
+
+- **There are two CK3 user dirs on this machine and only one is live.**
+  Live: `D:/Documents/Paradox Interactive/Crusader Kings III/`.
+  Dead decoy: `C:/Users/nahue/Documentos/Paradox Interactive/Crusader Kings III/`.
+  The decoy has a full `mod/` folder and a plausible `dlc_load.json`, so deploying
+  into it looks correct and simply never loads. This burned an entire session.
+- Resolve it from the registry instead of guessing at the Spanish folder name:
+  `reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" | grep -i personal`
+  → `Personal REG_EXPAND_SZ D:\Documents`. CK3 uses the Windows known-folder API,
+  so it follows `Personal`.
+- Tells that a dir is the dead one: `launcher-v2.sqlite` is 0 bytes (live is
+  ~180 KB), no `last_save.ck3` / `continue_game.json` / `dlc_signature`, and
+  `dlc_load.json` mtime only ever matches your own edits.
+- Local (non-workshop) `.mod` pointers in the live dir use an absolute `path=`,
+  same as workshop pointers — not a relative `mod/<name>`.
+
+## Saves
+
+- **A modded game rule is baked into the save.** Disabling the mod afterwards
+  makes the save fail to load that key:
+  `[E] Failed to read key reference: <rule_option> ... in file: "save games/<x>.ck3"`.
+  Bisect by disabling a mod only on a save made *before* the mod was added, or
+  expect this noise.
+- **`autosave_exit.ck3` can be written truncated** if the game is quit while
+  heavily loaded, and `last_save.ck3` + `continue_game.json` both get pointed at
+  it. A save that is much smaller than the previous autosaves is the tell
+  (101 MB vs 124/155 MB here). Symptom is a hard, reproducible
+  `EXCEPTION_ACCESS_VIOLATION` a few minutes into loading, at the same fault
+  address every time and with no script error near it. Use **Load** and pick an
+  older autosave rather than **Continue**.
+- A crash that reproduces at the *identical* fault address both with and without
+  your mod is not your mod. Check the address in `crashes/*/exception.txt`
+  before spending runs on a bisect. Fault addresses are only comparable within
+  one Windows boot (ASLR fixes the image base per boot).
+
+## on_actions do NOT fully merge
+
+- `events = { }`, `random_events = { }` and `on_actions = { }` are additive lists
+  and merge across files. **`effect = { }` does not.** If two files give the same
+  on_action an `effect`, the engine keeps exactly one and logs
+  `[E][jomini_onaction.cpp:161]: There is more than one 'effect' defined using most recent: file: ...`
+- "Most recent" is **file read order inside `common/on_action`, which is
+  alphabetical — not playset load order.** A mod loading dead last still loses if
+  its filename sorts early: `bc_spike_on_actions.txt` was discarded in favour of
+  `combat_on_actions.txt`. Naming a file `zz_*` is the usual workaround, but it
+  only wins a race you should not be running.
+- **Always hook via `events = { your.event }`** and put the logic in a
+  `hidden = yes` event with the right `scope = ...`. That is what vanilla does
+  (`on_combat_end_winner` → `combat_event.0001`, `hidden = yes`,
+  `scope = combat_side`) and it composes with every other mod.
+
+## Combat phase events
+
+- They fire every `COMBAT_EVENT_DAYS = 5`. Opening the battle screen while the
+  game is paused produces nothing, no matter how high `chance = { base = ... }`.
+- `type = commander` roots on the commander, so `is_ai = no` means *you* must be
+  leading that army. `type = knight` has no such gate and fires for knights on
+  any side of any combat in the world.
+- Lock a probe out with `NOT = { has_character_modifier = ... }` in `is_valid`;
+  verified to work even at `base = 100000`.
+
+## Scripted effect parameters
+
+- `$PARAM$` substitution inside a quoted string **eats the space in front of it**.
+  `debug_log = "applied $MODIFIER$"` prints `appliedbc_spike_momentum_major`.
+  Harmless for logs, but never build a display string that depends on it.
+
+## Reading results out of a run
+
+- **`debug_log` writes to `<user dir>/logs/debug.log`, never to stdout.** Piping
+  `ck3.exe -debug_mode` to a file captures only `[Checksum Builder]` spam. Read
+  `logs/debug.log`, `logs/error.log` and `logs/game.log` instead.
+- `error.log` is the single best proof a mod loaded and parsed. It names the file
+  for every complaint, e.g.
+  `Duplicate localization key. Key 'X' is defined in both 'localization/english/<mod>.yml' and ...`
+  or `Modifier 'X' was not used by the script or code but exists in the database`.
+  A mod that produces such lines is definitively in the load.
+- CK3 wants **UTF-8 BOM on script `.txt` too**, not just loc. Without it you get
+  `[lexer.cpp:306] File '...' should be in utf8-bom encoding (will try to use it anyways)`.
+  It still parses, but it clutters `error.log`.
+- **Do not use `PAUSED` as a load canary.** The on-screen pause banner is
+  `PAUSED_BY_PLAYER`. `PAUSED` exists in `core_l_english.yml` but nothing draws
+  it, so overriding it is a permanent false negative.
+- CK3's debug console is an in-game overlay, not a separate OS window. The
+  process has exactly one visible top-level window, so `SendKeys` after
+  `SetForegroundWindow` types into the *game*, firing hotkeys, unless the
+  console overlay already has focus. Prefer driving tests from script.
+
 ## Load order and playsets
 
 - Last mod in `dlc_load.json` wins. Compat patches go *after* their targets.
@@ -44,6 +133,12 @@ this machine.
   commands.
 - **Do not pipe the launch through `tail`** — you lose everything except
   trailing `[Checksum Builder]` spam. Redirect the whole stream to a file.
+- **`[Checksum Builder]` output is not a file manifest.** Do not use it to prove
+  a mod loaded. It lists only checksum-relevant content and omits plenty that is
+  definitely loaded — e.g. Battlefield Duel+ ships a uniquely named
+  `common/combat_phase_events/00_phase_events.txt`, is enabled, and never appears
+  in the log. Absence there means nothing. To confirm a mod is live, check
+  in-game (a modifier, a toast, `debug_mode` tooltips) or `dlc_load.json`.
 - `logs/` stays empty while the game runs *and* after a clean exit. CK3 only
   creates `error.log` when something actually failed. Empty `logs/`, `crashes/`,
   `dumps/` and `exceptions/` after a full session means a clean run — do not sit

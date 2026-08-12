@@ -112,6 +112,40 @@ Useful ones: `on_birth_child`, `on_death`, `on_marriage`, `yearly_playable_pulse
 `three_year_pool_pulse`, `on_war_won_attacker`, `on_game_start`,
 `on_game_start_after_lobby` (the right place for one-time setup).
 
+## Combat
+
+`common/combat_phase_events/` merges per key across files, so always ship a new
+file. An entry rolls every `COMBAT_EVENT_DAYS = 5` while a battle runs:
+
+    bc_banner_falls = {
+        type = commander          # roots on the commander; `is_ai = no` means
+                                  # the PLAYER is personally leading that army
+        is_valid = { ... }        # gate hard here
+        chance = { base = 60 modifier = { add = 40 martial >= 12 } }
+        effect = { ... }
+    }
+
+`type = knight` has **no** `is_ai` gate — it fires for every knight on every side
+of every combat in the world. One battle produced 41 fires. Gate hard, and do no
+work before the gate.
+
+Root's `scope:combat_side` is set for both types. From it:
+
+| Link | Gives |
+|---|---|
+| `combat` | the combat; `.location` is a province |
+| `enemy_side` | the other side |
+| `side_commander` | may not exist — use `?=` |
+| `side_primary_participant` | the ruler whose war it is |
+| `side_strength` | a number, usable in script values |
+| `any_/every_/random_side_knight` | the knights |
+| `enemy_side.vastly_outnumbered_combat_side_threshold` | vanilla's own outnumbered threshold — prefer it over hand-rolling `side_strength * 1.5` |
+
+An `advantage` term on a **character modifier** on the commander does reach the
+combat roll and renders in the advantage breakdown under its localized name.
+Verified. AGOT's own combat phase events use no `advantage` at all, so this is
+unclaimed ground in that stack.
+
 ## Localization
 
     # localization/english/mymod_l_english.yml   (UTF-8 WITH BOM)

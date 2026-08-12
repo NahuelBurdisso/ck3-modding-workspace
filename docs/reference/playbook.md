@@ -114,6 +114,25 @@ session:
 - Compare file sizes across autosaves. A save far smaller than its neighbours is
   truncated, and `continue_game.json` may be pointing at it.
 
+## Write script that does not cost frames
+
+CK3 runs script far more often than it looks. Four rules, in order of how much
+they matter:
+
+- **Never nest an unbounded iterator inside a per-character pulse.**
+  `every_living_character` inside `yearly_playable_pulse` is quadratic across
+  thousands of characters. Filter to the smallest scope first, then iterate.
+- **Order triggers cheapest-first, and use `trigger_if`.** Boolean early-out does
+  *not* apply while the game is building a tooltip — it evaluates every child so
+  it can render every line. `trigger_if = { limit = { ... } ... }` is the only
+  way to actually skip work there.
+- **Script values recalculate every UI frame** they are displayed in. A script
+  value with iterators in it, shown in a tooltip, is a frame-rate bug.
+- **`ai_check_interval = 0`** on a decision only the player can take. Otherwise
+  every AI ruler re-evaluates it forever.
+- 1.19 added `(any_)ruler` as a pre-filtered iterator, and made `(any_)dynasty`
+  iterate only active dynasties by default. Prefer them over the wide versions.
+
 ## Order of work
 
 1. Design doc in `docs/specs/`, with a **risks and unknowns** section. That

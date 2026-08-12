@@ -12,7 +12,7 @@ stack. Everything about paths lives in `ck3.config.json` — never hardcode a pa
     mods/<slug>/           mod sources, one git repo each
     index/ck3.sqlite3      generated index, rebuildable, not tracked
     docs/reference/        folder-map, script-cheatsheet, gotchas, workflow,
-                           playbook
+                           playbook, sources
     logs/                  captured ck3.exe stdout
 
 ## CLI
@@ -46,6 +46,9 @@ stack. Everything about paths lives in `ck3.config.json` — never hardcode a pa
   run, not a missing log.
 - **Spike before you build.** A restart costs ~7 minutes, so one probe mod must
   answer every open question in one run. See `docs/reference/playbook.md`.
+- **Script runs more often than it looks.** Never nest an unbounded iterator in a
+  per-character pulse; use `trigger_if` rather than relying on early-out, because
+  tooltip rendering evaluates every branch. See `docs/reference/playbook.md`.
 - Never edit files under `SteamLibrary/` — workshop content is overwritten on
   update. Write a patch mod in `mods/` that loads last instead.
 - Playset edits (`playset add/remove/move`) change what the user's game loads.
@@ -58,4 +61,9 @@ stack. Everything about paths lives in `ck3.config.json` — never hardcode a pa
 Read `docs/reference/` before non-trivial work — `script-cheatsheet.md` for
 syntax, `folder-map.md` for where things go, `gotchas.md` for silent failures,
 `workflow.md` for the loop, `playbook.md` for how to test a mod without losing a
-day to loading screens.
+day to loading screens, `sources.md` for where a trustworthy answer comes from.
+
+The best available reference is one the game generates itself: `script_docs` in
+the in-game console (`-debug_mode -develop`) dumps every effect, trigger, scope
+link, modifier and on_action to `<user dir>/logs/`. It has never been run here,
+and Claude cannot run it — the console is an in-game overlay. Ask the user.

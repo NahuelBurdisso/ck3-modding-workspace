@@ -41,6 +41,10 @@ this machine.
   `dlc_load.json` mtime only ever matches your own edits.
 - Local (non-workshop) `.mod` pointers in the live dir use an absolute `path=`,
   same as workshop pointers — not a relative `mod/<name>`.
+- **A mod source folder does not have to live under the user dir.** A pointer at
+  `path="D:/ck3/mods/<slug>"` mounts fine — confirmed by
+  `Mounted Data: D:/ck3/mods/battle_chronicles` in `debug.log`. So `ck3.py deploy`
+  needs no copy step, and there is only ever one copy of the source to edit.
 
 ## Saves
 
@@ -77,6 +81,32 @@ this machine.
   (`on_combat_end_winner` → `combat_event.0001`, `hidden = yes`,
   `scope = combat_side`) and it composes with every other mod.
 
+- `common/on_action` is **singular**. A folder named `common/on_actions/` is
+  silently ignored — no error, no entries, nothing.
+- An on_action's `effect = { }` runs *concurrently with*, not before, its
+  `events = { }`. Scopes and variables set in the effect do **not** reach the
+  events. Save what the event needs inside the event.
+- `on_game_start` fires exactly once per save. A mod enabled mid-save therefore
+  never initialises. If setup matters, guard it on a version variable checked
+  from a pulse on_action instead.
+
+## Scope and syntax traps that produce no error
+
+- **`prev` cannot be chained.** There is no `prevprev`. Save a scope instead.
+- **`save_scope_as` does nothing inside a trigger block.** Use
+  `save_temporary_scope_as` there.
+- Saved scopes survive an unbroken effect chain, including across
+  `trigger_event`. They do not survive a delayed event across a different chain.
+- **`NOT` with more than one child is NAND, not NOR** — it is true when *any*
+  child is false. For "none of these", use `NOR`.
+- **`add_character_modifier` with no `days`/`years` is permanent.** Easy way to
+  ship a modifier that never comes off.
+- `show_as_tooltip = { }` displays without executing; `hidden_effect = { }`
+  executes without displaying. Mixing them up looks like a broken effect.
+- Event ids above `9999` in a namespace are unreliable — keep four digits.
+- The `:0` in a loc entry is a version counter with no meaning to the engine.
+  It is not an index and not a variable.
+
 ## Combat phase events
 
 - They fire every `COMBAT_EVENT_DAYS = 5`. Opening the battle screen while the
@@ -86,6 +116,20 @@ this machine.
   any side of any combat in the world.
 - Lock a probe out with `NOT = { has_character_modifier = ... }` in `is_valid`;
   verified to work even at `base = 100000`.
+
+## Effects that reject what looks obvious
+
+- **`add_gold` refuses a negative value.** `add_gold = -100` logs
+  `Script system error! Error: add_gold effect [ Negative value in: {} ]` and the
+  option silently does nothing — the player gets the benefit for free. Use
+  `remove_short_term_gold = 100`. Vanilla trips over the mirror image of this
+  (`Negative value in remove_short_term_gold: -450` in `buy_ruby_crown_events.txt`),
+  so neither direction accepts a sign.
+- **`monthly_change` on a decaying opinion modifier is a RATE and must be
+  positive**, even for a negative opinion. A negative value is rejected with
+  `Decaying modifier 'x' should have a duration or monthly_change!` and the
+  modifier is dropped. The sign comes from `opinion = -20` at the `add_opinion`
+  call site. Every vanilla decaying modifier uses `monthly_change = 0.1`.
 
 ## Scripted effect parameters
 

@@ -225,6 +225,20 @@ def cmd_errors(cfg, args) -> int:
     return 0
 
 
+def cmd_probe(cfg, args) -> int:
+    collected = run.probe(cfg, args.pattern, ignore_case=args.ignore_case)
+    if not collected:
+        print(f"no lines matching {args.pattern!r} in {cfg.game_logs}")
+        print("debug_log output lands in debug.log, and only after the game has run.")
+        return 1
+    for name, counts in collected.items():
+        total = sum(counts.values())
+        print(f"\n=== {name} ({total} hit(s), {len(counts)} distinct) ===")
+        for message, hits in counts.most_common():
+            print(f"  {hits:>5}  {message}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ck3", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -293,6 +307,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("errors", help="collect error output from the last run")
     p.add_argument("--tail", type=int, default=80)
     p.set_defaults(func=cmd_errors)
+
+    p = sub.add_parser("probe", help="count debug_log markers in the game logs")
+    p.add_argument("pattern", help="regex, e.g. 'BC:' to aggregate one mod's markers")
+    p.add_argument("-i", "--ignore-case", action="store_true")
+    p.set_defaults(func=cmd_probe)
 
     return parser
 

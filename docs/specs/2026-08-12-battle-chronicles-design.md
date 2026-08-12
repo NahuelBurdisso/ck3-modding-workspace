@@ -1,7 +1,10 @@
 # Battle Chronicles — design
 
-Status: draft
+Status: phase 0 probes complete (13/13), shipping set written, not yet played
 Mod slug: `battle_chronicles`
+Implementation: `mods/battle_chronicles/` — see its README for what is still
+unverified in game (the outnumbered ratio script value, the weights, and the
+shieldbrother memory, which ships as opinion only).
 Target: CK3 1.19.0.6 + A Game of Thrones 0.4.40
 
 ## Problem

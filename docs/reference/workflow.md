@@ -27,10 +27,18 @@ game reads the source folder, so there is no build step and no sync step.
     python tools/ck3.py launch --clear-logs
     # ... play, reproduce, quit from the in-game menu ...
     python tools/ck3.py errors
+    python tools/ck3.py probe 'MY_MOD'
 
 `validate` before every launch: it catches missing BOMs, brace imbalance and
 malformed loc lines in a second, which the game would otherwise swallow silently
 or report five minutes into a load.
+
+`errors` reads the tail of every log. `probe` is the one to reach for when the
+mod under test writes `debug_log` markers: it greps `<user dir>/logs/` for a
+pattern and prints counts per distinct message, which is the only workable way to
+read a `debug.log` that has grown to tens of megabytes. A restart costs about
+seven minutes, so design each run to answer every open question at once —
+`playbook.md` covers how.
 
 ## Research before writing
 

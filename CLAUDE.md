@@ -11,7 +11,8 @@ stack. Everything about paths lives in `ck3.config.json` — never hardcode a pa
                            playset, launch
     mods/<slug>/           mod sources, one git repo each
     index/ck3.sqlite3      generated index, rebuildable, not tracked
-    docs/reference/        folder-map, script-cheatsheet, gotchas, workflow
+    docs/reference/        folder-map, script-cheatsheet, gotchas, workflow,
+                           playbook
     logs/                  captured ck3.exe stdout
 
 ## CLI
@@ -21,7 +22,7 @@ stack. Everything about paths lives in `ck3.config.json` — never hardcode a pa
     python tools/ck3.py conflicts
     python tools/ck3.py new "Name" [--agot] [--deploy] | deploy <slug> | validate <slug> [--strict]
     python tools/ck3.py playset list|add|remove|move|audit
-    python tools/ck3.py launch [--clear-logs] | errors
+    python tools/ck3.py launch [--clear-logs] | errors | probe <regex>
     python tools/ck3.py sync-workshop <id>
 
 ## Rules
@@ -39,7 +40,12 @@ stack. Everything about paths lives in `ck3.config.json` — never hardcode a pa
   whole file is ignored.
 - **Run `ck3.py validate` before claiming anything works.** Braces, BOM and loc
   syntax fail silently in CK3.
-- **Empty `logs/` after a session means a clean run**, not a missing log.
+- **Results come from `<user dir>/logs/`, never from stdout.** `debug_log` writes
+  to `debug.log`; `[Checksum Builder]` stdout spam is not a file manifest. Read a
+  run with `ck3.py probe <marker>`. Empty `logs/` after a session means a clean
+  run, not a missing log.
+- **Spike before you build.** A restart costs ~7 minutes, so one probe mod must
+  answer every open question in one run. See `docs/reference/playbook.md`.
 - Never edit files under `SteamLibrary/` — workshop content is overwritten on
   update. Write a patch mod in `mods/` that loads last instead.
 - Playset edits (`playset add/remove/move`) change what the user's game loads.
@@ -51,4 +57,5 @@ stack. Everything about paths lives in `ck3.config.json` — never hardcode a pa
 
 Read `docs/reference/` before non-trivial work — `script-cheatsheet.md` for
 syntax, `folder-map.md` for where things go, `gotchas.md` for silent failures,
-`workflow.md` for the loop.
+`workflow.md` for the loop, `playbook.md` for how to test a mod without losing a
+day to loading screens.

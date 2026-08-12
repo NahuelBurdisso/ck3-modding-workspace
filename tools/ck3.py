@@ -15,6 +15,7 @@
     python tools/ck3.py sync-workshop 3664900993
     python tools/ck3.py launch                  run ck3.exe -debug_mode
     python tools/ck3.py errors                  collect error output
+    python tools/ck3.py api side_strength       the engine's own API docs
 """
 
 from __future__ import annotations
@@ -225,6 +226,50 @@ def cmd_errors(cfg, args) -> int:
     return 0
 
 
+API_DIR = Path(__file__).resolve().parent.parent / "docs" / "api"
+API_FILES = ("effects", "triggers", "event_targets", "event_scopes", "modifiers", "on_actions")
+
+
+def cmd_api(cfg, args) -> int:
+    """Look a key up in the script_docs dump - the engine documenting itself."""
+    versions = sorted(p for p in API_DIR.iterdir() if p.is_dir()) if API_DIR.is_dir() else []
+    if not versions:
+        print(f"no script_docs dump in {API_DIR}")
+        print("Ask the user to run `script_docs` in the in-game console (-debug_mode -develop),")
+        print("then copy <user dir>/logs/{effects,triggers,event_targets,...}.log into a")
+        print("docs/api/<version>/ folder.")
+        return 1
+    latest = versions[-1]
+
+    wanted = API_FILES if args.kind is None else (args.kind,)
+    found = False
+    for kind in wanted:
+        path = latest / f"{kind}.log"
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        # effects/triggers/targets/on_actions are '-'*20 delimited; scopes and
+        # modifiers are blank-line delimited.
+        blocks = text.split("-" * 20) if "-" * 20 in text else text.split("\n\n")
+        for block in blocks:
+            block = block.strip()
+            if not block:
+                continue
+            head = block.split("\n", 1)[0]
+            # `name - description`, `name:`, or `Tag: name` depending on the file.
+            name = head.removeprefix("Tag: ").split(" ")[0].rstrip(":")
+            if (args.key in name) if args.partial else (name == args.key):
+                print(f"--- {latest.name}/{kind} ---")
+                print(block)
+                print()
+                found = True
+    if not found:
+        print(f"{args.key!r} is not in the {latest.name} script_docs dump.")
+        print("If script expects it to exist, it comes from a mod, not the engine.")
+        return 1
+    return 0
+
+
 def cmd_probe(cfg, args) -> int:
     collected = run.probe(cfg, args.pattern, ignore_case=args.ignore_case)
     if not collected:
@@ -307,6 +352,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("errors", help="collect error output from the last run")
     p.add_argument("--tail", type=int, default=80)
     p.set_defaults(func=cmd_errors)
+
+    p = sub.add_parser("api", help="look a key up in the script_docs dump")
+    p.add_argument("key", help="effect/trigger/scope link/modifier/on_action name")
+    p.add_argument("--kind", choices=API_FILES, help="restrict to one dump")
+    p.add_argument("--partial", action="store_true")
+    p.set_defaults(func=cmd_api)
 
     p = sub.add_parser("probe", help="count debug_log markers in the game logs")
     p.add_argument("pattern", help="regex, e.g. 'BC:' to aggregate one mod's markers")

@@ -13,6 +13,7 @@ stack. Everything about paths lives in `ck3.config.json` — never hardcode a pa
     index/ck3.sqlite3      generated index, rebuildable, not tracked
     docs/reference/        folder-map, script-cheatsheet, gotchas, workflow,
                            playbook, sources
+    docs/api/<version>/    script_docs dump - the engine's own API reference
     logs/                  captured ck3.exe stdout
 
 ## CLI
@@ -22,15 +23,17 @@ stack. Everything about paths lives in `ck3.config.json` — never hardcode a pa
     python tools/ck3.py conflicts
     python tools/ck3.py new "Name" [--agot] [--deploy] | deploy <slug> | validate <slug> [--strict]
     python tools/ck3.py playset list|add|remove|move|audit
+    python tools/ck3.py api <key> [--kind effects|triggers|...] [--partial]
     python tools/ck3.py launch [--clear-logs] | errors | probe <regex>
     python tools/ck3.py sync-workshop <id>
 
 ## Rules
 
 - **Look it up, do not guess.** Before writing any effect, trigger, trait,
-  on_action or loc key, run `ck3.py find` / `ck3.py loc` and read the vanilla
-  definition the index points at. The index covers vanilla plus all 60+ enabled
-  mods; a hallucinated key fails silently in-game.
+  on_action or loc key: `ck3.py api <key>` for what the engine defines, then
+  `ck3.py find` / `ck3.py loc` and read the vanilla definition the index points
+  at. The index covers vanilla plus all 60+ enabled mods; a hallucinated key
+  fails silently in-game.
 - **Add files, do not replace them.** A file at a vanilla relative path replaces
   the vanilla file entirely. Prefer a new uniquely-named file. Check with
   `ck3.py where` before touching an existing path.
@@ -63,7 +66,10 @@ syntax, `folder-map.md` for where things go, `gotchas.md` for silent failures,
 `workflow.md` for the loop, `playbook.md` for how to test a mod without losing a
 day to loading screens, `sources.md` for where a trustworthy answer comes from.
 
-The best available reference is one the game generates itself: `script_docs` in
-the in-game console (`-debug_mode -develop`) dumps every effect, trigger, scope
-link, modifier and on_action to `<user dir>/logs/`. It has never been run here,
-and Claude cannot run it — the console is an in-game overlay. Ask the user.
+The best reference is the one the game generates itself. `docs/api/1.19.0.6/` is
+a captured `script_docs` dump — 1945 effects, 1954 triggers, 286 scope links,
+1748 on_actions, every modifier key, as *this* binary defines them. Query it with
+`ck3.py api`. It covers the loaded playset too, so "not in the dump" means not in
+the engine and not in any enabled mod. Regenerate after a game patch: the user
+types `script_docs` in the in-game console (Claude cannot — it is an overlay,
+not an OS window), then the logs go into a new `docs/api/<version>/`.

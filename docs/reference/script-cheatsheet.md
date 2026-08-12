@@ -137,9 +137,14 @@ Root's `scope:combat_side` is set for both types. From it:
 | `enemy_side` | the other side |
 | `side_commander` | may not exist — use `?=` |
 | `side_primary_participant` | the ruler whose war it is |
-| `side_strength` | a number, usable in script values |
+| `side_strength` | soldiers still fighting, **divided by 1000** by the engine |
 | `any_/every_/random_side_knight` | the knights |
-| `enemy_side.vastly_outnumbered_combat_side_threshold` | vanilla's own outnumbered threshold — prefer it over hand-rolling `side_strength * 1.5` |
+
+A trigger can only compare one side's strength against the other's. For "are we
+outnumbered by half again", the multiplied figure has to come out of a script
+value — vanilla does exactly this in `00_combat_values.txt`:
+
+    vastly_outnumbered_combat_side_threshold = { value = side_strength multiply = 5 }
 
 An `advantage` term on a **character modifier** on the commander does reach the
 combat roll and renders in the advantage breakdown under its localized name.
@@ -162,7 +167,15 @@ unclaimed ground in that stack.
 
 ## Where to look things up
 
-Use the index instead of grepping 30k files:
+**First: ask the engine.** `docs/api/<version>/` holds the `script_docs` dump —
+every effect, trigger, scope link, modifier and on_action, as this binary defines
+them:
+
+    python tools/ck3.py api side_commander      # what scope does this take/give
+    python tools/ck3.py api add_gold            # does it exist, in what scope
+    python tools/ck3.py api knight --partial
+
+Then the index, instead of grepping 30k files:
 
     python tools/ck3.py find add_courtly_glory       # where is this defined
     python tools/ck3.py find courtly --partial

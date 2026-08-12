@@ -1,0 +1,16 @@
+* text=auto eol=lf
+
+# Paradox script and localization are LF + UTF-8 (loc additionally needs a BOM).
+*.txt text eol=lf
+*.yml text eol=lf
+*.gui text eol=lf
+*.mod text eol=lf
+*.asset text eol=lf
+*.gfx text eol=lf
+
+*.png binary
+*.dds binary
+*.tga binary
+*.mesh binary
+*.ogg binary
+*.wav binary

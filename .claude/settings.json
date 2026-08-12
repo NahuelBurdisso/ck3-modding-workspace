@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python tools/ck3.py:*)",
+      "Bash(python D:/ck3/tools/ck3.py:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git merge-file:*)"
+    ],
+    "deny": [
+      "Read(**/steam_api*.dll)",
+      "Write(D:/SteamLibrary/**)",
+      "Edit(D:/SteamLibrary/**)"
+    ]
+  }
+}

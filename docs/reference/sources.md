@@ -14,6 +14,11 @@ The game documents itself. **Already captured, in `docs/api/1.19.0.6/`.**
 Ask this before writing any effect, trigger or scope link. It is the only source
 that is true for *this* binary.
 
+Caveat worth knowing: it is authoritative about **existence and scope**, but its
+usage strings are hand-written and occasionally incomplete — `add_opinion` omits
+the `opinion = N` parameter that every vanilla call site passes. Existence: trust
+the dump. Exact syntax: confirm against a vanilla call site.
+
 | File | Entries | Contents |
 |---|---:|---|
 | `effects.log` | 1945 | every effect, supported scopes, call syntax |
@@ -38,8 +43,14 @@ so Claude cannot drive it — ask the user.
 
 ## 2. The game's own `.info` files
 
-The install ships **166 `.info` files** describing GUI types, shaders and data
-formats. `ck3.py find` indexes the script; these are the layer under it.
+The install ships **166 `.info` files**, one per `common/` subfolder plus GUI,
+shader and data-format specs. They are the format documentation for the folder
+they sit in, written by the developers, and they answer questions the wiki does
+not. `common/combat_phase_events/_combat_phase_events.info` is nine lines and
+states that `chance` is weighted against all other *valid* events, and that an
+empty `effect` is skipped internally — both load-bearing facts.
+
+**Always read the `_<folder>.info` before writing a new kind of file.**
 
 ## 3. Vanilla script
 

@@ -129,6 +129,20 @@ file. An entry rolls every `COMBAT_EVENT_DAYS = 5` while a battle runs:
 of every combat in the world. One battle produced 41 fires. Gate hard, and do no
 work before the gate.
 
+`chance` is a weight **against every other event that is currently valid**, per
+the engine's `_combat_phase_events.info`. The competition is the `none` event:
+
+| Pool | `none` weight | vanilla's real events |
+|---|---:|---|
+| commander | `commander_none` = 1000 | 5–25 |
+| knight | `knight_none` = 2000 | 30–100 |
+
+So a knight event at `base = 40` is ~2% of a valid roll, and if its `is_valid` is
+also narrow it will never be seen. Check the `none` weight before tuning.
+
+An empty `effect = { }` is skipped internally for performance — which is why the
+`.info` warns never to add effects to a `none` event.
+
 Root's `scope:combat_side` is set for both types. From it:
 
 | Link | Gives |

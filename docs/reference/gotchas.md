@@ -117,6 +117,37 @@ this machine.
 - Lock a probe out with `NOT = { has_character_modifier = ... }` in `is_valid`;
   verified to work even at `base = 100000`.
 
+## Toasts and messages are not a place to put gameplay
+
+- `send_interface_toast` / `send_interface_message` are documented as *"sends a
+  message to the player playing the character in the scope and then executes any
+  effects inside"*. Two consequences that are easy to miss:
+  - **The recipient is the player playing the scoped character.** Raised on an AI
+    courtier, the message reaches nobody. If you want the player to see a thing
+    that happened to their knight, re-scope first — vanilla writes
+    `liege = { send_interface_message = ... }` for exactly this reason.
+  - **Do not rely on effects nested inside them.** Vanilla never does: in
+    `00_knight_phase_events.txt` the `set_variable` / `add_prestige` sit in the
+    effect block and the message carries only icons and a tooltip. State first,
+    presentation second.
+- The failure is silent and asymmetric, which is what makes it expensive. One
+  Battle Chronicles event penalised the *enemy* commander from outside a toast
+  and its own commander from inside one, so the same event was doing two
+  different things depending on who was AI.
+
+## `script_docs` is authoritative about existence, not about parameters
+
+The dump is generated from the engine, so if a key is absent it does not exist.
+But its usage strings are hand-written and sometimes incomplete. `add_opinion`
+documents itself as `{ modifier = X days/months/years = Y target = Z }` and never
+mentions `opinion = N` — yet every vanilla call site passes it, and it is the
+only way a decaying modifier gets a magnitude. **Existence: trust the dump.
+Syntax: confirm against a vanilla call site.**
+
+Similar trap in the dump's own words, worth quoting: `has_trait_rank` notes that
+"not having the trait and having rank 0 counts as the same thing", so
+`rank < X` **is always true for a character without the trait**.
+
 ## Effects that reject what looks obvious
 
 - **`add_gold` refuses a negative value.** `add_gold = -100` logs

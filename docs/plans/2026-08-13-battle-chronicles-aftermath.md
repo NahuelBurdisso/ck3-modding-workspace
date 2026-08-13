@@ -18,9 +18,9 @@ CK3 script has no unit test framework, so the TDD loop is replaced by a two-laye
 
 1. **Static, per task:** `python tools/ck3.py validate battle_chronicles` — must report `0 errors, 0 warnings` after every task. This is the "run the test" step.
 
-   **Know what it does not catch.** It checks brace balance, the UTF-8 BOM, malformed localization lines, duplicate top-level definitions and stray root directories. It does **not** resolve references. `validate.py:37` limits its loc cross-check to `LOC_EXPECTED = {common/traits, common/decisions, common/character_interactions}`, and even that is gated behind `--strict`. None of the categories this plan touches is in that set, so a typo in any of the 18 new localization keys passes every task silently and surfaces as a raw key name in game. Every task that adds a `desc = `, `title = ` or `type = ` reference therefore carries an explicit `ck3.py loc` check for each key it added.
+   **Know what it does not catch.** It checks brace balance, the UTF-8 BOM, malformed localization lines, duplicate top-level definitions and stray root directories. It does **not** resolve references. `tools/ck3lib/validate.py:37` limits its loc cross-check to `LOC_EXPECTED = {common/traits, common/decisions, common/character_interactions}`, and even that is gated behind `--strict`. None of the categories this plan touches is in that set, so a typo in any of the 18 new localization keys passes every task silently and surfaces as a raw key name in game. Every task that adds a `desc = `, `title = ` or `type = ` reference therefore carries an explicit `ck3.py loc` check for each key it added.
 
-   **Those checks must reindex first.** `ck3.py loc` reads the sqlite index at `index/ck3.sqlite3` (`index.py:193-198, 231-242`), not the files on disk, and the index is only rebuilt by `ck3.py index`. Without a reindex every newly added key reports as missing and the check is noise. Each loop below therefore opens with `python tools/ck3.py index -q`. The same applies to `ck3.py conflicts` in Task 9 and is why Task 11 uses `grep` rather than `ck3.py find`.
+   **Those checks must reindex first.** `ck3.py loc` reads the sqlite index at `index/ck3.sqlite3` (`tools/ck3lib/index.py:193-198, 231-242`), not the files on disk, and the index is only rebuilt by `ck3.py index`. Without a reindex every newly added key reports as missing and the check is noise. Each loop below therefore opens with `python tools/ck3.py index -q`. `ck3.py conflicts` reads the same index (`tools/ck3lib/index.py:245+`), so Task 9 reindexes before it too — otherwise it reports the file set as it stood *before* this plan's tasks ran, which is precisely the set with no collisions. It is also why Task 11 uses `grep` rather than `ck3.py find`.
 2. **Dynamic, once at the end:** a single game run (Task 10). A restart costs about seven minutes, so the run is instrumented up front to answer every open question in one pass. `debug_log` markers are counted with `python tools/ck3.py probe 'BC:'`.
 
 Tasks 1–9 build and land the feature. Task 10 runs it. Task 11 sets the real thresholds from what Task 10 measured and strips the instrumentation.
@@ -84,7 +84,7 @@ Insert into `bc_l_english.yml` immediately after the `setting_bc_swing_dramatic_
  setting_bc_aftermath_off:0 "Off"
  setting_bc_aftermath_off_desc:0 "Battles leave nothing behind. The mod behaves as it did before this was added, and AGOT's own nickname system is left entirely alone."
  setting_bc_aftermath_default:0 "Default"
- setting_bc_aftermath_default_desc:0 "A battle must be large, or large and something else besides. Most fields are not."
+ setting_bc_aftermath_default_desc:0 "A battle must stand out in at least two ways — its size, its cost, the odds against, or how completely it was decided. Most fields do not."
  setting_bc_aftermath_generous:0 "Generous"
  setting_bc_aftermath_generous_desc:0 "One reason is enough. Notable fields and the names won on them become common."
 ```
@@ -854,7 +854,8 @@ bc_chronicles.0092 = {
 					limit = {
 						# Knights die in the combat that just ended. Vanilla
 						# guards its own post-battle knight handling the same
-						# way (combat_events.txt:854, :1028).
+						# way (AGOT combat_events.txt:854, :1028; the
+						# vanilla equivalents are :813 and :877).
 						is_alive = yes
 						# We never give a commander a battle memory - vanilla
 						# already gives the loser's commander one, every time,
@@ -862,6 +863,8 @@ bc_chronicles.0092 = {
 						# every_side_knight includes him; this costs nothing if
 						# it does not.
 						#
+						# NOTE, deviation from the spec: the spec writes this
+						# as a bare `NOT = { this = root.side_commander }`.
 						# trigger_if, not a bare NOT: a side can be leaderless,
 						# which is why side_commander and combat.location are
 						# reached with ?= everywhere else in this event. A bare
@@ -1100,13 +1103,12 @@ bc_chronicles.0091 = {
 					# two.
 					bc_notable_battle_counter_effect = yes
 
-					# `exists` is belt and braces: the counter effect above
-					# already guarantees the variable, but a var: comparison
-					# against one that was never set does not evaluate to false
-					# safely, and this documents that the order matters. It is
-					# safe HERE because calc_true_if is not involved - the two
-					# lines are siblings in a limit, which is an AND, and the
-					# exists comes first. Do not copy this shape into an OR.
+					# `exists` is belt and braces. What actually makes the
+					# var: read below safe is bc_notable_battle_counter_effect
+					# immediately above, which always writes the variable
+					# before anything reads it. Do not rely on evaluation
+					# order to make it safe - CK3 guarantees no order of
+					# evaluation among siblings, in a limit or anywhere else.
 					if = {
 						limit = {
 							has_any_nickname = no
@@ -1136,9 +1138,9 @@ bc_chronicles.0091 = {
 					}
 					else_if = {
 						# No `exists` guard needed and none wanted:
-						# bc_notable_battle_counter_effect ran three lines
-						# above and guarantees the variable. An
-						# `OR = { NOT = { exists } ... }` here would be the
+						# bc_notable_battle_counter_effect ran unconditionally
+						# before this whole chain and guarantees the variable.
+						# An `OR = { NOT = { exists } ... }` here would be the
 						# unsafe read the comment above warns about, since CK3
 						# does not guarantee OR short-circuits.
 						limit = { var:bc_notable_battles < 3 }
@@ -1231,8 +1233,10 @@ discarded by alphabetical filename order regardless of load order."
 
 - [ ] **Step 1: Confirm no file collisions**
 
-Run: `python tools/ck3.py conflicts`
+Run: `python tools/ck3.py index -q && python tools/ck3.py conflicts`
 Expected: no line naming `battle_chronicles`. Every path this plan touched was already mod-owned, so this should be unchanged from before the work started — it is a regression check, not a discovery.
+
+**The reindex is what makes it a check.** `conflicts` reads `index/ck3.sqlite3`, not the files on disk. Against a stale index it reports the file set as it stood before Task 1, which by construction has no collisions — it would pass no matter what these tasks did.
 
 - [ ] **Step 2: Deploy**
 
@@ -1242,7 +1246,7 @@ Expected: confirmation that the `.mod` pointer was written.
 - [ ] **Step 3: Confirm the mod is in the playset**
 
 Run: `python tools/ck3.py playset list`
-Expected: `battle_chronicles` present, loading after AGOT and after Battlefield Duel+. If absent, `python tools/ck3.py playset add battle_chronicles` — **ask the user before changing the playset.**
+Expected: `battle_chronicles` present, loading after AGOT. If absent, `python tools/ck3.py playset add battle_chronicles` — **ask the user before changing the playset.**
 
 - [ ] **Step 4: Final static check**
 
@@ -1315,11 +1319,13 @@ Failure signatures to watch for:
 
 - [ ] **Step 4: Read the error log**
 
-Run: `python tools/ck3.py errors --tail 400`
+Run: `python tools/ck3.py probe 'battle_chronicles|bc_chronicles|bc_aftermath|bc_battle|bc_notable'`
 
-**Read only the `=== error.log ===` section.** `errors` tails every `*.log`, and `debug.log` and `game.log` are where this mod's own `debug_log` markers land — their tails will be almost entirely lines naming `bc_events.txt` and `bc_chronicles.0091`. That is the instrumentation working, not a problem.
+**Use `probe`, not `errors`, for this.** Script errors from a mod are logged when the file loads or when the event first fires — near the **top** of `error.log`, not the end. `errors` cannot reach them: `collect_errors` is `lines[-tail:]` (`tools/ck3lib/launch.py:96-103`), a tail slice with no head option, and `error.log` on an AGOT-stack run is hundreds of thousands of lines. `probe` reads each log end to end (`tools/ck3lib/launch.py:85-92`) and groups its output by file, so the `=== error.log ===` block is the whole answer.
 
-Expected, in `error.log` only: no line naming a `bc_` key, a `bc_chronicles` event or a `battle_chronicles` file. Script errors from a mod are logged when the file loads or the event first fires, so look at the **top** of that section as well as the tail — this only works because Step 1 cleared the logs, which is one more reason it is not optional.
+Expected: **no `=== error.log ===` block at all.** If nothing anywhere matches, `probe` prints `no lines matching ...` and exits 1 — here that non-zero exit is the pass condition, not a failure. Ignore the `=== debug.log ===` and `=== game.log ===` blocks; those are this mod's own `debug_log` markers, which is the instrumentation working.
+
+This only reads cleanly because Step 1 cleared the logs — one more reason that is not optional. Then, as a second pass on anything the pattern missed, run `python tools/ck3.py errors --tail 400` and read only the `=== error.log (N line(s)) ===` block for unattributed script errors at the end of the run.
 
 `probe` only counts markers that fired. Every failure class in this feature that is *not* a missing marker lands here instead: an invalid `left_icon`, a comparison against a missing scope on a leaderless side, an unresolvable `var:` read, a mistyped memory type or localization key. This is the cheapest step in the run and the one that catches what the markers cannot.
 
@@ -1412,7 +1418,11 @@ Expected: no output. `PLACEHOLDER` is in the pattern because Step 1 is also told
 
 - [ ] **Step 5: Update the README**
 
-Record the final thresholds and the reasoning, in the style of the existing "Changes made after that run" section. Move the memory-in-an-iterator question out of "Not yet verified in game" and into the resolved list, with what the two-knight check showed.
+Record the final thresholds and the reasoning, in the style of the existing "Changes made after that run" section. Three specific edits:
+
+1. Add a run write-up for this run with its own `**Resolved:**` bullet, in the style of the existing "First live run (2026-08-12)" block, recording what the two-knight check showed about a memory written inside `every_side_knight`. There is no standing "memory-in-an-iterator" bullet to move — the question lived in the spec, not the README.
+2. Strike the `bc_shieldbrother_memory` bullet from "Not yet verified in game" (`README.md:110-118`) if Step 5 of the run answered it, along with whichever of the other two bullets that run settled.
+3. Fix `README.md:18`, which names a mod — "Battlefield Duel+" — that is not in the playset. `ck3.py playset list` is the authority for what to replace it with.
 
 - [ ] **Step 6: Deploy and commit**
 

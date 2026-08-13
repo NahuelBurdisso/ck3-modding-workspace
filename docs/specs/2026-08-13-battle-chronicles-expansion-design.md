@@ -120,25 +120,57 @@ Momentum must stay a modifier — it is what the engine reads for combat advanta
 Scratch and ledger must be variables: the mod's own `bc_cleanup_effect` strips every
 modifier at combat end, so anything modifier-shaped cannot persist by construction.
 
-### Scratch variables — five
+### Scratch variables — six
 
 | variable | written | read |
 |---|---|---|
 | `bc_battle_moments` | seam, every call | pacing floor, escalation ladder |
-| `bc_battle_style` | seam, when the moment's tier ≥ the stored high-water tier | B, at combat end |
-| `bc_battle_size` | `bc_battle_open_effect` | verb-family gate, chronicle-flag duration |
+| `bc_battle_tier` | seam, when the moment's effective tier ≥ the stored value | the seam, to decide whether to overwrite `bc_battle_style` |
+| `bc_battle_style` | seam, alongside `bc_battle_tier` | B, at combat end |
+| `bc_battle_size` | `bc_battle_open_effect` | verb-family gate, chronicle-flag duration, wound gate |
 | `bc_battle_wounded` | `bc_wound_effect` | wound gate — one per character per battle |
 | `bc_battle_foe` | `bc_battle_open_effect` | C, at combat end |
 
-**Clearing means `remove_variable`, not `set_variable value = 0`.** Three of the five
+**Clearing means `remove_variable`, not `set_variable value = 0`.** Three of the six
 cannot hold zero — `bc_battle_style` is a flag, `bc_battle_foe` is a character,
 `bc_battle_wounded` is a presence test — and the distinction is load-bearing for the
-other two: it is how `bc_battle_open_effect` detects the first phase event of a battle,
-and it is which arm of the pacing floor's `OR` fires.
+rest: it is how `bc_battle_open_effect` detects the first phase event of a battle, how
+the seam detects the first moment, and which arm of the pacing floor's `OR` fires.
+
+**The two writes `bc_battle_open_effect` makes**, stated so an implementer does not
+have to choose:
+
+```
+bc_battle_size = scope:combat_side.combat.num_total_troops
+bc_battle_foe  = scope:combat_side.enemy_side.side_commander    # via ?=
+```
+
+`num_total_troops`, deliberately the same quantity the notability trigger's size rows
+use (`bc_scripted_triggers.txt:153-154`), so the two ladders are directly comparable
+and the 2026-08-13 calibration data applies to both. **Not `side_strength`** — the
+mod's own warning at `bc_script_values.txt:15-16` records that the engine scales
+`side_strength` down by a factor of 1000, so an implementer reaching for it would
+produce a mod in which every battle is "under 2,000" and no size gate ever passes.
+
+`?=` on the foe because a side can be leaderless; the variable is then simply left
+unset and C never arms for that battle, which is correct.
 
 `bc_battle_style` holds the KIND of the **highest-tier** moment of the battle, ties
 broken by the **last** such moment. Not last-wins: a decisive stand on day five should
 name the battle even if a minor scuffle followed it. Stored as `flag:<kind>`.
+
+That rule needs a high-water mark, which is what `bc_battle_tier` is for — an integer
+1/2/3 holding the **effective** tier (post-ceiling) of the best moment so far. It
+cannot be derived from `bc_battle_moments`, because a call site may request `minor` at
+any rung of the ladder. The seam's write is:
+
+```
+if = { effective tier >= bc_battle_tier (or bc_battle_tier unset)
+       set bc_battle_tier = effective tier
+       set bc_battle_style = flag:KIND }
+```
+
+`>=` rather than `>` is what makes ties break to the last moment.
 
 `bc_battle_size` exists because the size gates are otherwise unevaluable from a pop-up
 option, per the invariant above. Written once by `bc_battle_open_effect` in a phase
@@ -167,12 +199,12 @@ Never cleared. On side commanders only.
 | `bc_nemesis` | C, on a notable loss | C escalation, phase-event gates |
 | `bc_nemesis_losses` | C | C escalation |
 
-Ten variables total per commander, every one with a named reader. An earlier draft
-carried fifteen; `bc_battles_led`, `bc_times_routed`, `bc_last_outcome`,
-`bc_battle_worst_tier`, `bc_battle_best_tier` and `bc_battle_held` were all defined
-and never read by anything, and were cut under the "spine first, then grow" decision.
-`bc_battle_worst_tier` in particular was redundant: the wound gate is evaluated at
-write time inside the seam, where the tier is a parameter.
+Eleven variables total per commander — six scratch, five ledger — every one with a
+named reader. An earlier draft carried fifteen; `bc_battles_led`, `bc_times_routed`,
+`bc_last_outcome`, `bc_battle_worst_tier` and `bc_battle_held` were defined and never
+read by anything, and were cut under the "spine first, then grow" decision.
+`bc_battle_worst_tier` in particular is redundant: the wound gate is evaluated at write
+time inside the seam, where the tier and the swing are both parameters.
 
 ### KIND enumeration
 
@@ -228,13 +260,19 @@ turned aftermath off would get `advantage ±10` modifiers bleeding twenty days i
 next battle. That is precisely the bug `bc_scripted_effects.txt:98-99` exists to
 prevent, reintroduced silently and only for the players who touched a setting.
 
-The game rule therefore moves to an inner `if` wrapping the grading branch only:
+The game rule therefore moves to an inner `if` wrapping the grading branch only. **The
+body order is load-bearing and is part of the design, not an implementation detail:**
 
-| outside the gate — always runs | inside the gate |
-|---|---|
-| `bc_cleanup_effect` on commander and knights | the notability grade |
-| scratch clearing on the commander | knight battle memories |
-| — | B, C and the nickname |
+1. `bc_cleanup_effect` on the commander and on every knight — **outside** the gate.
+2. The grading branch — **inside** `if = { limit = { NOT = { has_game_rule = bc_aftermath_off } } }`:
+   the notability grade, knight battle memories, B, C, the nickname.
+3. Scratch clearing on the commander — **outside** the gate, and **last**.
+
+Step 3 must come after step 2 because B reads `bc_battle_style` and C reads
+`bc_battle_foe`, and both are scratch. CK3 executes sibling effects in written order,
+so clearing first would leave B and C reading variables that had just been removed —
+they would silently never fire, and each would emit a missing-variable error-log line
+on every combat end. The natural way to write the two-column split is exactly wrong.
 
 The consolidation itself is behaviour-neutral when done correctly, so it belongs in
 stage 0 alongside the other structural work — and stage 1 depends on it, because
@@ -255,25 +293,93 @@ through the swing wrappers. Unchanged.
 ### Family 2 — character
 
 New character modifiers giving a battle a *shape*, not just a direction. All 20-day
-like momentum, all stripped at combat end.
+like momentum, all stripped at combat end. They live in their own
+`common/modifiers/bc_battle_modifiers.txt`, not alongside family 1:
+`bc_momentum_modifiers.txt`'s header is a tuning document for a single `advantage`
+ladder, and these four are not on that ladder.
 
-| modifier | effect keys | narrative |
+| modifier | keys and values | narrative |
 |---|---|---|
-| `bc_bloodied` | `army_damage_mult` up, `army_toughness_mult` down | traded blood for ground |
-| `bc_shieldwall` | `army_toughness_mult` up, `army_damage_mult` down | dug in and refused to move |
-| `bc_spent_horse` | `knight_effectiveness_mult` down | the knights are blown |
-| `bc_pursuit` | `army_pursuit_mult` up | the enemy is running and we are on them |
+| `bc_bloodied` | `army_damage_mult = 0.15`, `army_toughness_mult = -0.10` | traded blood for ground |
+| `bc_shieldwall` | `army_toughness_mult = 0.15`, `army_damage_mult = -0.10` | dug in and refused to move |
+| `bc_spent_horse` | `knight_effectiveness_mult = -0.20` | the knights are blown |
+| `bc_pursuit` | `army_pursuit_mult = 0.25` | the enemy is running and we are on them |
 
-`knight_effectiveness_mult` is confirmed valid on a character modifier —
-`00_martial_lifestyle_modifiers.txt:251`,
-`warfare_stablemaster_tamed_wild_horse_modifier`.
+Magnitudes are sized against shipped precedent, not invented: `army_damage_mult` and
+`army_toughness_mult` appear across the playset from 0.05 to 0.25
+(`03_dlc_fp2_modifiers.txt:904` at 0.15, `06_ce1_modifiers.txt:1097` at 0.25,
+`01_dlc_fp3_modifiers.txt:560` at −0.10), and `knight_effectiveness_mult = 0.2` is a
+full lifestyle-perk payout (`00_martial_lifestyle_modifiers.txt:251`,
+`warfare_stablemaster_tamed_wild_horse_modifier`) — which also confirms the key is
+valid on a *character* modifier. A 20-day battle modifier sitting at the same scale as
+a permanent perk is deliberate: it lasts one battle.
+
+### How family 2 is applied
+
+**By the seam, from `(KIND, SWING)`. No call site names a family-2 modifier.** The
+seam already holds both parameters, so this costs zero extra wiring and cannot drift
+out of sync with the KIND table:
+
+| KIND | SWING | modifier |
+|---|---|---|
+| `bloodied` | either | `bc_bloodied` |
+| `entrenched` | either | `bc_shieldwall` |
+| `wild` | either | `bc_spent_horse` |
+| `ordered` | `up` | `bc_pursuit` |
+| `ordered` | `down` | none |
+| `adapted` | either | none |
+| `measured` | either | none |
+
+Which resolves against the KIND table to: `bc_bloodied` from `bc_horse_killed_under_him`,
+`bc_van_breaks_through` and `bc_chronicles.0003` opt a; `bc_shieldwall` from
+`bc_chronicles.0001` opt a, `bc_chronicles.0002` opt c and `bc_knight_holds_the_breach`;
+`bc_spent_horse` from `bc_banner_falls`, `bc_chronicles.0001` opt c,
+`bc_flank_collapses` and `bc_knight_shames_himself`; `bc_pursuit` from
+`bc_rally_the_line`, `bc_chronicles.0002` opt a and `bc_shieldbrother_forged`.
+
+`bloodied`/`entrenched`/`wild` ignore SWING because the *shape* is the same either way
+— a slugging match is a slugging match whether it is going well or badly, and the
+direction is already carried by family 1's advantage modifier applied in the same
+call. Doubling the polarity into family 2 would double-count it.
+
+Three KINDs deliberately grant nothing. `ordered` down never occurs (all three
+`ordered` rows in the KIND table are `up`) and is listed only so the ladder is total.
+`adapted` is terrain, which is family 1 plus Section 3's terrain traits. `measured` is
+the commander who *neither* slugs nor digs in — the absence of a shape is the point,
+and a fourth modifier meaning "nothing in particular happened" would be noise on the
+army breakdown.
+
+**Applied through a wrapper**, `bc_add_verb_effect = { MODIFIER = $MODIFIER$ }`,
+mirroring `bc_add_momentum_effect` (`bc_scripted_effects.txt:12-17`) so duration lives
+in one place. Re-application follows whatever family 1 already does — the seam applies
+unconditionally, exactly as the momentum wrappers do today. This design introduces no
+new stacking rule.
+
+**`bc_cleanup_effect` gains four remove branches.** It already performs six flat
+guarded removals — three of its own (`bc_scripted_effects.txt:103-114`) plus the three
+inside `bc_clear_faltering_effect` (`:77-90`). Ten is past the point where a
+copy-paste ladder is maintainable, which is the reason the stage-0 hygiene item
+flattens it.
+
+**The four new removals go in `bc_cleanup_effect` only, never in
+`bc_clear_faltering_effect`.** That effect is also called *mid-battle* by
+`bc_rally_effect` (`:92-95`), and a rally is supposed to clear a setback, not erase
+the shape of the battle so far. The two are easy to conflate once cleanup is
+flattened, and conflating them would make every rally silently strip family 2.
+
+### Rendering
 
 These need loc — four names plus four descriptions — but they do **not** appear where
 the momentum ladder does. `bc_momentum_modifiers.txt:5-8` records that a character
 **`advantage`** modifier moves the battle breakdown and is listed next to
 `Commander Martial Skill`; none of the four keys above is `advantage`, so they surface
-in the army-stat breakdown instead. Same loc obligation, different tooltip. Confirm
-where each actually renders during stage 2 rather than assuming.
+in the army-stat breakdown instead. Same loc obligation, different tooltip.
+
+`army_pursuit_mult` is engine-valid (`modifiers.log:1598`) but has **zero uses in any
+modifier across vanilla or AGOT**, so nothing in the playset proves how it renders or
+whether it does anything on a character modifier. Stage 2 must confirm all four
+in-game before family 2 is called done; `bc_pursuit` is the one that might have to be
+dropped.
 
 ### Family 3 — flesh
 
@@ -375,6 +481,26 @@ trait and reset the streak to 0.
 The two reset values differ on purpose: a mismatch means the battle just fought *is*
 the first of a new streak, so 1. An award means the streak has been spent, so 0.
 
+**All three reads are guarded.** The whole block is wrapped in
+`if = { limit = { exists = var:bc_battle_style } ... }` — a notable battle in which no
+moment ever fired has no style, and B must do nothing rather than log a missing
+variable on every such combat end. Inside it, the mismatch branch is
+`OR = { NOT = { exists = var:bc_style_last }  NOT = { var:bc_style_last = var:bc_battle_style } }`,
+which folds the first-ever-battle case into the mismatch case where it belongs — a
+commander with no history is a commander starting a streak.
+
+`bc_style_streak` uses the create-or-increment shape from
+`bc_notable_battle_counter_effect` (`bc_scripted_effects.txt:197-211`), not bare
+`change_variable`, for the reason that effect's own comment gives: `change_variable`
+on a variable that was never set is not safe. In practice the mismatch branch always
+writes 1 before any increment can happen, but relying on that is relying on control
+flow to keep a variable alive, and the mod has a standing rule against it.
+
+`bc_style_last` is a `flag:<kind>` like `bc_battle_style`, compared with
+`var:bc_style_last = var:bc_battle_style`. Flag equality, not string equality — this
+is the same value shape the seam writes, deliberately, so no conversion happens
+anywhere.
+
 | style | trait |
 |---|---|
 | `bloodied` | `aggressive_attacker` |
@@ -437,10 +563,34 @@ none of them is a thing a battle can teach you.
 - A battle may award **either** a nickname **or** a trait, never both. **The trait
   wins.** A nickname is decoration; a trait changes how the man fights. Evaluate the
   trait branch first and set a temporary flag that suppresses the nickname branch.
-- Every award toast goes through a shared `bc_addressed_toast_effect`, extracted from
-  `bc_aftermath_nickname_toast_effect`. `send_interface_toast` bodies do not reliably
-  run for an AI character, so every award must route to the liege when the subject is
-  AI, and that rule belongs in one effect rather than in five copies.
+- Every award toast goes through a shared `bc_addressed_toast_effect`.
+  `send_interface_toast` bodies do not reliably run for an AI character, so every award
+  must route to the liege when the subject is AI, and that rule belongs in one effect
+  rather than in five copies.
+
+  **What is extracted is the routing, not the toast.** The routing lives in
+  `bc_aftermath_nickname_effect` (`bc_scripted_effects.txt:288-297`) — the
+  `is_ai = no` / `else_if exists = liege` fork. `bc_aftermath_nickname_toast_effect`
+  (`:302-309`) is only the toast body it calls twice, and it is not reusable as-is
+  because its `left_icon` is hardcoded to `scope:bc_named_commander`.
+
+  Signature:
+
+  ```
+  bc_addressed_toast_effect = { TITLE = <key>  DESC = <key>  SUBJECT = <scope> }
+  ```
+
+  Called **on the subject**. It tests `is_ai` on THIS, and raises the toast on THIS or
+  on `liege`; `left_icon = $SUBJECT$` in both arms, so the toast always names the man
+  who earned the thing regardless of who is being told. `$SUBJECT$` is passed as a
+  saved scope rather than read from THIS because a scripted effect does not rebind
+  ROOT and the liege arm has already changed scope by the time `left_icon` is written.
+
+  `bc_aftermath_nickname_effect` is then rewritten to call it, and
+  `bc_aftermath_nickname_toast_effect` is deleted. That is a behaviour-neutral
+  refactor of shipped, working code, so it belongs in stage 0 — but it must happen
+  **after** the force-execution named under Carried-over hygiene, since that path has
+  never run at runtime and refactoring an unverified path hides which change broke it.
 
 ### Risk
 
@@ -454,17 +604,79 @@ be measured before B ships. See the DIAG pass, Q1.
 
 ### Escalation
 
-Read `bc_battle_foe` at combat end. On a **notable loss** to him, increment
-`bc_nemesis_losses` and set the relation for the new level:
+Read `bc_battle_foe` at combat end. On a **notable loss** to him: if `bc_nemesis` is
+unset, set it to him (create-or-increment shape, `bc_nemesis_losses = 1`); if it is
+already him, increment. Then set the relation for the new level.
+
+**Thresholds, not exact values.** The `scope:wipe` rule in Section 5 increments by 2,
+so the counter skips values, and an exact-match table would leave 4 with no row:
 
 | `bc_nemesis_losses` | relation |
 |---|---|
-| 1 | `grudge` |
-| 2 | `rival` |
-| 3 | `nemesis` |
+| `>= 3` | `nemesis` |
+| `2` | `rival` |
+| `1` | `grudge` |
 
-On a **notable win** against the current `bc_nemesis`, decrement. At 0, clear
-`bc_nemesis` and `bc_nemesis_losses`, and remove the relation.
+Written as an `if` / `else_if` / `else` ladder in descending order, so the first arm
+that matches wins and there is no unreachable value above the top rung.
+
+On a **notable win** against the current `bc_nemesis`, decrement — **clamped at 0**:
+
+```
+if = {
+	limit = { var:bc_nemesis_losses <= 2 }   # 1 or 2, and a wipe win subtracts 2
+	set_variable = { name = bc_nemesis_losses value = 0 }
+}
+else = {
+	change_variable = { name = bc_nemesis_losses subtract = 1 }   # or 2 on a wipe
+}
+```
+
+Without the clamp a wipe win against a 1-loss foe produces **−1**, and a literal
+`= 0` test never fires again — the rivalry slot jams permanently on a negative
+counter. The clear condition is therefore written `<= 0`, belt and braces, even with
+the clamp in place.
+
+At `<= 0`: remove the relation, then `remove_variable` both `bc_nemesis` and
+`bc_nemesis_losses`.
+
+**Removal order matters.** Test what is held and remove exactly one, testing
+`has_relation_rival` **last**:
+
+```
+if = {
+	limit = { has_relation_nemesis = var:bc_nemesis }
+	remove_relation_nemesis = var:bc_nemesis
+}
+else_if = {
+	limit = { has_relation_rival = var:bc_nemesis }
+	remove_relation_rival = var:bc_nemesis
+}
+else_if = {
+	limit = { has_relation_grudge = var:bc_nemesis }
+	remove_relation_grudge = var:bc_nemesis
+}
+remove_variable = bc_nemesis
+remove_variable = bc_nemesis_losses
+```
+
+`has_relation_* = var:<name>` is shipped — AGOT `bp1_yearly_james.txt:1160-1161`
+tests `has_relation_nemesis` then `has_relation_rival` against `var:my_doppelganger`,
+in that order, for this same aliasing reason. No scope save is needed, but the two
+`remove_variable` lines must come **after** the ladder: CK3 runs siblings in written
+order, and the ladder reads the variable it is about to delete.
+
+`nemesis` carries `relation_aliases = { rival }` (`00_scripted_relations.txt:81`), so
+`has_relation_rival` is **true for a nemesis**. Testing rival first would fire
+`remove_relation_rival` on a man whose actual relation is `nemesis`, leaving the
+nemesis relation in place with its variables gone — unremovable, because the counter
+that would find him again has just been deleted.
+
+Exactly one of the three is ever held, and the engine guarantees it rather than the
+mod: `rival`'s `opposites` list contains `grudge` (`:56`), and `nemesis`'s contains
+both `rival` and `grudge` (`:72-73`). Setting a higher rung removes the lower one
+automatically. This is also why escalation needs no explicit teardown step — it is
+purely `set_relation_*` at the new level.
 
 `grudge` is one-directional — `00_scripted_relations.txt:43` (vanilla; AGOT ships
 `00_agot_scripted_relations.txt` alongside rather than overriding) has no
@@ -521,9 +733,47 @@ one thing:
 Root is the Combat, so the commanders are reached via `combat_attacker.side_commander`
 and `combat_defender.side_commander` (`event_targets.log:1054`, `:1060`).
 
+**Four gates, in this order:**
+
+1. `is_ai = no`. This is not a polish gate, it is the difference between a mod and a
+   crash: `on_combat_start` fires for **every combat in the world**, and without it
+   the hook raises a `character_event` on every AI commander of every skirmish on the
+   map. The mod's existing pop-ups are gated the same way, for the same reason
+   (`bc_events.txt:5-6`).
+2. `num_total_troops >= 5000` — written bare, because Root **is** the Combat here and
+   `num_total_troops` is a combat-scope trigger (`bc_scripted_triggers.txt:153-154`
+   reaches it as `combat = { num_total_troops >= ... }` from a combat *side*). This is
+   the one place in the mod where a size gate needs no variable, because the combat
+   scope is genuinely in hand. Deliberately half the notability floor of 10,000: a
+   battle can be worth an eve without turning out to be worth remembering, and the eve
+   has to decide before anyone knows which it is.
+3. `NOT = { has_character_flag = bc_eve_cooldown }`.
+4. `NOT = { has_game_rule = bc_aftermath_off }`.
+
 The eve pop-up gets its **own 90-day `bc_eve_cooldown` flag**. Sharing the existing
 60-day `bc_popup_cooldown` would starve the mid-battle chronicles: the eve fires
 first, every time, and would consume the budget before the battle began.
+
+**What it does.** A single choice, made before the first blood, that the battle then
+has to live with — the only moment in the mod where the player commits *ahead* of
+knowing anything. Three options, each an opening posture, each applying a family-2
+modifier directly (this is the one call site that names a family-2 modifier, because
+there is no moment and therefore no seam call):
+
+| option | applies | cost |
+|---|---|---|
+| press them at first light | `bc_bloodied` | `add_stress = 10` |
+| hold the ground and let them come | `bc_shieldwall` | none |
+| wait and see how they form up | none | `add_prestige = -25` |
+
+The third option is the honest out and is deliberately not free — declining to commit
+is a choice, and a commander who never commits should not be indistinguishable from
+one who does. No option applies momentum: the battle has not started, and the eve is
+about shape, not advantage.
+
+If `bc_nemesis` is set and resolves to this battle's opposing commander, the
+description changes. That is the read-back Section 4 promises, and the eve is the
+cheapest place in the mod to deliver it — a single `desc` branch, no new event.
 
 **Scratch clearing does not live here.** An earlier draft put it on `on_combat_start`,
 which made all of sub-project C depend on a hook whose scope resolution is unverified
@@ -551,11 +801,19 @@ It becomes the top tier of three things. Each needs a stated mechanism, because
 2. **Reputation.** The streak increments by **2** instead of 1 on a wipe, so two
    wipes fought the same way earn the trait. Nothing else about B changes.
 3. **Rivalry.** `bc_nemesis_losses` increments by **2** instead of 1, and the
-   relation is then set from the resulting value using Section 4's table unchanged —
+   relation is then set from the resulting value using Section 4's ladder unchanged —
    so a wipe takes a stranger straight to `rival`, and a second wipe to `nemesis`.
-   This is the whole of the interaction: Section 4's table remains the single source
+   This is the whole of the interaction: Section 4's ladder remains the single source
    of truth for value→relation, and "escalate only, never downgrade" is untouched.
-   A wipe **win** likewise decrements by 2.
+   A wipe **win** likewise decrements by 2, subject to the same clamp.
+
+   This rule is the *reason* Section 4's ladder is written as thresholds and its
+   decrement is clamped. A by-2 step makes the counter skip values — a stranger who
+   loses two wipes sits at 4, which an exact-match table has no row for — and makes
+   it overshoot zero downward from an odd value. Neither problem exists without the
+   wipe rule, and neither is visible from inside Section 4. If the wipe rule is ever
+   cut, the thresholds and the clamp are still correct; they just stop being
+   load-bearing.
 
 **Read it as `AND = { exists = scope:wipe  scope:wipe = yes }`.** Shipped script uses
 both idioms — `exists = scope:wipe` at `combat_on_actions.txt:100`, `scope:wipe = yes`
@@ -716,9 +974,9 @@ the DIAG pass, Q3.
 | `common/modifiers/bc_battle_modifiers.txt` | new | the four family-2 modifiers |
 | `common/game_rules/bc_game_rules.txt` | modify | `bc_wounds`, `bc_rivalry` |
 | `common/on_action/bc_on_actions.txt` | modify | add `on_combat_start`; end hooks now one event each |
-| `common/combat_phase_events/bc_commander_phase_events.txt` | modify | seam calls, size gates, nemesis gates |
-| `common/combat_phase_events/bc_knight_phase_events.txt` | modify | seam calls routed through `side_commander` |
-| `events/bc_events.txt` | modify | player pop-ups only; seam calls in options |
+| `common/combat_phase_events/bc_commander_phase_events.txt` | modify | `bc_battle_open_effect` at the top of every `effect` block; swap `bc_chronicle_ready_trigger` → `bc_chronicle_ready_commander_trigger` and `bc_mark_chronicle_effect` → `bc_mark_chronicle_commander_effect`; seam calls; size gates; nemesis gates |
+| `common/combat_phase_events/bc_knight_phase_events.txt` | modify | `bc_battle_open_effect` at the top of every `effect` block, inside `side_commander ?=`; seam calls routed through `side_commander`. Trigger and mark effect stay the **existing** shared ones — see Section 6 |
+| `events/bc_events.txt` | modify | player pop-ups only; seam calls in options. No `bc_battle_open_effect` — the raising phase event has already run it, which is the whole reason it exists |
 | `events/bc_aftermath_events.txt` | new | the consolidated combat-end graders |
 | `events/bc_eve_events.txt` | new | `on_combat_start` and the eve pop-up |
 | `localization/english/bc_l_english.yml` | modify | see below |
@@ -735,10 +993,16 @@ not cosmetic.
 | 4 family-2 modifiers | 8 (name + desc each), rendered in the combat breakdown |
 | 6 style-trait award toasts | 12 |
 | 5 terrain-trait award toasts | 10 |
-| eve pop-up | title, desc, 2–3 options |
+| eve pop-up | 5 (title, desc, 3 options) + 1 alternate `desc` for the nemesis branch |
 | aggregate dead-knight toast | 2 |
-| game rule `bc_wounds` | 8 (rule name/desc + 2 options × name/desc/tooltip) |
-| game rule `bc_rivalry` | 14 (4 options) |
+| game rule `bc_wounds` | 6 |
+| game rule `bc_rivalry` | 10 |
+
+Game-rule counts are `rule_X` + `rule_X_desc` + two keys per option
+(`setting_Y` + `setting_Y_desc`) — the shape the mod already uses
+(`bc_l_english.yml:35-42` for `bc_swing`). There is **no** per-option tooltip key, so
+the arithmetic is 2 + 2n: six for `bc_wounds`'s two options, ten for `bc_rivalry`'s
+four.
 
 UTF-8 with BOM, one leading space per line. Every stage that adds a player-facing
 string adds its loc in the same stage — never deferred.
@@ -838,7 +1102,7 @@ ships in stage 1 carrying nothing but the logging event.
 
 | stage | ships | gated on |
 |---|---|---|
-| 0 | strip old DIAG markers, split files, flatten `bc_cleanup_effect`, **consolidate the three combat-end events into one per side** | — |
+| 0 | strip old DIAG markers, force-execute the nickname path, split files, flatten `bc_cleanup_effect`, extract `bc_addressed_toast_effect`, **consolidate the three combat-end events into one per side** | — |
 | 1 | the seam + `bc_battle_open_effect` + scratch + ledger + KIND table, wired to existing events; `on_combat_start` hook; DIAG pass | stage 0 |
 | 2 | family 2 modifiers, pacing curve | Q3 |
 | 3 | B — reputation | Q1, Q4 |
@@ -854,8 +1118,11 @@ may ship in any order. Stage 4 needs only stage 1, because `bc_battle_foe` is wr
 by `bc_battle_open_effect`, not by the eve. Only stage 6 is strictly downstream of
 another feature stage. Stages 0 and 1 are the only genuinely mandatory prefix.
 
-**Order inside stage 0 matters**: the old DIAG markers must be stripped *before* the
-new ones are added, or the log is two interleaved generations of markers.
+**Order inside stage 0 matters**, twice. The old DIAG markers must be stripped
+*before* the new ones are added, or the log is two interleaved generations of markers.
+And the nickname path must be force-executed *before* `bc_addressed_toast_effect` is
+extracted from it — it has never run at runtime, so refactoring it first would leave
+no way to tell an old bug from a new one.
 
 ---
 
@@ -869,7 +1136,8 @@ Folded into stage 0:
   `bc_scripted_triggers.txt`'s header comment are **not** DIAG output and must survive
   — they are the only record of how the notability thresholds were derived.
 - **`bc_aftermath_nickname_effect` has never executed at runtime.** Force-execute it
-  once before anything is built on the reward path.
+  once before anything is built on the reward path — and specifically before
+  `bc_addressed_toast_effect` is extracted out of it (Section 3).
 - **`bc_shieldbrother_forged` calls `bc_mark_chronicle_effect` twice, on two different
   characters** (`bc_knight_phase_events.txt:236`, `:240`). The pacing rework must not
   collapse that into one call.
@@ -892,6 +1160,32 @@ Folded into stage 0:
 | `bc_battle_size` missing when the first moment is a pop-up | size gates evaluate against nothing; C never arms | `bc_battle_open_effect` runs in the phase event, before any `trigger_event` |
 | reward silently reaches nobody | award happens with no toast seen | `bc_addressed_toast_effect` routes to liege for AI subjects; DIAG Q4 |
 | file collision with AGOT or the playset | `ck3.py conflicts` | every new file is `bc_`-prefixed and additive; no file is overridden |
+
+### Two accepted limitations
+
+Both are real, both are bounded, and both cost more to fix than they cost to live
+with. They are written down so they are not rediscovered as bugs.
+
+**Scratch leaks when the side commander is replaced mid-combat.** Clearing runs on
+`side_commander` at combat end, which is the man commanding *then*. If the man who
+commanded during the moments died or was captured and someone else finished the
+battle, the original keeps his scratch variables — the ones the design says are always
+cleared. It self-heals: the next battle he commands, `bc_battle_open_effect` overwrites
+`bc_battle_size` and `bc_battle_foe`, and the seam overwrites the rest on its first
+call. The cost is one battle in which his `bc_battle_moments` starts non-zero, so his
+escalation ladder opens further up and his pacing floor does not fire. Fixing it
+properly means clearing on `every_side_knight` too, or on a saved opening scope —
+both of which cost an extra iteration over every knight of every combat in the world,
+every time, to correct a rare and self-correcting cosmetic error.
+
+**The pacing floor is defeated while a pop-up is pending.** The seam runs in the
+pop-up *option*, not in the phase event that raised it, so `bc_battle_moments` does
+not increment until the player clicks. Between the raise and the click, the floor's
+"no moments yet" arm is still true, so the next phase-event roll can fire a second
+chronicle. The window is one 5-day roll (`COMBAT_EVENT_DAYS`) and only opens on the
+first moment of a battle, for a player who leaves the pop-up sitting. Closing it means
+marking intent at raise time and unmarking on cancel, which is more moving parts than
+one duplicated toast is worth.
 
 ## Verification
 

@@ -58,7 +58,7 @@ Built first because everything else reads it, and because a game rule is baked i
 - Modify: `mods/battle_chronicles/common/game_rules/bc_game_rules.txt` (append after line 35)
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml` (append after line 42, inside the `--- game rules ---` block)
 
-- [ ] **Step 1: Add the rule**
+- [x] **Step 1: Add the rule**
 
 Append to `bc_game_rules.txt`:
 
@@ -76,7 +76,7 @@ bc_aftermath = {
 
 Option keys repeat the rule name because that is how the other two rules in this file are written and how `has_game_rule = <option>` reads them.
 
-- [ ] **Step 2: Add the eight localization keys**
+- [x] **Step 2: Add the eight localization keys**
 
 Insert into `bc_l_english.yml` immediately after the `setting_bc_swing_dramatic_desc` line (line 42), before the `# --- commander chronicles ---` header. Note the single leading space on every entry — the file's syntax is exact.
 
@@ -91,7 +91,7 @@ Insert into `bc_l_english.yml` immediately after the `setting_bc_swing_dramatic_
  setting_bc_aftermath_generous_desc:0 "One reason is enough. Notable fields and the names won on them become common."
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `python tools/ck3.py validate battle_chronicles`
 Expected: `0 errors, 0 warnings`
@@ -104,7 +104,7 @@ cd /d/ck3 && python tools/ck3.py index -q && for k in rule_bc_aftermath rule_bc_
 
 Expected: no output.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add common/game_rules/bc_game_rules.txt localization/english/bc_l_english.yml && git commit -m "feat(bc): add bc_aftermath game rule
@@ -122,7 +122,7 @@ already exist."
 - Modify: `mods/battle_chronicles/common/character_memory_types/bc_memories.txt` (append after line 45)
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml` (append in the `--- memories ---` block, after the `bc_shieldbrother_memory_desc_third_perspective` line)
 
-- [ ] **Step 1: Add both types**
+- [x] **Step 1: Add both types**
 
 Append to `bc_memories.txt`:
 
@@ -199,7 +199,7 @@ bc_battle_memory_lost = {
 }
 ```
 
-- [ ] **Step 2: Add the eight localization keys**
+- [x] **Step 2: Add the eight localization keys**
 
 Append to the `--- memories ---` block of `bc_l_english.yml`:
 
@@ -221,7 +221,7 @@ Append to the `--- memories ---` block of `bc_l_english.yml`:
  bc_battle_memory_lost_desc_third_perspective:0 "[owner.GetName] stood in the line at [ROOT.Var('battle_location').GetProvince.GetName], and the line did not hold"
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `python tools/ck3.py validate battle_chronicles`
 Expected: `0 errors, 0 warnings`
@@ -234,7 +234,7 @@ cd /d/ck3 && python tools/ck3.py index -q && for k in bc_battle_memory_won bc_ba
 
 Expected: no output.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add common/character_memory_types/bc_memories.txt localization/english/bc_l_english.yml && git commit -m "feat(bc): add battle memory types for won and lost fields
@@ -252,7 +252,7 @@ A trigger can compare one `side_max_army_size` against another but cannot multip
 **Files:**
 - Modify: `mods/battle_chronicles/common/script_values/bc_script_values.txt` (append after line 26; also amend the file header)
 
-- [ ] **Step 1: Amend the file header**
+- [x] **Step 1: Amend the file header**
 
 The header currently describes only the two `scope:combat_side`-rooted values. Insert this paragraph on line 17 — the blank line between the last header comment (line 16) and `bc_outnumbered_threshold_value = {` (line 18):
 
@@ -265,7 +265,7 @@ The header currently describes only the two `scope:combat_side`-rooted values. I
 # call site.
 ```
 
-- [ ] **Step 2: Add the two live values**
+- [x] **Step 2: Add the two live values**
 
 Append to `bc_script_values.txt`:
 
@@ -302,7 +302,7 @@ bc_their_host_gap_value = {
 }
 ```
 
-- [ ] **Step 3: Add the four calibration values**
+- [x] **Step 3: Add the four calibration values**
 
 Append below. These exist only to bracket the live 1.5 and are deleted in Task 11.
 
@@ -339,12 +339,12 @@ bc_cal_their_host_gap_12x = {
 }
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `python tools/ck3.py validate battle_chronicles`
 Expected: `0 errors, 0 warnings`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add common/script_values/bc_script_values.txt && git commit -m "feat(bc): add host-gap script values for battle grading
@@ -361,7 +361,7 @@ bracket the live 1.5 for the calibration run and come out afterwards."
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_triggers/bc_scripted_triggers.txt` (amend header lines 6-7; append after line 93)
 
-- [ ] **Step 1: Amend the file header**
+- [x] **Step 1: Amend the file header**
 
 The header at lines 6-7 currently reads:
 
@@ -380,7 +380,7 @@ Replace with:
 # `scope:combat_side` does not exist. Check which one you are writing.
 ```
 
-- [ ] **Step 2: Add the trigger**
+- [x] **Step 2: Add the trigger**
 
 Append to `bc_scripted_triggers.txt`:
 
@@ -438,12 +438,12 @@ bc_battle_is_notable_trigger = {
 
 Note: `side_max_army_size` as a trigger has no script precedent anywhere in vanilla, AGOT or the playset — every shipped occurrence is as a script value operand. It is documented as legal (`python tools/ck3.py api side_max_army_size` lists traits `<, <=, =, !=, >, >=` on scope `combat_side`). Unprecedented, not unsupported. Whether it works is settled by the **per-side host size ladder** in Tasks 6 and 7, not by the odds ladder — every rung of the odds ladder uses the same suspect construct, so if the construct is dead the odds ladder reports `even` on every battle and looks exactly like a world of evenly matched hosts. The per-side ladder compares `side_max_army_size` against plain constants, and the inference runs **one way only**: if that ladder never leaves its `else` while the size ladder shows large battles, the token does not resolve on the left of a comparison, the odds row is dead, and it should be dropped — nothing else depends on it. Leaving the `else` does *not* prove the odds row works, because the odds row also carries an `enemy_side.` prefix and a script value on the right. Those two are separately corroborated: the mod's own `bc_side_is_outnumbered_trigger` already compares a scope path against a script value, and `bc_script_values.txt:7-8` records that shape as verified in game on 2026-08-12.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `python tools/ck3.py validate battle_chronicles`
 Expected: `0 errors, 0 warnings`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add common/scripted_triggers/bc_scripted_triggers.txt && git commit -m "feat(bc): add battle grading trigger
@@ -461,7 +461,7 @@ are vanilla's numbers as a placeholder until the calibration run."
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt` (append after line 141)
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml` (append after the `--- knight chronicles ---` block, before `--- memories ---`)
 
-- [ ] **Step 1: Add the memory effect**
+- [x] **Step 1: Add the memory effect**
 
 Append to `bc_scripted_effects.txt`:
 
@@ -509,7 +509,7 @@ bc_battle_memory_effect = {
 }
 ```
 
-- [ ] **Step 2: Add the counter effect**
+- [x] **Step 2: Add the counter effect**
 
 Append below:
 
@@ -545,7 +545,7 @@ bc_notable_battle_counter_effect = {
 }
 ```
 
-- [ ] **Step 3: Add the nickname effect**
+- [x] **Step 3: Add the nickname effect**
 
 Append below. All 27 entries, transcribed from `agot_nicknames_events.txt:187-213`.
 
@@ -623,7 +623,7 @@ bc_aftermath_nickname_effect = {
 }
 ```
 
-- [ ] **Step 4: Add the two toast localization keys**
+- [x] **Step 4: Add the two toast localization keys**
 
 Insert into `bc_l_english.yml` after the `bc_shieldbrother_forged_toast_desc` line, before the `# --- memories ---` header. The text names no number on purpose — `<N>` is retuned in Task 11 and nothing would catch a toast still saying "third" after it moved to five.
 
@@ -635,7 +635,7 @@ Insert into `bc_l_english.yml` after the `bc_shieldbrother_forged_toast_desc` li
  bc_aftermath_nickname_toast_desc:0 "He has won another great field, and enough of them now that men who were not there have started calling him something. It has stuck."
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `python tools/ck3.py validate battle_chronicles`
 Expected: `0 errors, 0 warnings`
@@ -648,7 +648,7 @@ cd /d/ck3 && python tools/ck3.py index -q && for k in bc_aftermath_nickname_toas
 
 Expected: no output.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add common/scripted_effects/bc_scripted_effects.txt localization/english/bc_l_english.yml && git commit -m "feat(bc): add aftermath memory, counter and nickname effects
@@ -667,7 +667,7 @@ Built before the winner's because it is the smaller of the two — grade, log, w
 **Files:**
 - Modify: `mods/battle_chronicles/events/bc_events.txt` (append after line 159)
 
-- [ ] **Step 1: Add the event**
+- [x] **Step 1: Add the event**
 
 Append to `bc_events.txt`:
 
@@ -888,12 +888,12 @@ bc_chronicles.0092 = {
 }
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `python tools/ck3.py validate battle_chronicles`
 Expected: `0 errors, 0 warnings`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add events/bc_events.txt && git commit -m "feat(bc): add bc_chronicles.0092, aftermath on the losing side
@@ -910,7 +910,7 @@ memory of the field. Does not touch the counter - that is wins only."
 **Files:**
 - Modify: `mods/battle_chronicles/events/bc_events.txt` (append after `.0092`)
 
-- [ ] **Step 1: Add the event**
+- [x] **Step 1: Add the event**
 
 Append to `bc_events.txt`. The calibration block is `.0092`'s with every `lose` replaced by `win` and nothing else changed — the ladders must be identical or the comparison is meaningless.
 
@@ -1167,12 +1167,12 @@ bc_chronicles.0091 = {
 }
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `python tools/ck3.py validate battle_chronicles`
 Expected: `0 errors, 0 warnings`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add events/bc_events.txt && git commit -m "feat(bc): add bc_chronicles.0091, aftermath on the winning side
@@ -1191,7 +1191,7 @@ Left until last on purpose. Until this task the events exist and cannot fire, so
 **Files:**
 - Modify: `mods/battle_chronicles/common/on_action/bc_on_actions.txt` (lines 17-27)
 
-- [ ] **Step 1: Add both entries**
+- [x] **Step 1: Add both entries**
 
 Replace the two blocks with:
 
@@ -1213,12 +1213,12 @@ on_combat_end_loser = {
 
 Do **not** add an `effect = { }` block — the warning at the top of this file explains why, and it cost a whole probe run once already. This hook is shared: AGOT: The Knighting Ceremony rolls a post-battle knighting on it and Grand Remembrance tracks battles on it, both through their own files. `events = { }` lists merge, so all three coexist.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `python tools/ck3.py validate battle_chronicles`
 Expected: `0 errors, 0 warnings`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add common/on_action/bc_on_actions.txt && git commit -m "feat(bc): hook the aftermath events to combat end
@@ -1233,24 +1233,24 @@ discarded by alphabetical filename order regardless of load order."
 
 **Files:** none modified.
 
-- [ ] **Step 1: Confirm no file collisions**
+- [x] **Step 1: Confirm no file collisions**
 
 Run: `python tools/ck3.py index -q && python tools/ck3.py conflicts`
 Expected: no line naming `battle_chronicles`. Every path this plan touched was already mod-owned, so this should be unchanged from before the work started — it is a regression check, not a discovery.
 
 **The reindex is what makes it a check.** `conflicts` reads `index/ck3.sqlite3`, not the files on disk. Against a stale index it reports the file set as it stood before Task 1, which by construction has no collisions — it would pass no matter what these tasks did.
 
-- [ ] **Step 2: Deploy**
+- [x] **Step 2: Deploy**
 
 Run: `python tools/ck3.py deploy battle_chronicles`
 Expected: confirmation that the `.mod` pointer was written.
 
-- [ ] **Step 3: Confirm the mod is in the playset**
+- [x] **Step 3: Confirm the mod is in the playset**
 
 Run: `python tools/ck3.py playset list`
 Expected: `battle_chronicles` present, loading after AGOT. If absent, `python tools/ck3.py playset add battle_chronicles` — **ask the user before changing the playset.**
 
-- [ ] **Step 4: Final static check**
+- [x] **Step 4: Final static check**
 
 Run: `python tools/ck3.py validate battle_chronicles`
 Expected: `0 errors, 0 warnings`

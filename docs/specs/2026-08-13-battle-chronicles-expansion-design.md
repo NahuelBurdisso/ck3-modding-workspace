@@ -38,7 +38,7 @@ Six choices were settled during design and everything below follows from them.
 |---|---|
 | integration shape | **The Ledger** — one seam, every moment reports through `bc_record_moment_effect` |
 | lethality | **wounds yes, death never** |
-| ledger scope | **commanders only**, 5 ledger variables + 5 scratch, world-wide (AI included) |
+| ledger scope | **commanders only**, 7 ledger variables + 6 scratch, world-wide (AI included) |
 | reputation | **earn existing vanilla/AGOT commander traits** — no new trait art |
 | pacing | **scale moments to battle size**, with a floor so no battle goes silent |
 | volume | **spine first, then grow** |
@@ -180,9 +180,18 @@ There is no way to read it into a `set_variable value =`. An earlier draft wrote
 worked, and every size gate in the design rests on that one write.
 
 The trigger form is available, so the ladder above reaches the same quantity through
-the only door the engine opens. The thresholds are the notability trigger's own
-(`bc_scripted_triggers.txt:153-154`), so the buckets are directly comparable to it and
-the 2026-08-13 calibration data applies unchanged.
+the only door the engine opens.
+
+**Only the upper threshold is inherited.** `bc_battle_is_notable_trigger`'s two size
+rows are **10,000 and 20,000** (`bc_scripted_triggers.txt:153-154`), not 10,000 and
+2,000. So bucket 3's boundary is the notability trigger's lower size row and the
+2026-08-13 calibration applies to it directly — 10k was measured as the top 13% of 39
+battles (`:128-133`). **The 2,000 boundary between buckets 1 and 2 is invented**: the
+calibration run recorded `under 5k` as a single undivided bucket of 26 of 39 and never
+subdivided it. That is the one number in this design with no evidence behind it, which
+is why DIAG Q3 exists and why Section 6 repeats the warning. An earlier draft claimed
+both thresholds were the trigger's own, which was false for the lower one and
+contradicted Section 6's own risk note.
 
 Buckets lose nothing, because **every consumer already wanted buckets**: Section 6's
 verb-family table is three rows, the wound gate is "bucket 3", and the chronicle-flag
@@ -219,8 +228,9 @@ if = { effective tier >= bc_battle_tier (or bc_battle_tier unset)
 `>=` rather than `>` is what makes ties break to the last moment.
 
 `bc_battle_size` exists because the size gates are otherwise unevaluable from a pop-up
-option, per the invariant above. Written once by `bc_battle_open_effect` in a phase
-event where the combat scope exists; read freely everywhere thereafter.
+option, per the invariant above. Written by `bc_battle_open_effect` in a phase event
+where the combat scope exists — **rewritten on every phase event, not once**, per the
+unconditional rule above; read freely everywhere thereafter.
 
 `bc_battle_foe` is captured at the opening of the battle, not read at combat end,
 because the man commanding at the end may not be the man who commanded during the
@@ -298,12 +308,17 @@ tier. They are separate ladders that happen to share vocabulary.
 ### Consolidation
 
 `bc_chronicles.0090` (cleanup, both hooks), `.0091` (winner) and `.0092` (loser)
-become **one event per side**.
+become **one event per side** — that is **two** events, not one: a winner grader on
+`on_combat_end_winner` and a loser grader on `on_combat_end_loser`, each doing cleanup,
+grading and clearing for its own side. Three become two. Merging further is not
+possible, since nothing in an event body can tell which of the two hooks invoked it —
+the reason `.0091` and `.0092` were split in the first place.
 
 The reason is *not* saving a knight iteration. An earlier draft claimed that, and the
-body order below refutes it: cleanup runs on every knight outside the game-rule gate,
-battle memories run on every knight inside it, and Section 5 adds a third pass over
-the dead. The consolidated event iterates `every_side_knight` three times.
+body order below refutes it: cleanup runs on every knight outside the game-rule gate
+and battle memories run on every knight inside it, so the consolidated event still
+iterates `every_side_knight` twice. (Section 5's dead-knight toast adds no third pass —
+it is an `any_side_knight` presence test, not an iteration.)
 
 The real reason is that `.0090` deliberately carries no `trigger` while `.0091`/`.0092`
 do, both fire from the same two hooks, and the ordering between them is undefined.
@@ -589,9 +604,14 @@ the same way has still shown you who he is.
 
 ### Terrain traits
 
-Awarded from `scope:bc_battle_province` at combat end with **no new state** — the
-province is already in scope for the memory writes. Gated on *fighting* there, not
-owning there, which is the deliberate difference from the vanilla granter.
+Awarded from `scope:bc_battle_province` at combat end — the province is already in
+scope for the memory writes, so no new *scratch* is needed. Gated on *fighting* there,
+not owning there, which is the deliberate difference from the vanilla granter.
+
+**The whole terrain branch is wrapped in `if = { limit = { exists = scope:bc_battle_province } ... }`**,
+the same guard the aftermath events already put around the memory writes
+(`bc_events.txt:210`, `:273`) for the same reason: `combat.location` is reached with
+`?=` and may not resolve.
 
 **Style traits are evaluated first, and a terrain trait needs its own streak of 2.**
 Without both rules terrain wins every time and B never ships. The five terrain buckets
@@ -606,6 +626,25 @@ The terrain streak reuses the style machinery exactly: `bc_terrain_last` and
 instead of 3. Two ledger variables, no new mechanism. Two rather than three because
 fighting the same ground twice is a weaker claim than fighting the same *way* three
 times, and because terrain is not chosen — a commander goes where the war goes.
+
+**`bc_terrain_last` holds the *bucket*, not the terrain key**, and the bucket is
+written explicitly. Two things force this, and neither is optional:
+
+1. There is no scratch `bc_battle_terrain` to compare against the way `bc_battle_style`
+   backs the style streak, and `terrain` is a **trigger**, not something a
+   `set_variable value =` can read. So the branch must resolve the province through the
+   same five-way `if` / `else_if` ladder that picks the trait, and that ladder writes
+   `flag:<bucket>` — `flag:desert`, `flag:open`, `flag:rough`, `flag:forest`,
+   `flag:jungle` — into `bc_terrain_last` in the same arm that names the trait. One
+   ladder, two outputs, so the bucket and the trait cannot disagree.
+2. Storing the raw key would break the streak on terrain that maps to the *same* trait.
+   `hills` then `mountains` are both `rough_terrain_expert`, but as raw keys they are a
+   mismatch, so the streak would reset and `rough_terrain_expert` would be
+   near-unreachable. The streak has to be counted on the thing being awarded.
+
+`flag:<bucket>` is deliberately the same value shape as `bc_style_last`, so the
+comparison is `var:bc_terrain_last = flag:<bucket>` and no conversion happens anywhere
+in B.
 
 Order within a combat end is: style branch, then terrain branch, then the nickname.
 Each is gated on the budget, so an award by an earlier branch closes the later ones
@@ -668,7 +707,19 @@ none of them is a thing a battle can teach you.
   wins.** A nickname is decoration; a trait changes how the man fights.
 
   Implemented as an `if` / `else_if` / `else_if` chain in one effect — style, terrain,
-  nickname — not as a flag. There is no such thing as a temporary flag in CK3: a
+  nickname.
+
+  **The nickname arm keeps its own winner-only gate.** Consolidation leaves one grader
+  per side, so the chain is written once and called from both; but style and terrain
+  grade **either outcome** while the nickname is a reward for winning. As a bare third
+  `else_if` the arm would be reachable on a defeat — its existing gate is
+  `var:bc_notable_battles >= 3`, a *cumulative* tally that a man who has won three
+  battles before still satisfies on the day he loses one. The outcome must therefore be
+  carried explicitly — either as a parameter on the shared effect, or by the loser's
+  grader calling a two-arm chain. Either is fine; what is not fine is assuming the chain
+  is outcome-neutral because two thirds of it are.
+
+  **Not a flag.** There is no such thing as a temporary flag in CK3: a
   character flag with no duration is permanent, and one with a duration outlives the
   event. An earlier draft said "set a temporary flag that suppresses the nickname
   branch", which would have left a real flag on every commander who ever earned a
@@ -757,13 +808,21 @@ else = {
 
 The guard must be `<= N`, **not a constant**. Written `<= 2` it over-fires: an
 ordinary win (*N* = 1) against a two-loss foe would zero the counter and run the whole
-removal ladder, deleting `rival` outright instead of stepping down to `grudge` — two
-losses to earn a rival, one ordinary win to erase him. Written `<= 1` it under-fires
-and a wipe win against a one-loss foe produces **−1**, after which a literal `= 0`
-test never fires again and the rivalry slot jams permanently on a negative counter.
-Only `<= N` is right in both directions, and it is right for any future step size.
+removal ladder, erasing a `rival` after a single win when the counter says two are
+owed. Written `<= 1` it under-fires and a wipe win against a one-loss foe produces
+**−1**, after which a literal `= 0` test never fires again and the rivalry slot jams
+permanently on a negative counter. Only `<= N` is right in both directions, and it is
+right for any future step size.
 
 The clear condition is written `<= 0` regardless, belt and braces.
+
+**A decrement that lands above 0 changes nothing but the counter.** The relation is
+left exactly as it was — that is the "escalate only, never downgrade" rule below, and
+it is the whole behaviour of the decrement short of zero. An ordinary win against a
+two-loss `rival` leaves him `rival` with the counter at 1; a second win takes it to 0
+and removes the relation outright. So a rival costs two wins to be rid of, and the
+counter is the only thing that moves in between. **The ladder is not re-run on the way
+down** — running it would demote `rival` to `grudge`, which the rule below forbids.
 
 **Not `clamp_variable`.** It exists (`effects.log:223-227`) but has **zero uses in
 vanilla**, and it takes `max` as well as `min`, so it would need an invented ceiling.
@@ -863,8 +922,17 @@ these three relations alone, so the idiom is thoroughly shipped in the playset.
   one place an effect is guaranteed to run: `bc_battle_open_effect`, which already
   executes at the top of every phase event and is already writing `bc_battle_foe`. It
   gains one guarded `remove_variable` on `bc_nemesis`. That is at most one check per
-  phase event per commander, and it collects the dangling reference before the phase
-  event's own triggers read it.
+  phase event per commander.
+
+  **It does not collect the reference before the triggers read it, and it does not need
+  to.** An event's `is_valid` runs *before* its `effect` block, so the wipe always lags
+  the read by one phase event — the first roll of the first battle after the man dies
+  reads the dangling variable, and only the roll after that sees it gone. That is
+  harmless because the guard is `exists` **plus** `is_alive = yes`: CK3 keeps dead
+  characters as real objects, so `is_alive` on one is a clean `no`, not an error. The
+  guard declines to fire and nothing is logged. The wipe exists to stop the variable
+  living on a commander forever, not to make the read safe — the guard already does
+  that.
 
 ### Read-back
 
@@ -992,8 +1060,20 @@ It becomes the top tier of three things. Each needs a stated mechanism, because
    warns that rows are counted as direct children, so a wipe is worth one point of the
    two required — it makes a battle notable when combined with any single other row,
    which every wipe will already satisfy on blood or warscore.
-2. **Reputation.** The streak increments by **2** instead of 1 on a wipe, so two
-   wipes fought the same way earn the trait. Nothing else about B changes.
+2. **Reputation.** The **style** streak increments by **2** instead of 1 on a wipe, so
+   two wipes fought the same way earn the trait: the first is a mismatch and creates
+   the streak at 1, the second matches and adds 2, reaching the threshold of 3.
+
+   **The terrain streak is not affected — it always steps by 1.** Its threshold is 2,
+   so a wipe bonus would award a terrain trait from a single battle and reopen exactly
+   the budget problem Section 3's ordering rule exists to close.
+
+   **The create branch stays 1 on a wipe**, unlike C's, whose create branch uses *N*.
+   The asymmetry is deliberate and is the reason "two wipes earn the trait" is true
+   rather than "one wipe plus a mismatch": a streak is a claim about repetition, and
+   nothing repeated has happened yet on the first battle. C's counter is a tally of
+   damage done to you, where the first blow's severity is exactly the thing being
+   counted.
 3. **Rivalry.** `bc_nemesis_losses` increments by **2** instead of 1, and the
    relation is then set from the resulting value using Section 4's ladder unchanged —
    so a wipe takes a stranger straight to `rival`, and a second wipe to `nemesis`.
@@ -1023,6 +1103,28 @@ second pass over the dead.
 
 The dead-knight toast must be **one aggregate toast per battle per liege**, not one per
 knight. A liege who lost six knights should be told once.
+
+**The mechanism, because "aggregate" is not implementable on its own.** CK3 script
+cannot group an iteration by an arbitrary key, so there is no way to fan the dead
+knights out into one toast per distinct liege. It does not need to: on a combat side
+the knights are the side commander's, so **one toast raised once on `side_commander`
+is already one per liege**. Written as a presence test, not an iteration:
+
+```
+if = {
+	limit = { any_side_knight = { is_alive = no } }
+	side_commander ?= { bc_addressed_toast_effect = { ... SUBJECT = <this> } }
+}
+```
+
+The dead are not iterated at all. The toast names no individual knight — that is the
+price of aggregating, and it is why the loc budget for this is two keys rather than
+one per name. A side whose commander is absent gets no toast, which is correct: there
+is nobody to tell.
+
+This replaces the "second pass over the dead" phrasing above. There is no second pass;
+Section 1's claim that the consolidated event iterates `every_side_knight` three times
+is therefore **twice** — cleanup and battle memories.
 
 ---
 
@@ -1070,8 +1172,6 @@ This also preserves `bc_shieldbrother_forged`'s two calls on two different chara
 `bc_mark_chronicle_commander_effect` replaces the hardcoded `days = 15` with a script
 value scaled by `bc_battle_size`:
 
-| `bc_battle_size` | flag duration |
-|---|---|
 | `bc_battle_size` | means | flag duration |
 |---|---|---|
 | 1 | under 2,000 | 40 days |
@@ -1080,6 +1180,12 @@ value scaled by `bc_battle_size`:
 
 Driven off the bucket, so this ladder and the verb-family ladder read the same
 variable and cannot drift.
+
+The script value is written against **`this`, a character** — `bc_mark_chronicle_commander_effect`
+runs on the commander, so `var:bc_battle_size` is a bare read with no scope prefix.
+`bc_script_values.txt:18-23` carries a standing warning that the file holds two
+different scope conventions and that new values must not copy one into the other's
+call site; this one belongs to neither, and the file's header must say so.
 
 `add_character_flag` accepts a script value for `days`. The dump itself does not say
 so — `effects.log:2892` gives the form and `:2893` says only "a value or value
@@ -1171,11 +1277,11 @@ the DIAG pass, Q3.
 | path | new? | contents |
 |---|---|---|
 | `common/scripted_effects/bc_ledger_effects.txt` | new | `bc_record_moment_effect`, `bc_battle_open_effect`, `bc_add_verb_effect`, scratch + ledger writes, scratch clearing |
-| `common/scripted_effects/bc_rivalry_effects.txt` | new | C's escalation ladder, the floored decrement, the relation-removal ladder, the lazy-wipe effect |
+| `common/scripted_effects/bc_rivalry_effects.txt` | new | C's escalation ladder, the floored decrement, the relation-removal ladder. **No wipe effect** — the dangling-reference wipe is one guarded `remove_variable` inside `bc_battle_open_effect`, in `bc_ledger_effects.txt`, per Section 4 |
 | `common/scripted_effects/bc_reward_effects.txt` | new | trait grant, `bc_wound_effect`, `bc_aftermath_nickname_effect`, `bc_notable_battle_counter_effect`, `bc_battle_memory_effect`, `bc_addressed_toast_effect` |
-| `common/scripted_effects/bc_scripted_effects.txt` | modify | momentum ladder, `bc_clear_faltering_effect`, flattened `bc_cleanup_effect`, the two chronicle-mark effects, `bc_start_popup_cooldown_effect` |
+| `common/scripted_effects/bc_scripted_effects.txt` | modify | momentum ladder, `bc_clear_faltering_effect`, flattened `bc_cleanup_effect`, the two chronicle-mark effects, `bc_start_popup_cooldown_effect`, and a new `bc_start_eve_cooldown_effect` (90 days, `bc_eve_cooldown`) beside it |
 | `common/scripted_triggers/bc_ledger_triggers.txt` | new | scratch/ledger reads, `exists`+`is_alive` guards |
-| `common/scripted_triggers/bc_scripted_triggers.txt` | modify | add `bc_chronicle_ready_commander_trigger`; add the `scope:wipe` row to `bc_battle_is_notable_trigger`'s `calc_true_if` (Section 5); terrain triggers and the calibration header unchanged |
+| `common/scripted_triggers/bc_scripted_triggers.txt` | modify | add `bc_chronicle_ready_commander_trigger`; add the `scope:wipe` row to `bc_battle_is_notable_trigger`'s `calc_true_if` (Section 5). Terrain triggers unchanged. The calibration **ladders** in the header must survive verbatim, but the header's "Five substantive rows plus the game rule" (`:110`) becomes six and must be updated with them |
 | `common/script_values/bc_script_values.txt` | modify | chronicle-flag duration by size |
 | `common/modifiers/bc_battle_modifiers.txt` | new | the four family-2 modifiers |
 | `common/game_rules/bc_game_rules.txt` | modify | `bc_wounds`, `bc_rivalry` |
@@ -1263,15 +1369,23 @@ bc_rivalry = {
 the existing warning: a modded game rule is baked into every save made with it, and
 disabling the mod afterwards makes that save fail to load.
 
-### The DIAG pass — one run, four questions
+### The DIAG pass — one run, five questions
 
 A game restart costs about seven minutes, so one run must answer everything. Each
-question independently invalidates a design decision. All four are pure `debug_log`
+question independently invalidates a design decision. All five are pure `debug_log`
 with no state.
 
+**Every one is a trigger ladder logging string constants, not a value read.**
+`debug_log` takes a string; it does not interpolate a variable or a script value. The
+mod's existing DIAG code is written this way already — `bc_events.txt:312-328` logs
+`bc_notable_battles` as an `if` / `else_if` / `else` ladder over three buckets rather
+than printing the number. Every question below is phrased as a bucketed ladder for that
+reason, not for readability.
+
 **Q1 — trait census.** Log `number_of_commander_traits` for every side commander at
-combat end, as a raw count, not a pass/fail. B gates on `< 3`. If the median commander
-already holds 3, B is dead on arrival.
+combat end as a four-rung ladder — 0, 1, 2, 3+ — so the *distribution* is visible
+rather than a pass/fail on the gate. B gates on `< 3`. If the median commander already
+holds 3, B is dead on arrival.
 
 **Q2 — does a `scope = combat` event work at all, and does `side_commander` resolve
 from it?** Two questions in one marker, because the second is meaningless without the
@@ -1425,12 +1539,15 @@ Per sub-project, beyond the DIAG pass:
   a 10,000+ battle, at rank 1, once.
 - **B** — three notable battles with the same style produce exactly one trait award
   and one toast, and the fourth produces none. A capped commander's streak does not
-  climb past 3. A commander who fights three notable battles on the same terrain gains
-  a terrain trait, and one who fights three in a row the same *way* still gains the
-  style trait — i.e. terrain has not eaten the budget.
+  climb past 3. **Two** notable battles on the same terrain *bucket* — `hills` then
+  `mountains` counts, they are both `rough` — gain a terrain trait, and a commander who
+  fights three in a row the same *way* still gains the style trait afterwards, i.e.
+  terrain has not eaten the budget. A commander who loses three notable battles the
+  same way gains the style trait, since the streak counts either outcome.
 - **C** — a second notable loss to the same commander produces `rival`, not a second
-  `grudge`. An ordinary notable win against a two-loss foe steps him down to `grudge`,
-  **not** to nothing. A wipe loss against a stranger produces `rival` in one battle.
+  `grudge`. An ordinary notable win against a two-loss foe leaves him `rival` with the
+  counter at 1 — the relation does not move — and a second ordinary win removes it
+  entirely. A wipe loss against a stranger produces `rival` in one battle.
   `bc_rivalry_rival` caps at `rival` while the counter keeps climbing past 3.
 - **D** — the eve pop-up fires at most once per 90 days per commander. The dead-knight
   toast is one per battle per liege, not one per knight.

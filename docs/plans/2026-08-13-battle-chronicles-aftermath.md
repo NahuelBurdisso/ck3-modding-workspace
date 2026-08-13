@@ -1302,7 +1302,7 @@ Record the full table. The counts that matter:
 
 Read the size, blood, warscore and odds ladders against the **sub-huge** population — the two size rows nest, so those three rows never decide the largest battles.
 
-- [ ] **Step 3: Check the memory in game, on two knights** — NOT DONE, and it is the one unverified thing left in the design. The calibration run was played on `bc_aftermath_default` (see the correction in Task 11 Step 1), which produced only 5 notable wins across the whole run with no guarantee any was the player's — so there was nothing to open a memories window on. Settling it needs one more run started on **Generous**, which would also give that rule option its only test.
+- [x] **Step 3: Check the memory in game, on two knights** — DONE, but on a second run, not this one. The calibration run was played on `bc_aftermath_default` (see the correction in Task 11 Step 1) and produced only 5 notable wins with no guarantee any was the player's, so there was nothing to open a memories window on. A short follow-up run started on **Generous** settled it: two different knights, same province, after a player-fought battle. That run also gave `bc_aftermath_generous` its only test — 3 of 5 battles notable, symmetry holding on all 5.
 
 This is the one thing a probe cannot answer, and nothing in the log says *which* knights in the world received a memory — so do not go looking for one. Make one instead:
 

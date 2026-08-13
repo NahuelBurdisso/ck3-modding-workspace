@@ -19,6 +19,8 @@ CK3 script has no unit test framework, so the TDD loop is replaced by a two-laye
 1. **Static, per task:** `python tools/ck3.py validate battle_chronicles` — must report `0 errors, 0 warnings` after every task. This is the "run the test" step.
 
    **Know what it does not catch.** It checks brace balance, the UTF-8 BOM, malformed localization lines, duplicate top-level definitions and stray root directories. It does **not** resolve references. `validate.py:37` limits its loc cross-check to `LOC_EXPECTED = {common/traits, common/decisions, common/character_interactions}`, and even that is gated behind `--strict`. None of the categories this plan touches is in that set, so a typo in any of the 18 new localization keys passes every task silently and surfaces as a raw key name in game. Every task that adds a `desc = `, `title = ` or `type = ` reference therefore carries an explicit `ck3.py loc` check for each key it added.
+
+   **Those checks must reindex first.** `ck3.py loc` reads the sqlite index at `index/ck3.sqlite3` (`index.py:193-198, 231-242`), not the files on disk, and the index is only rebuilt by `ck3.py index`. Without a reindex every newly added key reports as missing and the check is noise. Each loop below therefore opens with `python tools/ck3.py index -q`. The same applies to `ck3.py conflicts` in Task 9 and is why Task 11 uses `grep` rather than `ck3.py find`.
 2. **Dynamic, once at the end:** a single game run (Task 10). A restart costs about seven minutes, so the run is instrumented up front to answer every open question in one pass. `debug_log` markers are counted with `python tools/ck3.py probe 'BC:'`.
 
 Tasks 1–9 build and land the feature. Task 10 runs it. Task 11 sets the real thresholds from what Task 10 measured and strips the instrumentation.
@@ -95,7 +97,7 @@ Expected: `0 errors, 0 warnings`
 The validator will not check that these keys exist, so check them by hand:
 
 ```bash
-cd /d/ck3 && for k in rule_bc_aftermath rule_bc_aftermath_desc setting_bc_aftermath_off setting_bc_aftermath_off_desc setting_bc_aftermath_default setting_bc_aftermath_default_desc setting_bc_aftermath_generous setting_bc_aftermath_generous_desc; do python tools/ck3.py loc "$k" >/dev/null 2>&1 || echo "MISSING $k"; done
+cd /d/ck3 && python tools/ck3.py index -q && for k in rule_bc_aftermath rule_bc_aftermath_desc setting_bc_aftermath_off setting_bc_aftermath_off_desc setting_bc_aftermath_default setting_bc_aftermath_default_desc setting_bc_aftermath_generous setting_bc_aftermath_generous_desc; do python tools/ck3.py loc "$k" >/dev/null 2>&1 || echo "MISSING $k"; done
 ```
 
 Expected: no output.
@@ -225,7 +227,7 @@ Expected: `0 errors, 0 warnings`
 Then check all eight keys resolve — six of these are the `desc = ` targets inside `bc_memories.txt`, and a typo in one of those renders as a raw key in the memory list with nothing else to warn you:
 
 ```bash
-cd /d/ck3 && for k in bc_battle_memory_won bc_battle_memory_won_desc bc_battle_memory_won_desc_second_perspective bc_battle_memory_won_desc_third_perspective bc_battle_memory_lost bc_battle_memory_lost_desc bc_battle_memory_lost_desc_second_perspective bc_battle_memory_lost_desc_third_perspective; do python tools/ck3.py loc "$k" >/dev/null 2>&1 || echo "MISSING $k"; done
+cd /d/ck3 && python tools/ck3.py index -q && for k in bc_battle_memory_won bc_battle_memory_won_desc bc_battle_memory_won_desc_second_perspective bc_battle_memory_won_desc_third_perspective bc_battle_memory_lost bc_battle_memory_lost_desc bc_battle_memory_lost_desc_second_perspective bc_battle_memory_lost_desc_third_perspective; do python tools/ck3.py loc "$k" >/dev/null 2>&1 || echo "MISSING $k"; done
 ```
 
 Expected: no output.
@@ -432,7 +434,7 @@ bc_battle_is_notable_trigger = {
 }
 ```
 
-Note: `side_max_army_size` as a trigger has no script precedent anywhere in vanilla, AGOT or the playset — every shipped occurrence is as a script value operand. It is documented as legal (`python tools/ck3.py api side_max_army_size` lists traits `<, <=, =, !=, >, >=` on scope `combat_side`). Unprecedented, not unsupported. Whether it works is settled by the **per-side host size ladder** in Tasks 6 and 7, not by the odds ladder — every rung of the odds ladder uses the same suspect construct, so if the construct is dead the odds ladder reports `even` on every battle and looks exactly like a world of evenly matched hosts. The per-side ladder compares `side_max_army_size` against plain constants: if it ever leaves its `else`, the construct works and the odds row's silence is real. If it does not, this is the row to drop; nothing else depends on it.
+Note: `side_max_army_size` as a trigger has no script precedent anywhere in vanilla, AGOT or the playset — every shipped occurrence is as a script value operand. It is documented as legal (`python tools/ck3.py api side_max_army_size` lists traits `<, <=, =, !=, >, >=` on scope `combat_side`). Unprecedented, not unsupported. Whether it works is settled by the **per-side host size ladder** in Tasks 6 and 7, not by the odds ladder — every rung of the odds ladder uses the same suspect construct, so if the construct is dead the odds ladder reports `even` on every battle and looks exactly like a world of evenly matched hosts. The per-side ladder compares `side_max_army_size` against plain constants, and the inference runs **one way only**: if that ladder never leaves its `else` while the size ladder shows large battles, the token does not resolve on the left of a comparison, the odds row is dead, and it should be dropped — nothing else depends on it. Leaving the `else` does *not* prove the odds row works, because the odds row also carries an `enemy_side.` prefix and a script value on the right. Those two are separately corroborated: the mod's own `bc_side_is_outnumbered_trigger` already compares a scope path against a script value, and `bc_script_values.txt:7-8` records that shape as verified in game on 2026-08-12.
 
 - [ ] **Step 3: Verify**
 
@@ -609,25 +611,26 @@ bc_aftermath_nickname_effect = {
 
 	debug_log = "BC: nickname awarded"
 
+	# Field order matches every other toast in the mod.
 	send_interface_toast = {
-		title = bc_aftermath_nickname_toast
-		left_icon = scope:bc_named_commander
 		type = event_toast_effect_good
+		title = bc_aftermath_nickname_toast
 		desc = bc_aftermath_nickname_toast_desc
+		left_icon = scope:bc_named_commander
 	}
 }
 ```
 
 - [ ] **Step 4: Add the two toast localization keys**
 
-Insert into `bc_l_english.yml` after the `bc_shieldbrother_forged_toast_desc` line, before the `# --- memories ---` header:
+Insert into `bc_l_english.yml` after the `bc_shieldbrother_forged_toast_desc` line, before the `# --- memories ---` header. The text names no number on purpose — `<N>` is retuned in Task 11 and nothing would catch a toast still saying "third" after it moved to five.
 
 ```
 
 # --- aftermath --------------------------------------------------------------
 
  bc_aftermath_nickname_toast:0 "A Name Won on the Field"
- bc_aftermath_nickname_toast_desc:0 "He has won his third great field. Men who were not there have started calling him something, and it has stuck."
+ bc_aftermath_nickname_toast_desc:0 "He has won another great field, and enough of them now that men who were not there have started calling him something. It has stuck."
 ```
 
 - [ ] **Step 5: Verify**
@@ -638,7 +641,7 @@ Expected: `0 errors, 0 warnings`
 Then:
 
 ```bash
-cd /d/ck3 && for k in bc_aftermath_nickname_toast bc_aftermath_nickname_toast_desc; do python tools/ck3.py loc "$k" >/dev/null 2>&1 || echo "MISSING $k"; done
+cd /d/ck3 && python tools/ck3.py index -q && for k in bc_aftermath_nickname_toast bc_aftermath_nickname_toast_desc; do python tools/ck3.py loc "$k" >/dev/null 2>&1 || echo "MISSING $k"; done
 ```
 
 Expected: no output.
@@ -1076,9 +1079,9 @@ bc_chronicles.0091 = {
 
 			# --- CALIBRATION ONLY - DELETE AFTER THE TUNING RUN -------------
 			# Accounts for the notable wins that never reach the commander
-			# branch at all. Without this, `nickname awarded` plus the three
-			# `nickname blocked` counts can fall short of `win notable` with no
-			# explanation.
+			# branch at all. Without this, `nickname awarded` plus the four
+			# other `nickname blocked` counts can fall short of `win notable`
+			# with no explanation.
 			if = {
 				limit = { NOT = { exists = side_commander } }
 				debug_log = "BC: nickname blocked no commander"
@@ -1256,15 +1259,25 @@ No commit — this task changes nothing under version control.
 
 **Files:** none modified.
 
-- [ ] **Step 1: Launch**
+- [ ] **Step 1: Launch, with the logs cleared**
 
-Run: `python tools/ck3.py launch`
+Run: `python tools/ck3.py launch --clear-logs`
+
+**The `--clear-logs` is not optional.** `probe` scans every `*.log` in the logs directory end to end (`launch.py:70-93`); it does not know about sessions. The logs on disk right now hold 3,884 `BC:` hits from the 2026-08-12 run — 858 cleanup calls, 439 `bc_knight_holds_the_breach`, 437 toast-body markers. Without clearing, every ladder is poisoned, the winner-versus-loser equality test is meaningless, and all four of the questions in Step 5 come back pre-answered by the previous run.
+
+Set the `bc_aftermath` game rule to **Generous** at the start (see Step 3 — it is what makes a notable battle producible on demand, and it is the only test that option gets). Note the consequence for Step 2.
 
 Play or observe until a meaningful number of battles have resolved. More battles is strictly better — the whole point is a distribution.
 
 - [ ] **Step 2: Collect the outcome markers**
 
 Run: `python tools/ck3.py probe 'BC:'`
+
+**Read every notable count as a Generous count.** The run is under `bc_aftermath_generous`, which adds a free `calc_true_if` point, so the effective bar for the whole run is "one real row", not `amount >= 2`. Consequences:
+
+- the five **ladders** are unaffected — they fire on every combat end regardless of the bar, and they are what Task 11 sets thresholds from
+- the **winner-versus-loser equality test** is unaffected — both sides read the same game rule
+- the **notable rate**, `BC: nickname awarded` and every `blocked` count are inflated. The Default rate is strictly lower. Do **not** judge `amount >= 2` or `<N> = 3` from these numbers; derive them from the ladder distributions instead.
 
 Record the full table. The counts that matter:
 
@@ -1279,7 +1292,7 @@ Record the full table. The counts that matter:
 | `BC: win warscore *` ladder | sets `<SCORE>`. The least trustworthy threshold — it is the only row whose scale is not troops, and AGOT's warscore is not obviously on vanilla's scale. |
 | `BC: win odds *` ladder | sets `<ODDS>` — but only if the host ladder above proved the construct works. `odds even` on every battle is ambiguous on its own. |
 | `BC: nickname awarded` | did a name ever land |
-| `BC: nickname blocked *` | if awarded is zero, which gate ate it. The four blocked counts plus awarded should sum to `BC: win notable`; a shortfall means a path nothing is measuring. |
+| `BC: nickname blocked *` | if awarded is zero, which gate ate it. The **five** blocked counts — `no commander`, `dead commander`, `already named`, `count`, `martial` — plus `awarded` should sum to `BC: win notable`; a shortfall means a path nothing is measuring. |
 
 Read the size, blood, warscore and odds ladders against the **sub-huge** population — the two size rows nest, so those three rows never decide the largest battles.
 
@@ -1302,8 +1315,11 @@ Failure signatures to watch for:
 
 - [ ] **Step 4: Read the error log**
 
-Run: `python tools/ck3.py errors --tail 200`
-Expected: no line naming a `bc_` key or a `bc_chronicles` event.
+Run: `python tools/ck3.py errors --tail 400`
+
+**Read only the `=== error.log ===` section.** `errors` tails every `*.log`, and `debug.log` and `game.log` are where this mod's own `debug_log` markers land — their tails will be almost entirely lines naming `bc_events.txt` and `bc_chronicles.0091`. That is the instrumentation working, not a problem.
+
+Expected, in `error.log` only: no line naming a `bc_` key, a `bc_chronicles` event or a `battle_chronicles` file. Script errors from a mod are logged when the file loads or the event first fires, so look at the **top** of that section as well as the tail — this only works because Step 1 cleared the logs, which is one more reason it is not optional.
 
 `probe` only counts markers that fired. Every failure class in this feature that is *not* a missing marker lands here instead: an invalid `left_icon`, a comparison against a missing scope on a leaderless side, an unresolvable `var:` read, a mistyped memory type or localization key. This is the cheapest step in the run and the one that catches what the markers cannot.
 
@@ -1334,6 +1350,7 @@ cd /d/ck3 && git add mods/battle_chronicles/README.md && git commit -m "docs(bc)
 - Modify: `mods/battle_chronicles/common/scripted_triggers/bc_scripted_triggers.txt`
 - Modify: `mods/battle_chronicles/common/script_values/bc_script_values.txt`
 - Modify: `mods/battle_chronicles/events/bc_events.txt`
+- Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml` — only if `<N>` moves far enough that `bc_aftermath_nickname_toast_desc` reads wrong
 - Modify: `mods/battle_chronicles/README.md`
 
 `bc_scripted_effects.txt` is deliberately not on this list — its one marker, `"BC: nickname awarded"`, is permanent.
@@ -1350,9 +1367,9 @@ In `bc_battle_is_notable_trigger`, replace the placeholder numbers with values r
 
 Replace the `# PLACEHOLDER NUMBERS` comment block above the trigger with what the run actually showed and where the numbers came from, so the next reader is not told they are still guesses.
 
-If the notable rate is far off, adjust `amount >= 2` before adjusting the rows — but the spec's judgement is that above 2 the bar starts requiring coincidences rather than significance, so prefer moving thresholds.
+**`amount` and `<N>` come off the ladders, not off the notable counts.** The run was played under `bc_aftermath_generous`, so its notable rate is the rate at a one-row bar and the Default rate is strictly lower. The ladders are rule-independent and are the only sound basis for both numbers. If the thresholds alone cannot bring the rate somewhere sensible, adjust `amount >= 2` — but the spec's judgement is that above 2 the bar starts requiring coincidences rather than significance, so prefer moving thresholds.
 
-If `<N> = 3` proved to be a formality rather than a career, raise it in `bc_chronicles.0091` (both the `var:bc_notable_battles >= 3` gate and the matching `< 3` in the calibration `else_if`, though that one is about to be deleted).
+If `<N> = 3` proved to be a formality rather than a career, raise it in `bc_chronicles.0091` (both the `var:bc_notable_battles >= 3` gate and the matching `< 3` in the calibration `else_if`, though that one is about to be deleted), and reread `bc_aftermath_nickname_toast_desc` to check it still says nothing a new `<N>` contradicts.
 
 - [ ] **Step 2: Delete the four calibration script values**
 
@@ -1376,6 +1393,8 @@ In `bc_events.txt`, remove **every** block bracketed by `--- CALIBRATION ONLY --
 
 **Keep** `debug_log = "BC: nickname awarded"` in `bc_aftermath_nickname_effect`.
 
+NOTE, deviation from the spec: the spec's Calibration section says "all markers are stripped once the numbers are set". These five stay. The asymmetric-bar test is the only check that catches a whole class of silent failure, and a test that cannot be rerun after the next tuning pass is not a test.
+
 - [ ] **Step 4: Verify**
 
 Run: `python tools/ck3.py validate battle_chronicles`
@@ -1384,10 +1403,10 @@ Expected: `0 errors, 0 warnings`
 Then confirm nothing is left behind:
 
 ```bash
-cd /d/ck3 && grep -rn 'bc_cal_\|CALIBRATION\|end calibration' mods/battle_chronicles/
+cd /d/ck3 && grep -rn --exclude-dir=.git --exclude-dir=.vscode 'bc_cal_\|CALIBRATION\|end calibration\|PLACEHOLDER' mods/battle_chronicles/
 ```
 
-Expected: no output.
+Expected: no output. `PLACEHOLDER` is in the pattern because Step 1 is also told to replace the `# PLACEHOLDER NUMBERS` comment above the trigger, and nothing else would catch forgetting it. The `--exclude-dir` flags matter: this mod has its own `.git`, whose loose objects and `COMMIT_EDITMSG` are in scope of a recursive grep.
 
 **Do not use `ck3.py find` for this.** `find` resolves to `find_key()` in `tools/ck3lib/index.py:215`, which queries the index's `defs` table — **definitions only**. The instant Step 2 deletes the definition it returns nothing no matter how many references survive, so it reports success precisely when the bug exists. The index is also only rebuilt by `ck3.py index`, which this task never runs. `validate` will not catch it either: it checks braces, BOM and loc-line syntax, never references.
 

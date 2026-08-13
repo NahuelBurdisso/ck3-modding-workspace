@@ -338,7 +338,11 @@ bc_battle_memory_effect = { TYPE = bc_battle_memory_won }
 # bc_scripted_effects.txt
 bc_battle_memory_effect = {
     create_character_memory = { type = $TYPE$ }
-    scope:new_memory ?= {
+    random_memory = {
+        limit = {
+            has_memory_type = $TYPE$
+            NOT = { has_variable = battle_location }
+        }
         set_variable = { name = battle_location value = scope:bc_battle_province }
     }
 }
@@ -348,21 +352,47 @@ One effect parameterised by `$TYPE$` rather than two, matching the mod's existin
 `bc_add_momentum_effect = { MODIFIER = ... }` (`bc_scripted_effects.txt:12-17`).
 The won/lost split is a localization decision, not a behavioural one.
 
-**`scope:new_memory` directly, without the double-scoping dance.** Vanilla's
-battle memories re-save it into a second scope first
-(`combat_on_actions.txt:127-135`), carrying the comment "we have to do this weird
-double-scoping due to some kind of dark pact with Code, else things won't work"
-(`00_knight_phase_events.txt:564`, and `harm_events.txt:673, :770`). Four sites in
-total, and they are the exception. Twenty-odd shipped sites write
-`scope:new_memory` straight — `hajj_events.txt:81, :1022`,
-`ep4_decision_events.txt:56, :240, :347, :628, :765, :858` (one of which stores a
-*saved scope* as the value, `scope:new_primary_title`, which is our exact case),
-`adoption_events.txt:82, :95`, `bp3_journey_events.txt:519`, and more. The API
-dump states it as the contract outright: `create_character_memory` is
-"**Saved as scope:new_memory**". The dance is cargo cult, and copying it would
-have added a decision — temporary scope or not — to a question that does not
-exist. If the restart shows the variable unset, the double-scoping is the
-fallback.
+**`random_memory` rather than `scope:new_memory`, because this call sits inside
+an iterator.** There are three shipped idioms for writing a variable onto a
+freshly created memory. Twenty-odd sites use `scope:new_memory` directly
+(`hajj_events.txt:81, :1022`, `ep4_decision_events.txt:56, :240, :347, :628,
+:765, :858`, `adoption_events.txt:82, :95`, `bp3_journey_events.txt:519`), and
+the API dump states it as the contract: `create_character_memory` is
+"**Saved as scope:new_memory**". Four sites instead re-save it into a second
+scope first (`combat_on_actions.txt:127-135`, `00_knight_phase_events.txt:564`,
+`harm_events.txt:673, :770`), carrying the comment "we have to do this weird
+double-scoping due to some kind of dark pact with Code, else things won't work".
+Every one of those twenty-four is a single-character call in an event
+`immediate`, an option, or a toast. **None is inside an iterator**, so none of
+them proves `scope:new_memory` rebinds per pass.
+
+The third idiom does not care. AGOT's `death_in_battle_memory_effect`
+(`death_management_events.txt:2308-2349`) creates a battle memory and writes
+`battle_location` onto it without ever touching `scope:new_memory`:
+
+```
+random_memory = {
+    limit = {
+        OR = { has_memory_type = witnessed_death_battle_good  ... }
+        NOT = { has_variable = battle_location }
+    }
+    set_variable = { name = battle_location value = scope:battle_death_location }
+}
+```
+
+It is a `$TYPE$`-parameterised scripted effect that creates a battle memory and
+sets exactly the variable we set — structurally the same effect, from the mod we
+load under. Its own call sites (`:2625, :2646, :2662, :2665, :2983`) are ordinary
+event `immediate` blocks, so it is no more *proven* in an iterator than the
+others. What it is, is **iterator-safe by construction**: `random_memory` searches
+the memories of the character currently in scope, and the newly created one is
+the only memory of that type without `battle_location` set — every earlier one
+got the variable when it was made. There is no cross-pass scope to rebind and
+nothing to leak between knights. The randomness is nominal; the limit matches one
+memory.
+
+The cost is one extra `NOT = { has_variable = ... }` per pass over a knight's own
+memory list. Worth removing the design's one unproven line.
 
 Localization reads the variable back with the vanilla accessor. AGOT **does**
 override this file, but through `localization/replace/english/memories_l_english.yml`
@@ -596,9 +626,12 @@ Variable names to avoid, all live in the playset: `battle_poi_*`, `epic_*`,
 - **Dead characters.** `is_alive = yes` on the knight loop and the commander
   branch. Commanders and knights can die in the combat that just ended.
 - **Leaderless sides.** `side_commander ?=` and `combat.location ?=` throughout.
-- **`scope:new_memory` not rebinding per iteration.** No shipped precedent for
-  creating a memory inside an iterator. The one unproven line in the design, with
-  a known fallback. See Verification.
+- **Memory variable written onto the wrong memory.** No shipped script creates a
+  memory inside an iterator, so `scope:new_memory` rebinding per pass is unproven.
+  `random_memory` sidesteps the question entirely — see the memory effect above.
+  The residual risk is only that a knight somehow already holds a
+  `bc_battle_memory_*` with no `battle_location`, which can only happen if a
+  previous write failed. Still checked at the restart.
 - **Bar too low.** Every knight in Westeros ends up with a wall of memories and
   the mark means nothing. **Bar too high.** Nothing fires, which is how vanilla's
   battle point-of-interest already behaves in AGOT. Both detected by the same
@@ -656,16 +689,12 @@ Aftermath adds:
   not prove the bar is right, only that it is even; the size distribution is what
   says whether it is set sensibly.
 - a knight's memory list rendering `bc_battle_memory_*` with the province name.
-  **This is the highest-risk line in the design.** No shipped script anywhere
-  creates a character memory inside an `every_*` iterator, so nothing proves
-  `scope:new_memory` rebinds on each pass rather than sticking to the first
-  memory created. The failure is not loud — it renders as one knight with a
+  Creating a memory inside an `every_*` iterator has no shipped precedent, so
+  this is still the line to watch even though `random_memory` removes the scope
+  question. The failure would not be loud — it renders as one knight with a
   correct memory and the rest with an empty one, or as every memory naming the
   same field. So the check is specifically: **open two different knights from the
-  same battle and confirm both name the province the battle was fought in.** If
-  it fails, the fallback is to save the memory into a per-iteration scope
-  (`scope:new_memory = { save_temporary_scope_as = bc_memory }`) before writing
-  the variable.
+  same battle and confirm both name the province the battle was fought in.**
 - `probe 'BC: nickname'` — and, if zero, a companion marker on each failed gate,
   so a nickname that never fires is explained rather than merely absent
 
@@ -676,10 +705,14 @@ Aftermath adds:
   `any_memory` + `memory_creation_date`, but only correct if the on_action's
   `effect` runs before its `events` list, which is unestablished — and a second
   memory of the same field would be noise even if the guard were sound.
-- **`save_temporary_scope_as` after `create_character_memory`.** Copies a
-  four-site vanilla idiom whose own comment admits it is unexplained, when twenty
-  shipped sites and the API dump say `scope:new_memory` is usable directly.
-  Retained only as the fallback if the restart shows the variable unset.
+- **`scope:new_memory`, direct or double-scoped.** Both idioms are well shipped,
+  and either would very likely work. Neither has a single call site inside an
+  iterator, which is the only place this design uses them, and the failure mode —
+  every knight's memory naming the same field — is quiet enough to survive a
+  playtest. `random_memory` has the same effect with no scope to get wrong. The
+  double-scoping dance in particular is cargo cult: its own comment calls it a
+  "dark pact with Code", and copying it would have added a decision (temporary
+  scope or not) to a question that does not exist.
 - **A private `nick_bc_*` pool.** Squats the `has_any_nickname = no` slot AGOT's
   own nickname system depends on, and adds a name nobody asked for. AGOT's pool
   displaces the same slot but at least returns a name from the setting.

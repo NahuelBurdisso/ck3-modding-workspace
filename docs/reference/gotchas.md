@@ -267,3 +267,30 @@ Works well, reuse it:
 Caveat: some mods legitimately comment out `{`-opening lines, so their files are
 genuinely brace-imbalanced relative to the base. A merge that inherits the same
 offset is correct, not broken. Check *why* before "fixing" it.
+
+Two more things a merge pass has to check, not assume:
+
+- **A merge rots when its inputs are uninstalled, not just when they update.** Half
+  of `agot_conflict_merge`'s files pointed at mods no longer in the playset. One of
+  them, `gui/window_character.gui`, had gone from useful to *harmful*: that file is
+  now claimed by a purpose-built compatibility patch, and re-shipping a stale trunk
+  on top of it would undo the patch. Before re-enabling any merge mod, check every
+  file still appears in `conflicts` and that the colliding mods are the same ones.
+- **A "missing" line is not necessarily a dropped line.** Set-differencing a merge
+  against its inputs flags every deliberate decision as a loss. In `color_lists.txt`
+  87 House Founders lines were "missing" because AGOT+'s named-colour rewrite was
+  chosen for those blocks on purpose. Read the hits before believing them.
+
+## `ck3.py conflicts` reads the index, not the playset
+
+The index is a snapshot. If mods were subscribed, unsubscribed or disabled since the
+last `ck3.py index`, `conflicts`, `find` and `where` all answer confidently about a
+playset the game does not load. This is the worst kind of wrong: it looks authoritative.
+
+It happened: the index held 64 non-vanilla sources while `dlc_load.json` listed 45, so
+`conflicts` reported 122 collisions involving five mods that are not installed. After a
+rebuild: 47 sources, **300** collisions, and a completely different mod list.
+
+**Rebuild the index first, every time, before any conflict or load-order work.**
+`python tools/ck3.py doctor` prints the live playset count — compare it against
+`ck3.py stats` before trusting anything.

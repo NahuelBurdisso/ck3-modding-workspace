@@ -29,6 +29,8 @@ Tasks 1–9 build and land the feature. Task 10 runs it. Task 11 sets the real t
 
 All paths below are relative to `D:/ck3`. All script files are tab-indented — match the surrounding file.
 
+**The mod is its own git repository.** `D:/ck3/.gitignore` ignores `mods/`, so `git add mods/battle_chronicles/...` from the workspace root fails outright. Every commit step below therefore runs from `D:/ck3/mods/battle_chronicles` with paths relative to it. The plan document itself lives in the workspace repo and is committed separately.
+
 ---
 
 ## File structure
@@ -105,7 +107,7 @@ Expected: no output.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /d/ck3 && git add mods/battle_chronicles/common/game_rules/bc_game_rules.txt mods/battle_chronicles/localization/english/bc_l_english.yml && git commit -m "feat(bc): add bc_aftermath game rule
+cd /d/ck3/mods/battle_chronicles && git add common/game_rules/bc_game_rules.txt localization/english/bc_l_english.yml && git commit -m "feat(bc): add bc_aftermath game rule
 
 Ships with the feature rather than after it: a modded game rule is baked
 into every save made with it, so adding one later cannot reach saves that
@@ -235,7 +237,7 @@ Expected: no output.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /d/ck3 && git add mods/battle_chronicles/common/character_memory_types/bc_memories.txt mods/battle_chronicles/localization/english/bc_l_english.yml && git commit -m "feat(bc): add battle memory types for won and lost fields
+cd /d/ck3/mods/battle_chronicles && git add common/character_memory_types/bc_memories.txt localization/english/bc_l_english.yml && git commit -m "feat(bc): add battle memory types for won and lost fields
 
 Forty years, not memory_default_duration - that default resolves to 5 for
 a landless knight, which is the whole population this is for."
@@ -345,7 +347,7 @@ Expected: `0 errors, 0 warnings`
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /d/ck3 && git add mods/battle_chronicles/common/script_values/bc_script_values.txt && git commit -m "feat(bc): add host-gap script values for battle grading
+cd /d/ck3/mods/battle_chronicles && git add common/script_values/bc_script_values.txt && git commit -m "feat(bc): add host-gap script values for battle grading
 
 Anchored to root, unlike the two existing values, which are read from
 phase events where scope:combat_side is what exists. Four extra values
@@ -444,7 +446,7 @@ Expected: `0 errors, 0 warnings`
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /d/ck3 && git add mods/battle_chronicles/common/scripted_triggers/bc_scripted_triggers.txt && git commit -m "feat(bc): add battle grading trigger
+cd /d/ck3/mods/battle_chronicles && git add common/scripted_triggers/bc_scripted_triggers.txt && git commit -m "feat(bc): add battle grading trigger
 
 calc_true_if with amount >= 2, matching historical_artifacts.0100. Every
 row is symmetric so winner and loser reach the same verdict. Thresholds
@@ -649,7 +651,7 @@ Expected: no output.
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /d/ck3 && git add mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt mods/battle_chronicles/localization/english/bc_l_english.yml && git commit -m "feat(bc): add aftermath memory, counter and nickname effects
+cd /d/ck3/mods/battle_chronicles && git add common/scripted_effects/bc_scripted_effects.txt localization/english/bc_l_english.yml && git commit -m "feat(bc): add aftermath memory, counter and nickname effects
 
 Memory uses random_memory rather than scope:new_memory because it is the
 only one of the three shipped idioms that is iterator-safe by
@@ -894,7 +896,7 @@ Expected: `0 errors, 0 warnings`
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /d/ck3 && git add mods/battle_chronicles/events/bc_events.txt && git commit -m "feat(bc): add bc_chronicles.0092, aftermath on the losing side
+cd /d/ck3/mods/battle_chronicles && git add events/bc_events.txt && git commit -m "feat(bc): add bc_chronicles.0092, aftermath on the losing side
 
 Grades the battle, logs the calibration ladders on every combat end
 whether or not the bar is cleared, and gives each surviving knight a
@@ -1173,7 +1175,7 @@ Expected: `0 errors, 0 warnings`
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /d/ck3 && git add mods/battle_chronicles/events/bc_events.txt && git commit -m "feat(bc): add bc_chronicles.0091, aftermath on the winning side
+cd /d/ck3/mods/battle_chronicles && git add events/bc_events.txt && git commit -m "feat(bc): add bc_chronicles.0091, aftermath on the winning side
 
 Adds the cumulative notable-win counter and the nickname on top of what
 .0092 does. Counter increments before the nickname check so N counts the
@@ -1219,7 +1221,7 @@ Expected: `0 errors, 0 warnings`
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /d/ck3 && git add mods/battle_chronicles/common/on_action/bc_on_actions.txt && git commit -m "feat(bc): hook the aftermath events to combat end
+cd /d/ck3/mods/battle_chronicles && git add common/on_action/bc_on_actions.txt && git commit -m "feat(bc): hook the aftermath events to combat end
 
 events = { } only, as the file header demands - an effect block here is
 discarded by alphabetical filename order regardless of load order."
@@ -1343,7 +1345,7 @@ Same run, no extra cost:
 Append the probe table, the error-log result and the two-knight result to `mods/battle_chronicles/README.md`, in the style of the existing "First live run (2026-08-12)" section.
 
 ```bash
-cd /d/ck3 && git add mods/battle_chronicles/README.md && git commit -m "docs(bc): record the aftermath calibration run"
+cd /d/ck3/mods/battle_chronicles && git add README.md && git commit -m "docs(bc): record the aftermath calibration run"
 ```
 
 ---
@@ -1431,7 +1433,7 @@ cd /d/ck3 && python tools/ck3.py deploy battle_chronicles && python tools/ck3.py
 ```
 
 ```bash
-cd /d/ck3 && git add mods/battle_chronicles && git commit -m "tune(bc): set aftermath thresholds from the calibration run, strip markers
+cd /d/ck3/mods/battle_chronicles && git add . && git commit -m "tune(bc): set aftermath thresholds from the calibration run, strip markers
 
 Vanilla's numbers were placeholders for Westerosi host sizes. The
 notable/not-notable markers stay - the winner-versus-loser count is the

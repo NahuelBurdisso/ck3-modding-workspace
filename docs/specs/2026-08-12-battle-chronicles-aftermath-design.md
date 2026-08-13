@@ -7,8 +7,14 @@ Predecessor: `2026-08-12-battle-chronicles-design.md`
 
 All line citations are against the file **as loaded**. AGOT wins load order on
 most files cited here, so those are AGOT's line numbers, not vanilla's. The
-exceptions are `character_memories_events.txt`, which only vanilla ships, and
-`memories_l_english.yml`, which AGOT overrides through `localization/replace/`.
+exceptions:
+
+| File | Loaded from |
+|---|---|
+| `character_memories_events.txt`, `00_memory_values.txt` | vanilla only; AGOT ships no override |
+| `memories_l_english.yml` | AGOT, but through `localization/replace/` — which is why `ck3.py where localization/english/...` reports vanilla as the sole source |
+| `agot_knight_on_actions.txt` | **AGOT: The Knighting Ceremony** (workshop `3673468355`), a whole-file override of AGOT's |
+| `zz_gr_memory_tracking.txt` | **Grand Remembrance** (workshop `3678529052`), its own file |
 
 ## The problem
 
@@ -30,7 +36,7 @@ idea than it kept.
 - Loser, `combat_on_actions.txt:543-572`: a bare
   `if = { limit = { exists = side_commander, exists = enemy_side.side_commander } }`.
   No random gate. The losing commander gets `battle_lost_memory` **every time**.
-- Winner, `combat_on_actions.txt:90-136`: the same existence check wrapped in
+- Winner, `combat_on_actions.txt:90-139`: the same existence check wrapped in
   `random = { chance = { value = 10 ... } }`, rising to 100 on a wipe or when the
   enemy commander's primary title tier is **equal or higher**. Base case is
   **10%**.
@@ -51,10 +57,15 @@ side_commander = {
 Both branches also require the **enemy** side to have a commander, so a
 leaderless enemy suppresses the memory on both sides.
 
-Consequence for this design: there is no way to detect whether the vanilla roll
-fired. Any memory we create for a side commander duplicates his memory of the
-same field 100% of the time when he lost and 10% of the time when he won.
-**Commanders get no memory from us.**
+Consequence for this design: any memory we create for a side commander duplicates
+his memory of the same field 100% of the time when he lost and 10% of the time
+when he won. Detecting the winner's roll is *expressible* — `any_memory = {
+memory_type = battle_won_memory memory_creation_date = current_date }` — but it
+would only be correct if AGOT's `effect` block on `on_combat_end_winner` runs
+before the merged `events = { }` list, and nothing establishes that ordering. A
+guard that is right or wrong depending on an unverified execution order is worse
+than not needing one. **Commanders get no memory from us**, and the deeper reason
+is that a second memory of the same battle would be noise even if it were safe.
 
 **The knight gets nothing, but his sword does.** `combat_on_actions.txt:199`
 walks `every_side_knight` and sets `artifact_battles_won_var = 1` on his equipped
@@ -62,8 +73,8 @@ primary armament; `:223` is the increment branch for a weapon that already has
 one. The weapon accumulates a battle count. The man carries no record he was
 there.
 
-**Vanilla grades battles twice, and neither grade touches a person.**
-`combat_event.3000` writes a map point-of-interest onto the province.
+**Vanilla grades battles twice, and neither grade gives a person anything he can
+see.** `combat_event.3000` writes a map point-of-interest onto the province.
 `historical_artifacts.0100` (`historical_artifacts_events.txt:1018-1059`, itself
 `hidden = yes, scope = combat_side` — direct precedent for this whole approach)
 stores `epic_battle_location` / `epic_loser` on the primary participant to name
@@ -79,6 +90,7 @@ calc_true_if = {
         combat = { num_total_troops >= 20000 }
     }
     combat = { OR = { num_total_troops >= 30000 warscore_value >= 25 } }
+    # ... plus two any_in_list rows over slain_combatants and prisoners_of_war
 }
 ```
 
@@ -91,19 +103,23 @@ and `prisoners_of_war` is safe for them and is **not** safe for us.
 **`battle_poi_number_value` is unusable in AGOT.** It multiplies 3000 by a ladder
 keyed on `current_year`, topping out at ×6 above 1400. AGOT's earliest bookmark
 is `start_date = 8082.1.1` and every other is later, so the ladder is always
-maxed and the unit is always 18000. AGOT copied `08_bp3_values.txt` verbatim
-without retuning, which is why vanilla's battle point-of-interest is close to
-unreachable in Westeros. Do not reference it.
+maxed and the unit is always 18000. AGOT copied `08_bp3_values.txt` with a single
+unrelated edit and no retuning of this value. Do not reference it. (This does not
+mean the map point-of-interest never fires: `combat_event.3000` needs 3 of nine
+rows and six of them — `troops_ratio`, `warscore_value >= 15`, the
+`slain_combatants` and `prisoners_of_war` rows, and the two `is_ai = no` rows —
+do not touch `battle_poi_number_value` at all.)
 
 **AGOT runs a large, live nickname system, and it is gated on the slot we would
 take.** `agot_nicknames_pulse` drives roughly 1,630 `give_nickname` calls across
 `agot_nicknames_events.txt`. Its generic entry `agot_nicknames.0100` opens
-with `has_any_nickname = no`, as does vanilla's `assign_random_nickname_effect`
-(`00_nickname_effects.txt:41`). Its heroic branch requires `prowess >= 25` and
-bold AI and awards exactly the martial flavour an aftermath nickname would want —
-`nick_agot_breakspear`, `nick_agot_shieldbreaker`, `nick_agot_greatheart`,
-`nick_agot_thunderbolt`. There are 2,588 unique `nick_agot_*` keys across five
-files, including house-specific dynastic pools. (`agot_nicknames.0100:162`.)
+with `has_any_nickname = no` (`agot_nicknames_events.txt:162`), as does vanilla's
+`assign_random_nickname_effect` (`00_nickname_effects.txt:41`). Its heroic branch
+requires `prowess >= 25` and bold AI and awards exactly the martial flavour an
+aftermath nickname would want — `nick_agot_breakspear`,
+`nick_agot_shieldbreaker`, `nick_agot_greatheart`, `nick_agot_thunderbolt`. There
+are 2,758 unique `nick_agot_*` keys defined across the five files in
+`common/nicknames/`, including house-specific dynastic pools.
 
 The exclusion this causes is unavoidable: *any* nickname from any source closes
 every AGOT pool for that character. What is avoidable is what he ends up called.
@@ -118,8 +134,9 @@ victories without a loss, tracked in `combat_event_0001_tracker`
 
 **AGOT already uses this hook for an aftermath of its own.**
 `agot_knight_on_combat_end_winner` rolls a post-battle knighting
-(`agot_knight_on_actions.txt:45-50`), and the playset mod "AGOT: The Knighting
-Ceremony" whole-file-overrides that file to reroute it. It is knighting, not
+(`agot_knight_on_actions.txt:48-53`, as loaded — the playset mod "AGOT: The
+Knighting Ceremony" whole-file-overrides AGOT's copy to reroute it). It is
+knighting, not
 memories or names, so it does not overlap — but the hook is not ours alone.
 Grand Remembrance also hooks `on_combat_end_winner` (`zz_gr_memory_tracking.txt:50`)
 to track battles for player-tracked characters, granting nothing.
@@ -146,7 +163,9 @@ the winner of the combat", but every script use of it in vanilla and AGOT is
 *during* combat, inside `is_army_in_combat = yes`; its value at combat end is
 unproven, and this design will not rest on it.
 
-Two new hidden events instead, both `scope = combat_side`:
+Two new hidden events instead, both `hidden = yes` + `scope = combat_side` with
+**no `type =`**, matching `bc_chronicles.0090` (`bc_events.txt:146-149`) and the
+vanilla precedent `historical_artifacts.0100` (`:1018-1020`):
 
 | Event | Hook | Job |
 |---|---|---|
@@ -174,13 +193,15 @@ script (`combat_events.txt:2506`, `combat_on_actions.txt:442`).
 | `combat = { warscore_value >= <SCORE> }` | it decided something |
 | `has_game_rule = bc_aftermath_generous` | a free point when the player asked for one; see The game rule |
 
-**`amount >= 2`**, matching `historical_artifacts.0100`. Five substantive rows,
-two of which a very large battle satisfies together, so 2 means "big and
-something else, or two somethings" while 1 would mean "big" alone. The sixth row
-is the game rule, which hands out a free point under `bc_aftermath_generous` and
-so expresses "1" without a second copy of the list. Above 2 the bar starts
-requiring coincidences rather than significance, and the run will say whether
-even 2 is too many.
+**`amount >= 2`**, matching `historical_artifacts.0100`. Five substantive rows.
+The two size rows nest — `<SIZE_HUGE>` implies `<SIZE_BIG>` — so what the bar
+actually reads is **"huge, or big plus one other thing"**. That is deliberate: a
+field of thirty thousand men is notable whatever else happened on it. It also
+means the blood, odds and warscore rows never matter for the largest battles, so
+their ladders should be read against the *sub-huge* population when calibrating.
+The sixth row is the game rule, which hands out a free point under
+`bc_aftermath_generous`, so generous reads "any one real row at all". Above 2 the bar starts requiring coincidences rather than significance, and the
+run will say whether even 2 is too many.
 
 **The bar must be symmetric, and only two rows are symmetric for free.**
 `num_total_troops` and `warscore_value` are `combat`-scoped and identical from
@@ -198,9 +219,25 @@ What the row needs is a **threshold**, so that it asks "was one host much larger
 rather than "were the hosts unequal". That is what the two script values are for:
 
 ```
-bc_our_host_gap_value   = { value = side_max_army_size            multiply = <ODDS> }
-bc_their_host_gap_value = { value = enemy_side.side_max_army_size multiply = <ODDS> }
+bc_our_host_gap_value   = { value = root.side_max_army_size            multiply = <ODDS> }
+bc_their_host_gap_value = { value = root.enemy_side.side_max_army_size multiply = <ODDS> }
 ```
+
+**`root.`, not a bare operand.** Both rows put a scope path on the left —
+`enemy_side.side_max_army_size >= bc_our_host_gap_value` — and if the engine
+resolves an unprefixed script value on the right in the *left* operand's scope,
+`bc_our_host_gap_value` would evaluate as the enemy host and the row would read
+`enemy >= enemy × 1.5`: permanently false, on both sides, while still passing the
+winner-versus-loser symmetry check that is supposed to catch exactly this. That
+resolution rule is unverified and the design should not depend on knowing it.
+Anchoring removes the question. Vanilla anchors too, though at the call site
+rather than in the value: `vastly_outnumbered_combat_side_threshold` has a bare
+`side_strength` operand (`00_combat_values.txt:7-10`) and every one of its four
+call sites writes the full path on both sides
+(`00_commander_phase_events.txt:186, :316`, `00_knight_phase_events.txt:797, :998`).
+This mod's own `bc_outnumbered_threshold_value` anchors in the value itself, with
+`scope:combat_side.` — the same instinct, a different root, because those values
+are read from phase events where `scope:combat_side` is what exists.
 
 Each side then asks whether either host was at least `<ODDS>` times the other.
 Both sides compute the same answer, and `<ODDS>` is a real tunable — 1.5 to
@@ -209,10 +246,8 @@ greater than 1.** At exactly 1 the row degenerates back to `A != B` and
 reproduces the free-point failure it was built to avoid; at less than 1 it is
 true always.
 
-This shape — a `combat_side` trigger on the left, a script value on the right —
-is the same one this mod already proved in game with
-`bc_outnumbered_threshold_value`. It does not avoid using `side_max_army_size`
-as a trigger, and it is not trying to. That use has no script precedent anywhere
+This does not avoid using `side_max_army_size` as a trigger, and it is not
+trying to. That use has no script precedent anywhere
 in vanilla, AGOT or the playset (every occurrence is as a script value operand:
 `combat_on_actions.txt:442, :476`, `zz_gr_memory_tracking.txt:74`) but it is
 documented as legal — the API dump lists `side_max_army_size` with traits
@@ -256,12 +291,36 @@ end, log, then branch on the grade. The only thing in their `trigger` is the
 
 ### What a notable battle leaves — knights
 
-`every_side_knight` with `limit = { is_alive = yes, exists = scope:bc_battle_province }`.
-Vanilla guards its own knight iterators at combat end for exactly this reason
-(`combat_events.txt:854`, and `:1028` with the comment `is_alive = yes # Don't
-kill knights who are already dead!`), and guards the side commander the same way
-at `:87`. The mod's
-own knight phase events already gate on it.
+```
+if = {
+    limit = { exists = scope:bc_battle_province }
+    every_side_knight = {
+        limit = {
+            is_alive = yes
+            NOT = { this = root.side_commander }
+        }
+        ...
+    }
+}
+```
+
+`NOT = { this = root.side_commander }` protects the one guarantee this design
+makes — that **we** never give a commander a battle memory, because vanilla
+already does. Nothing in the API says whether `every_side_knight` includes the
+commander; vanilla runs `every_side_knight` and `every_side_commander` back to
+back without deduplicating (`combat_events.txt:2087-2093`, `:2119-2125`), which
+hints the sets are disjoint but does not prove it. The guard costs nothing if
+they are.
+
+The province check is an enclosing `if`, not part of the `limit` — it is a
+property of the battle, and re-asking it once per knight is noise.
+
+`is_alive = yes` because commanders and knights die in the combat that just
+ended. Vanilla guards its own knight handling at combat end for exactly this
+reason — inside its post-battle knight `random_list`, every outcome branch opens
+`is_alive = yes` (`combat_events.txt:854`, and `:1028` with the comment `# Don't
+kill knights who are already dead!`), and the side commander is guarded the same
+way at `:87`. The mod's own knight phase events already gate on it.
 
 The province scope must be saved by us. Vanilla saves `battle_province` in the
 on_action's `effect` block, which this mod cannot do, so it is saved at the top
@@ -274,30 +333,54 @@ combat.location ?= { save_scope_as = bc_battle_province }
 Then, per knight:
 
 ```
-create_character_memory = { type = bc_battle_memory_won }
-scope:new_memory = { save_temporary_scope_as = bc_memory }
-scope:bc_memory = {
-    set_variable = { name = battle_location value = scope:bc_battle_province }
+bc_battle_memory_effect = { TYPE = bc_battle_memory_won }
+
+# bc_scripted_effects.txt
+bc_battle_memory_effect = {
+    create_character_memory = { type = $TYPE$ }
+    scope:new_memory ?= {
+        set_variable = { name = battle_location value = scope:bc_battle_province }
+    }
 }
 ```
 
-`save_temporary_scope_as`, not `save_scope_as`. Both vanilla precedents for the
-double-scoping quirk (`harm_events.txt:672-681`, and the comment about "some
-kind of dark pact with Code" at `00_knight_phase_events.txt:564`) are
-single-character call sites outside any iterator, so neither settles the question.
-Temporary is correct here because the scope is rebound on every iteration and is
-wanted only for the statement that immediately follows it; a non-temporary scope
-would outlive the loop for no reason.
+One effect parameterised by `$TYPE$` rather than two, matching the mod's existing
+`bc_add_momentum_effect = { MODIFIER = ... }` (`bc_scripted_effects.txt:12-17`).
+The won/lost split is a localization decision, not a behavioural one.
+
+**`scope:new_memory` directly, without the double-scoping dance.** Vanilla's
+battle memories re-save it into a second scope first
+(`combat_on_actions.txt:127-135`), carrying the comment "we have to do this weird
+double-scoping due to some kind of dark pact with Code, else things won't work"
+(`00_knight_phase_events.txt:564`, and `harm_events.txt:673, :770`). Four sites in
+total, and they are the exception. Twenty-odd shipped sites write
+`scope:new_memory` straight — `hajj_events.txt:81, :1022`,
+`ep4_decision_events.txt:56, :240, :347, :628, :765, :858` (one of which stores a
+*saved scope* as the value, `scope:new_primary_title`, which is our exact case),
+`adoption_events.txt:82, :95`, `bp3_journey_events.txt:519`, and more. The API
+dump states it as the contract outright: `create_character_memory` is
+"**Saved as scope:new_memory**". The dance is cargo cult, and copying it would
+have added a decision — temporary scope or not — to a question that does not
+exist. If the restart shows the variable unset, the double-scoping is the
+fallback.
 
 Localization reads the variable back with the vanilla accessor. AGOT **does**
 override this file, but through `localization/replace/english/memories_l_english.yml`
 rather than the ordinary path, which is why `ck3.py where localization/english/...`
 reports vanilla as the only source — the tool does not look in `replace/`. The
-accessor is byte-identical in both copies, at `:927-929` in the loaded one:
+accessors are byte-identical in both copies — the description form at `:927-929`
+in the loaded one, the title form at `:555-556`:
 
 ```
+# description
 [ROOT.Var('battle_location').GetProvince.GetName]
+# title
+[ROOT.Var('battle_location').GetProvince.GetNameNoTooltip]
 ```
+
+Two accessors, not one. The title uses `GetNameNoTooltip`, as vanilla's own
+battle-memory titles do ("Battle of …"); `GetName` there would nest a tooltip
+inside a memory-list entry.
 
 Two memory types, `bc_battle_memory_won` and `bc_battle_memory_lost`, so the
 polarity token is right and the localization stays simple. Categories follow
@@ -342,7 +425,7 @@ side_commander ?= {
             var:bc_notable_battles >= <N>
             martial >= 14
         }
-        random_list = { ... give_nickname = nick_agot_<heroic> ... }
+        bc_aftermath_nickname_effect = yes
     }
 }
 ```
@@ -362,7 +445,22 @@ where most lords fight a handful of battles and few of those clear the bar. The
 run reports the notable-battle rate, which is what says whether 3 is a career or
 a formality.
 
-**The pool is AGOT's, not ours.** Both choices consume the same
+**The pool is exactly AGOT's heroic list — all 27 entries, weight 1 each, no null
+entry** (`agot_nicknames_events.txt:186-213`, `nick_agot_the_warrior` through
+`nick_agot_the_painter`). No null, because the gate above has already decided the
+man deserves a name; the list only decides which. Copying the whole list rather
+than a hand-picked subset keeps the mod out of the business of judging which of
+AGOT's names are martial enough, and means the pool tracks AGOT if AGOT extends
+it — the keys are referenced, not redefined.
+
+**The award is announced with a toast**, `event_toast_effect_good`, on the
+commander. It is the mod's own rule that state comes first and presentation
+second, and this is presentation: `give_nickname` runs in the effect block,
+outside the toast, so the AI commander is named whether or not anyone is watching.
+Vanilla announces its own battle nickname the same way rather than silently
+(`combat_events.txt:209`).
+
+**Why AGOT's pool and not ours.** Both choices consume the same
 `has_any_nickname = no` slot and both therefore close AGOT's whole nickname
 system for that character. They differ only in what the character is left
 holding. Drawing from AGOT's heroic martial names —
@@ -375,9 +473,10 @@ mod list sees a name that belongs to the setting.
 it.** Every dynastic event gates on `has_any_nickname = no` independently of the
 generic one (`agot_nicknames_events.txt:1332-1340` for the Lannister pool), so
 *any* name we award closes *every* AGOT pool for that character, house names
-included. Worse, a martial-distinction gate selects precisely the high-prowess,
-bold commander AGOT's own heroic branch wants. And our rate is far higher than
-AGOT's: `agot_nicknames.0100` is weight 2 of roughly 172 in `agot_nicknames_pulse`
+included. The `martial >= 14` gate at least does not aim at the same men AGOT's
+heroic branch wants — that branch needs `prowess >= 25` and bold AI, and the two
+populations only partly overlap — but it does not have to, because the dynastic
+pools have no skill gate at all. And our rate is far higher than AGOT's: `agot_nicknames.0100` is weight 2 of 174 in `agot_nicknames_pulse`
 (`agot_nicknames_on_actions.txt:1-71`), driven off a five-year pulse, and inside
 it the heroic branch is weight 50 against a 1000-weight null
 (`agot_nicknames_events.txt:177-186`).
@@ -393,10 +492,11 @@ deliberately overwrites any nickname flagged `is_bad`
 (`00_nickname_effects.txt:8-11`), and a Westeros playset is full of
 bad-sounding canon names worth keeping.
 
-This makes AGOT a hard dependency for the nickname branch, which is acceptable —
-the mod is an AGOT mod and its README already says to load it after AGOT. It is
-a change from the mod's existing stance of avoiding hard dependencies, but that
-stance was about *optional* playset mods such as Seasons of Ice and Fire.
+This is the first time mod *script* references an AGOT key. The dependency itself
+is not new — `descriptor.mod` already declares `dependencies = { "A Game of
+Thrones" }` — and the stance the mod does hold, avoiding hard dependencies, was
+always about *optional* playset mods such as Seasons of Ice and Fire, which is
+why the terrain triggers use plain vanilla keys.
 
 ### The game rule
 
@@ -410,6 +510,9 @@ option key repeats the rule name and is read with `has_game_rule`
 | `bc_aftermath_off` | no grading, no memories, no nicknames. The mod behaves exactly as it does today. |
 | `bc_aftermath_default` | as designed. `amount >= 2`, `<N>` as set. |
 | `bc_aftermath_generous` | one free `calc_true_if` point, so one real row suffices; notable fields and names are commoner |
+
+`default = bc_aftermath_default`, declared as the mod's other two rules declare
+theirs (`bc_game_rules.txt:20, :30`), and `categories = { flavor }` to match.
 
 Wired in two places:
 
@@ -467,12 +570,12 @@ grow on it.
 |---|---|
 | `common/character_memory_types/bc_memories.txt` | add `bc_battle_memory_won`, `bc_battle_memory_lost` |
 | `common/scripted_triggers/bc_scripted_triggers.txt` | add `bc_battle_is_notable_trigger`; amend the file header's scope invariant |
-| `common/scripted_effects/bc_scripted_effects.txt` | add the memory, nickname and counter effects |
+| `common/scripted_effects/bc_scripted_effects.txt` | add `bc_battle_memory_effect = { TYPE = ... }`, `bc_notable_battle_counter_effect`, `bc_aftermath_nickname_effect` |
 | `common/script_values/bc_script_values.txt` | add `bc_our_host_gap_value`, `bc_their_host_gap_value`; note in the file header that these two read the combat side as **root**, unlike the two existing values, which are written against `scope:combat_side` (`bc_script_values.txt:19, :24`) |
 | `common/on_action/bc_on_actions.txt` | `.0091` to `on_combat_end_winner`, `.0092` to `on_combat_end_loser` |
 | `common/game_rules/bc_game_rules.txt` | add `bc_aftermath` (`bc_aftermath_off` / `_default` / `_generous`) |
 | `events/bc_events.txt` | add `bc_chronicles.0091` and `.0092` |
-| `localization/english/bc_l_english.yml` | memory titles and descriptions, three perspectives each |
+| `localization/english/bc_l_english.yml` | 2 memory titles + 2 descriptions × 3 perspectives; the nickname toast; and the 8 game-rule keys — `rule_bc_aftermath`, `rule_bc_aftermath_desc`, and `setting_bc_aftermath_<option>` / `_desc` for each of the three options, following `bc_l_english.yml:26-42` |
 
 No new files, and no new nickname file — the AGOT-pool decision removes it.
 Every path is already mod-owned, so the zero-collision property is unchanged by
@@ -485,16 +588,17 @@ Variable names to avoid, all live in the playset: `battle_poi_*`, `epic_*`,
 
 ## Failure modes
 
-- **Duplicate commander memory.** Avoided by never creating one for him. The
-  vanilla roll is undetectable, so this is the only safe answer.
+- **Duplicate commander memory.** Avoided by never creating one for him, and by
+  excluding him from the knight loop in case `every_side_knight` includes him.
 - **Nickname exclusion.** Reduced by drawing from AGOT's pool rather than a
   private one, but not eliminated: any name closes every AGOT pool for that
   character, dynastic included. Controlled by rarity and by `bc_aftermath_off`.
 - **Dead characters.** `is_alive = yes` on the knight loop and the commander
   branch. Commanders and knights can die in the combat that just ended.
 - **Leaderless sides.** `side_commander ?=` and `combat.location ?=` throughout.
-- **Scope leak in the knight loop.** `save_temporary_scope_as` — and this is the
-  one unproven line in the design. See Verification.
+- **`scope:new_memory` not rebinding per iteration.** No shipped precedent for
+  creating a memory inside an iterator. The one unproven line in the design, with
+  a known fallback. See Verification.
 - **Bar too low.** Every knight in Westeros ends up with a wall of memories and
   the mark means nothing. **Bar too high.** Nothing fires, which is how vanilla's
   battle point-of-interest already behaves in AGOT. Both detected by the same
@@ -515,8 +619,8 @@ Variable names to avoid, all live in the playset: `battle_poi_*`, `epic_*`,
 Thresholds cannot be guessed, and a restart costs about seven minutes, so the run
 that sets them must also be the run that tests everything else.
 
-`bc_chronicles.0091` / `.0092` log buckets on every combat end, unconditionally
-and independently of the bar. **Every marker is tagged with which side logged
+`bc_chronicles.0091` / `.0092` log buckets on every combat end the events fire
+on, independently of the bar. **Every marker is tagged with which side logged
 it**, because the two events fire on the same battle and untagged markers would
 double-count the distribution and, worse, make the winner-versus-loser comparison
 below impossible — the one test that catches an asymmetric bar:
@@ -544,30 +648,38 @@ weights behave, and whether a toast body runs for an AI character.
 
 Aftermath adds:
 
-- `probe 'BC: win size'` / `'BC: lose size'`, and the same for blood and odds —
-  the distributions, for setting the four thresholds
+- `probe 'BC: win size'` / `'BC: lose size'`, and the same for blood, warscore
+  and odds — four ladders, for setting all five thresholds (`<SIZE_BIG>` and
+  `<SIZE_HUGE>` come off the one size distribution)
 - `probe 'BC: win notable'` vs `'BC: lose notable'` — **the counts must match
   exactly**. Any divergence means the bar is asymmetric. Equal counts alone do
   not prove the bar is right, only that it is even; the size distribution is what
   says whether it is set sensibly.
 - a knight's memory list rendering `bc_battle_memory_*` with the province name.
-  **This is the highest-risk line in the design.** Every shipped precedent for
-  the `scope:new_memory` double-scoping quirk is a single-character call site
-  outside any iterator; nothing proves `scope:new_memory` rebinds correctly on
-  each pass of `every_side_knight`, and nothing proves
-  `save_temporary_scope_as` is the right half of that pair. The failure is not
-  loud — it renders as every knight's memory naming the same province, or as a
-  memory with no province at all. So the check is specifically: **open two
-  different knights from the same battle and confirm both name the province the
-  battle was fought in.** If it fails, the fallback is
-  `save_scope_as` inside the loop, accepting the leak.
+  **This is the highest-risk line in the design.** No shipped script anywhere
+  creates a character memory inside an `every_*` iterator, so nothing proves
+  `scope:new_memory` rebinds on each pass rather than sticking to the first
+  memory created. The failure is not loud — it renders as one knight with a
+  correct memory and the rest with an empty one, or as every memory naming the
+  same field. So the check is specifically: **open two different knights from the
+  same battle and confirm both name the province the battle was fought in.** If
+  it fails, the fallback is to save the memory into a per-iteration scope
+  (`scope:new_memory = { save_temporary_scope_as = bc_memory }`) before writing
+  the variable.
 - `probe 'BC: nickname'` — and, if zero, a companion marker on each failed gate,
   so a nickname that never fires is explained rather than merely absent
 
 ## Rejected
 
 - **A memory for the side commander.** He already has one, guaranteed if he lost
-  and on a 10% roll if he won, and the roll is undetectable.
+  and on a 10% roll if he won. Detecting the roll is expressible with
+  `any_memory` + `memory_creation_date`, but only correct if the on_action's
+  `effect` runs before its `events` list, which is unestablished — and a second
+  memory of the same field would be noise even if the guard were sound.
+- **`save_temporary_scope_as` after `create_character_memory`.** Copies a
+  four-site vanilla idiom whose own comment admits it is unexplained, when twenty
+  shipped sites and the API dump say `scope:new_memory` is usable directly.
+  Retained only as the fallback if the restart shows the variable unset.
 - **A private `nick_bc_*` pool.** Squats the `has_any_nickname = no` slot AGOT's
   own nickname system depends on, and adds a name nobody asked for. AGOT's pool
   displaces the same slot but at least returns a name from the setting.

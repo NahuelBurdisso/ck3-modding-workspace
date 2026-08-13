@@ -1265,7 +1265,7 @@ No commit — this task changes nothing under version control.
 
 **Files:** none modified.
 
-- [ ] **Step 1: Launch, with the logs cleared**
+- [x] **Step 1: Launch, with the logs cleared**
 
 Run: `python tools/ck3.py launch --clear-logs`
 
@@ -1275,7 +1275,7 @@ Set the `bc_aftermath` game rule to **Generous** at the start (see Step 3 — it
 
 Play or observe until a meaningful number of battles have resolved. More battles is strictly better — the whole point is a distribution.
 
-- [ ] **Step 2: Collect the outcome markers**
+- [x] **Step 2: Collect the outcome markers**
 
 Run: `python tools/ck3.py probe 'BC:'`
 
@@ -1302,7 +1302,7 @@ Record the full table. The counts that matter:
 
 Read the size, blood, warscore and odds ladders against the **sub-huge** population — the two size rows nest, so those three rows never decide the largest battles.
 
-- [ ] **Step 3: Check the memory in game, on two knights**
+- [ ] **Step 3: Check the memory in game, on two knights** — NOT DONE, and it is the one unverified thing left in the design. The calibration run was played on `bc_aftermath_default` (see the correction in Task 11 Step 1), which produced only 5 notable wins across the whole run with no guarantee any was the player's — so there was nothing to open a memories window on. Settling it needs one more run started on **Generous**, which would also give that rule option its only test.
 
 This is the one thing a probe cannot answer, and nothing in the log says *which* knights in the world received a memory — so do not go looking for one. Make one instead:
 
@@ -1319,7 +1319,7 @@ Failure signatures to watch for:
 - every knight names the same wrong field — the province scope leaked
 - the memory renders as its raw key name — the localization file lost its BOM
 
-- [ ] **Step 4: Read the error log**
+- [x] **Step 4: Read the error log**
 
 Run: `python tools/ck3.py probe 'battle_chronicles|bc_chronicles|bc_aftermath|bc_battle|bc_notable'`
 
@@ -1331,7 +1331,7 @@ This only reads cleanly because Step 1 cleared the logs — one more reason that
 
 `probe` only counts markers that fired. Every failure class in this feature that is *not* a missing marker lands here instead: an invalid `left_icon`, a comparison against a missing scope on a leaderless side, an unresolvable `var:` read, a mistyped memory type or localization key. This is the cheapest step in the run and the one that catches what the markers cannot.
 
-- [ ] **Step 5: Answer the four questions still owed from the previous pass**
+- [x] **Step 5: Answer the four questions still owed from the previous pass**
 
 Same run, no extra cost:
 
@@ -1340,7 +1340,7 @@ Same run, no extra cost:
 - do the retuned commander weights produce a sane distribution?
 - compare the count of `"BC: toast body ran (knight breach)"` against `"BC: fired bc_knight_holds_the_breach"`. Fewer means a `send_interface_toast` body does **not** run for an AI character, which settles a standing rule. Nothing depends on the answer any more — this is to know it.
 
-- [ ] **Step 6: Write the results down**
+- [x] **Step 6: Write the results down**
 
 Append the probe table, the error-log result and the two-knight result to `mods/battle_chronicles/README.md`, in the style of the existing "First live run (2026-08-12)" section.
 
@@ -1363,7 +1363,7 @@ cd /d/ck3/mods/battle_chronicles && git add README.md && git commit -m "docs(bc)
 
 `bc_scripted_effects.txt` is deliberately not on this list — its one marker, `"BC: nickname awarded"`, is permanent.
 
-- [ ] **Step 1: Set the five thresholds**
+- [x] **Step 1: Set the five thresholds**
 
 In `bc_battle_is_notable_trigger`, replace the placeholder numbers with values read off the ladders:
 
@@ -1375,15 +1375,15 @@ In `bc_battle_is_notable_trigger`, replace the placeholder numbers with values r
 
 Replace the `# PLACEHOLDER NUMBERS` comment block above the trigger with what the run actually showed and where the numbers came from, so the next reader is not told they are still guesses.
 
-**`amount` and `<N>` come off the ladders, not off the notable counts.** The run was played under `bc_aftermath_generous`, so its notable rate is the rate at a one-row bar and the Default rate is strictly lower. The ladders are rule-independent and are the only sound basis for both numbers. If the thresholds alone cannot bring the rate somewhere sensible, adjust `amount >= 2` — but the spec's judgement is that above 2 the bar starts requiring coincidences rather than significance, so prefer moving thresholds.
+**`amount` and `<N>` come off the ladders, not off the notable counts.** **CORRECTION, 2026-08-13:** the run was played under `bc_aftermath_default`, not Generous — Step 1 asked for Generous and it was not set, and nothing in the log reports the active rule, so this was only caught afterwards by arithmetic (under Generous one real row suffices and `odds >= 1.5x` alone fired on 21 of 39, so notable would have been ≥21; it was 5, which is an exact fit for the two-row Default bar). The ladders are unaffected, which is exactly why they exist, and they remain the only sound basis for both numbers. The consequence is that **`bc_aftermath_generous` was never exercised at all** — record it as untested rather than treating the notable counts as a generous sample. If the thresholds alone cannot bring the rate somewhere sensible, adjust `amount >= 2` — but the spec's judgement is that above 2 the bar starts requiring coincidences rather than significance, so prefer moving thresholds.
 
 If `<N> = 3` proved to be a formality rather than a career, raise it in `bc_chronicles.0091` (both the `var:bc_notable_battles >= 3` gate and the matching `< 3` in the calibration `else_if`, though that one is about to be deleted), and reread `bc_aftermath_nickname_toast_desc` to check it still says nothing a new `<N>` contradicts.
 
-- [ ] **Step 2: Delete the four calibration script values**
+- [x] **Step 2: Delete the four calibration script values**
 
 Remove `bc_cal_our_host_gap_2x`, `bc_cal_their_host_gap_2x`, `bc_cal_our_host_gap_12x`, `bc_cal_their_host_gap_12x` and the `--- CALIBRATION ONLY ---` header above them from `bc_script_values.txt`.
 
-- [ ] **Step 3: Delete every calibration marker**
+- [x] **Step 3: Delete every calibration marker**
 
 In `bc_events.txt`, remove **every** block bracketed by `--- CALIBRATION ONLY ---` / `--- end calibration ---`. There are five of them:
 
@@ -1403,7 +1403,7 @@ In `bc_events.txt`, remove **every** block bracketed by `--- CALIBRATION ONLY --
 
 NOTE, deviation from the spec: the spec's Calibration section says "all markers are stripped once the numbers are set". These five stay. The asymmetric-bar test is the only check that catches a whole class of silent failure, and a test that cannot be rerun after the next tuning pass is not a test.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `python tools/ck3.py validate battle_chronicles`
 Expected: `0 errors, 0 warnings`
@@ -1418,7 +1418,7 @@ Expected: no output. `PLACEHOLDER` is in the pattern because Step 1 is also told
 
 **Do not use `ck3.py find` for this.** `find` resolves to `find_key()` in `tools/ck3lib/index.py:215`, which queries the index's `defs` table — **definitions only**. The instant Step 2 deletes the definition it returns nothing no matter how many references survive, so it reports success precisely when the bug exists. The index is also only rebuilt by `ck3.py index`, which this task never runs. `validate` will not catch it either: it checks braces, BOM and loc-line syntax, never references.
 
-- [ ] **Step 5: Update the README**
+- [x] **Step 5: Update the README**
 
 Record the final thresholds and the reasoning, in the style of the existing "Changes made after that run" section. Three specific edits:
 
@@ -1426,7 +1426,7 @@ Record the final thresholds and the reasoning, in the style of the existing "Cha
 2. Strike the `bc_shieldbrother_memory` bullet from "Not yet verified in game" (`README.md:110-118`) if Step 5 of the run answered it, along with whichever of the other two bullets that run settled.
 3. Fix `README.md:18`, which names a mod — "Battlefield Duel+" — that is not in the playset. `ck3.py playset list` is the authority for what to replace it with.
 
-- [ ] **Step 6: Deploy and commit**
+- [x] **Step 6: Deploy and commit**
 
 ```bash
 cd /d/ck3 && python tools/ck3.py deploy battle_chronicles && python tools/ck3.py validate battle_chronicles

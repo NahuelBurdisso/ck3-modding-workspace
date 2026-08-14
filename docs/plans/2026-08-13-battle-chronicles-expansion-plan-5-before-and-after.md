@@ -271,7 +271,7 @@ the world."
 ```bash
 cd /d/ck3/mods/battle_chronicles
 sed -n '/^bc_battle_is_notable_trigger = {/,/^}/p' common/scripted_triggers/bc_scripted_triggers.txt
-sed -n '/^bc_battle_is_notable_trigger = {/,/^}/p' common/scripted_triggers/bc_scripted_triggers.txt | grep -c "^\t\t[a-zA-Z]"
+sed -n '/^bc_battle_is_notable_trigger = {/,/^}/p' common/scripted_triggers/bc_scripted_triggers.txt | grep -c "^[[:space:]][[:space:]][a-zA-Z]"
 ```
 
 You should see `amount >= 2` and **six direct children**: two `combat = { num_total_troops }`
@@ -280,9 +280,17 @@ rows, an `OR` for blood, an `OR` for odds, a `combat = { warscore_value }` row, 
 substantive rows plus the game rule".
 
 **The second command must print 7 — `amount >= 2` plus those six children.** Write it down.
-Step 4 re-runs the identical command and requires **8**. The `^\t\t` anchor is what makes the
-count mean anything: the two `OR` blocks' contents are indented deeper and are not counted,
-which is exactly the distinction `calc_true_if` itself makes.
+Step 4 re-runs the identical command and requires **8**. The two-level indent anchor is what
+makes the count mean anything: the two `OR` blocks' contents are indented deeper and are not
+counted, which is exactly the distinction `calc_true_if` itself makes.
+
+**`[[:space:]][[:space:]]`, not `\t\t`.** POSIX basic regex has no `\t` escape — `grep -c
+"^\t\t[a-zA-Z]"` searches for a literal `tt` and returns **0** on this file, silently, which
+is indistinguishable from "the trigger moved" and would send you looking for the wrong thing.
+`grep -P` is not available in this environment either (`-P supports only unibyte and UTF-8
+locales`). The bracket class is the portable form, and it costs nothing here: the file is
+tab-indented throughout, so nothing at three tabs can match a pattern whose third character
+must be a letter.
 
 **If you count seven children, or the grep prints 8, plan 5 has already run.** Stop and check
 git log.
@@ -361,7 +369,7 @@ now six.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-sed -n '/^bc_battle_is_notable_trigger = {/,/^}/p' common/scripted_triggers/bc_scripted_triggers.txt | grep -c "^\t\t[a-zA-Z]"
+sed -n '/^bc_battle_is_notable_trigger = {/,/^}/p' common/scripted_triggers/bc_scripted_triggers.txt | grep -c "^[[:space:]][[:space:]][a-zA-Z]"
 grep -c "Five substantive rows" common/scripted_triggers/bc_scripted_triggers.txt
 grep -c "Six substantive rows" common/scripted_triggers/bc_scripted_triggers.txt
 ```
@@ -1377,7 +1385,7 @@ zero while every reference is indented, and plan 4's decrement carries a comment
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-sed -n '/^bc_battle_is_notable_trigger = {/,/^}/p' common/scripted_triggers/bc_scripted_triggers.txt | grep -c "^\t\t[a-zA-Z]"
+sed -n '/^bc_battle_is_notable_trigger = {/,/^}/p' common/scripted_triggers/bc_scripted_triggers.txt | grep -c "^[[:space:]][[:space:]][a-zA-Z]"
 grep -c "Five substantive rows" common/scripted_triggers/bc_scripted_triggers.txt
 grep -n "amount >= " common/scripted_triggers/bc_scripted_triggers.txt
 ```

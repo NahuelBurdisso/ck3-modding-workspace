@@ -66,7 +66,7 @@ until it expires. This is **pre-existing behaviour introduced by neither plan 1 
 2**, it applies today to `bc_momentum_minor_effect` and friends in
 `bc_chronicles.0001`–`.0003`, and the 60-day pop-up cooldown keeps the window narrow.
 
-**Plan 2 does not fix it and does not make it worse.** Task 5's `exists = var:bc_battle_size`
+**Plan 2 does not fix it and does not make it worse.** Task 6's `exists = var:bc_battle_size`
 guard means a late-answered option applies no *family-2* modifier, because
 `bc_clear_scratch_effect` removed the variable at combat end. That guard is there for
 correctness of the read, and the leak prevention is a free consequence — do not remove

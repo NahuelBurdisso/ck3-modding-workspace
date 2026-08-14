@@ -178,7 +178,7 @@ writes into files that already exist.
 | `common/on_action/bc_on_actions.txt` | modify | combat-end hooks now name one grader each; `on_combat_start` added |
 | `common/combat_phase_events/bc_commander_phase_events.txt` | modify | `bc_battle_open_effect` + seam calls |
 | `common/combat_phase_events/bc_knight_phase_events.txt` | modify | `bc_battle_open_effect` + seam calls, both inside `side_commander ?=` |
-| `README.md` | modify (final task) | the run log — DIAG verdicts Q1-Q3 and the counts behind them. **Every later plan reads this file to find out what this one learned**, so a result left only in a commit message is a result the next plan cannot use |
+| `README.md` | modify (tasks 6, 15) | task 6 corrects two passages describing `.0090` as live; task 15 settles **Q4** here, next to the claim it contradicts (`:48-51`, `:158-159`). **Q1/Q2/Q3/Q5 go in the spec instead**, because they gate later plans — the split is task 15 step 7's, and it is two commits in two different repositories |
 
 `bc_rivalry_effects.txt` and `bc_ledger_triggers.txt` are named in the spec's Files
 table but hold nothing until plans 3 and 4. **Do not create empty files.**
@@ -2759,8 +2759,12 @@ no tuning.
 - [ ] All three of `BC: moment minor` / `major` / `decisive` have appeared. If only
       `minor` ever appears, the `flag:$TIER$` comparison is silently failing and both
       upper arms of the ceiling are dead.
-- [ ] All five DIAG answers are recorded — Q1/Q3/Q5 in the spec, Q4 in the mod's README
-      next to the claim it corrects or confirms.
+- [ ] All five DIAG answers are recorded — **Q1/Q2/Q3/Q5 in the spec**, Q4 in the mod's
+      README next to the claim it corrects or confirms. That is the split task 15 step 7
+      commits, and **Q2 belongs in it**: plan 5 gates its entire eve on Q2's verdict, and
+      the only other record of that verdict is whether `events/bc_combat_start_events.txt`
+      exists — a fact about the filesystem that says nothing about *why*. An earlier draft
+      of this checklist listed only Q1/Q3/Q5 and left Q2 with no written home at all.
 - [ ] Q4 was answered on a run in which `BC: DIAG Q4 subject AI` appeared at least once.
       If that count is 0, the run only ever named a human subject and the question is
       untouched — record no verdict.

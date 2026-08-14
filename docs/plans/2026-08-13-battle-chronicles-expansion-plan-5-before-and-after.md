@@ -25,7 +25,7 @@ it is the only one that touches every other plan's files:
 | 1 | the consolidated graders in `events/bc_aftermath_events.txt`, `bc_addressed_toast_effect` **with its `TYPE` parameter**, and **DIAG Q2's verdict** |
 | 2 | `bc_add_verb_effect` and the family-2 modifiers `bc_bloodied` / `bc_shieldwall`, which the eve's first two options apply |
 | 3 | `bc_style_streak_effect`, whose increment becomes a script value here |
-| 4 | `bc_rivalry_step_value`, which this plan finally turns on, and `var:bc_nemesis`, which the eve's description reads |
+| 4 | `bc_rivalry_step_value`, whose inline wipe test this plan collapses into a named trigger — it was already live, not dormant — and `var:bc_nemesis`, which the eve's description reads |
 
 **Gated on DIAG Q2 — the eve only.** Q2 asks whether a `scope = combat` event fires at all.
 Tasks 1 through 5 are the wipe and the dead knights; neither touches `on_combat_start` and
@@ -158,7 +158,7 @@ All begin `BC: `, so plan 1's sweep row 3 covers them.
 | path | plan action | responsibility |
 |---|---|---|
 | `common/scripted_triggers/bc_scripted_triggers.txt` | modify (tasks 1, 2, 6) | `bc_was_wipe_trigger`, the notability row, `bc_eve_facing_nemesis_trigger` |
-| `common/script_values/bc_script_values.txt` | modify (tasks 3, 4) | `bc_style_step_value`; `bc_rivalry_step_value` switched on |
+| `common/script_values/bc_script_values.txt` | modify (tasks 3, 4) | `bc_style_step_value`; `bc_rivalry_step_value` routed through `bc_was_wipe_trigger` |
 | `common/scripted_effects/bc_reputation_effects.txt` | modify (task 3) | the style streak increment |
 | `events/bc_aftermath_events.txt` | modify (task 5) | the dead-knight toast in both graders, and the `BC: wipe` marker — the only effect context in the mod that can emit one |
 | `common/scripted_effects/bc_scripted_effects.txt` | modify (task 6) | `bc_start_eve_cooldown_effect` |
@@ -507,7 +507,7 @@ single battle."
 
 ---
 
-### Task 4: Turn on C's step value
+### Task 4: Route C's step value through the named trigger
 
 **Files:**
 - Modify: `mods/battle_chronicles/common/script_values/bc_script_values.txt`
@@ -515,14 +515,26 @@ single battle."
 **Depends on plan 4.** If `bc_rivalry_step_value` does not exist, plan 4 has not shipped;
 skip to task 5 and come back.
 
-- [ ] **Step 1: Understand that this is a one-line change and why it was designed that way**
+- [ ] **Step 1: Understand that this changes no behaviour, and that that is the point**
 
-Plan 4 wrote `bc_rivalry_step_value` with a deliberately inert test:
+**This task does not turn anything on.** `scope:wipe` is engine-provided on both combat-end
+hooks — AGOT documents it at `common/on_action/combat_on_actions.txt:12` and `:527` — so
+plan 4's step value has returned 2 on a wipe since the day plan 4 shipped. Nothing in this
+mod ever "saved" the scope, and an earlier draft of both plans said otherwise.
+
+Plan 4 wrote the test as an inline conjunction, character-for-character the body task 1 has
+now given a name:
 
 ```
 bc_rivalry_step_value = {
 	if = {
-		limit = { exists = scope:wipe }
+		limit = {
+			exists = scope:wipe
+			trigger_if = {
+				limit = { exists = scope:wipe }
+				scope:wipe = yes
+			}
+		}
 		value = 2
 	}
 	else = {
@@ -531,16 +543,16 @@ bc_rivalry_step_value = {
 }
 ```
 
-`exists = scope:wipe` on a scope nothing saved is a clean `no`, so until now the value has
-always been 1 and C has behaved as the spec's ordinary case. **The alternative — hardcoding
-1 in plan 4 and threading a parameter through five effects here — is how the design
-document's own note says an earlier draft broke.**
+**So this is a de-duplication, not a fix.** After task 1 there are two copies of the same
+four-line conjunction about the same unsettled question — whether the scope always exists
+carrying a boolean, or exists only when true. Two copies of an unsettled reading is exactly
+the thing that diverges the next time someone learns the answer. Collapse them to one.
 
-**But `exists` alone is not the test.** It is right under the reading where the scope exists
-only on a wipe and **wrong** under the reading where it always exists carrying a boolean:
-under that reading every battle in the game would be a wipe. Plan 4 could not tell the
-difference and chose the form that was safe rather than the form that was correct, because
-it was inert either way.
+Verify the behaviour is unchanged rather than assuming it: the replacement is `= yes` on a
+trigger whose body is the block above, so it is the same test by construction. If plan 4's
+value does **not** look like the block above — if it is a bare `limit = { exists =
+scope:wipe }` — you are looking at the pre-correction draft, and swapping it to the trigger
+**does** change behaviour, in the direction of correctness. Say so in the commit message.
 
 - [ ] **Step 2: Replace the test**
 
@@ -585,12 +597,16 @@ Expected: exit 0.
 ```bash
 cd /d/ck3/mods/battle_chronicles
 git add common/script_values/bc_script_values.txt
-git commit -m "feat: a wipe doubles the rivalry step
+git commit -m "refactor: route the rivalry step through bc_was_wipe_trigger
 
-Replaces plan 4's inert exists = scope:wipe with the trigger, so the whole mod
-has exactly one opinion about whether the scope always exists carrying a boolean
-or exists only when true. A wipe now takes a stranger straight to rival and a
-wipe win decrements by two."
+Plan 4 inlined the same exists + trigger_if conjunction this trigger now wraps,
+so behaviour is unchanged - the wipe step has been live since plan 4 shipped,
+because scope:wipe is engine-provided rather than something a script saves.
+
+The point is that the mod now has exactly one opinion about the unsettled
+question of whether the scope always exists carrying a boolean or exists only
+when true. Two copies of that guess would have diverged the moment someone
+learned the answer."
 ```
 
 ---

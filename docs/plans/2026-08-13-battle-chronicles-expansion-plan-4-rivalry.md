@@ -68,13 +68,44 @@ is about to delete". With a saved scope the ladder no longer reads the variable 
 the ordering anyway — it costs nothing and the next person to read it will expect it — but
 do not present it as load-bearing, because it is not.
 
-### The step size *N* is a script value, and it is deliberately inert until plan 5
+### The step size *N* is a script value, and it is LIVE the day this plan ships
 
 Section 4 defines *N* as 1 for an ordinary notable battle and 2 when `scope:wipe` holds.
-`scope:wipe` is Section 5's, and plan 5 is not written. **Write the script value now anyway**
-— `exists = scope:wipe` on a scope nothing ever saves is a clean `no`, not an error, exactly
-as `exists` on a missing variable is safe. Until plan 5 lands, `bc_rivalry_step_value` is
-always 1 and C behaves as the spec's ordinary case.
+
+**`scope:wipe` is not plan 5's and is not saved by any script. The engine provides it**, on
+both combat-end hooks, and it is available to this plan the moment it ships. AGOT documents
+it in its own headers — `common/on_action/combat_on_actions.txt:13`, `# scope:wipe - Was
+this a wipe?`, directly above `on_combat_end_winner`, and the identical comment at `:527`
+above `on_combat_end_loser`. It survives into events raised from those hooks' `events = { }`
+lists; vanilla `combat_event.1001` is raised that way and reads it. Plan 5 does not create
+this scope, it only wraps the *reading* of it in a named trigger.
+
+An earlier draft of this section said `scope:wipe` was "Section 5's" and that
+`bc_rivalry_step_value` would be "deliberately inert until plan 5". **Both claims were
+false**, and the second one mattered: a value described as inert gets shipped untested.
+
+**How to read it, and why not the obvious way.** Shipped AGOT uses *two different* idioms
+for this scope in one file — `exists = scope:wipe` as the whole test at
+`combat_on_actions.txt:100`, and `scope:wipe = yes` at `:758`. The first idiom only makes
+sense if the scope exists **only when true** (otherwise its `value = 10` base is dead code);
+the second only matters if the scope can exist carrying `no`. Which one holds is unsettled,
+so do not bet on either. Take the conjunction, with the comparison nested rather than a
+sibling, because CK3 does not short-circuit and a sibling comparison against a possibly
+missing scope would be read on every combat end in the world:
+
+```
+limit = {
+	exists = scope:wipe
+	trigger_if = {
+		limit = { exists = scope:wipe }
+		scope:wipe = yes
+	}
+}
+```
+
+This is character-for-character the body plan 5 later names `bc_was_wipe_trigger`, and plan
+5 task 1 replaces this inline copy with a call to it. Writing the same conjunction twice for
+one plan's span is the cost of not making plan 4 depend on plan 5.
 
 The alternative — hardcoding 1 now and threading a parameter through five effects later — is
 how Section 4's own note says an earlier draft broke: it hardcoded the create branch to 1
@@ -301,14 +332,30 @@ that is the kind of measured note this file carries. Match the style.
 # made "a wipe takes a stranger straight to rival" false and made the design's own
 # worked example unreachable. Do not inline the 1 anywhere.
 #
-# scope:wipe IS SECTION 5's AND IS NOT SAVED BY ANYTHING YET. Until plan 5 lands
-# this value is always 1. `exists` on a scope nothing ever saves is a clean `no`,
-# not an error - the same rule that makes `exists` on a missing variable safe -
-# so this is inert rather than broken, and plan 5 turns it on by saving the scope
-# and changing nothing here.
+# scope:wipe IS ENGINE-PROVIDED AND THIS VALUE IS LIVE TODAY. It is not plan 5's
+# and no script saves it: AGOT documents it in its own on_action headers, at
+# common/on_action/combat_on_actions.txt:13 above on_combat_end_winner and :527
+# above on_combat_end_loser, and it survives into events raised from those hooks'
+# `events = { }` lists. Plan 5 only wraps the read in a named trigger. Test this
+# branch when you test the plan; do not assume it is dormant.
+#
+# THE COMPARISON IS NESTED, NOT A SIBLING OF THE `exists`. Shipped AGOT uses both
+# idioms for this scope in one file - `exists = scope:wipe` as the entire test at
+# :100, `scope:wipe = yes` at :758 - so it is unsettled whether the scope
+# always exists carrying a boolean or exists only when true. Under the second
+# reading a sibling comparison would read a missing scope on every combat end in
+# the world. `exists` is safe on a missing scope; the COMPARISON is what has to be
+# guarded, and CK3 does not short-circuit. Plan 5 task 1 replaces this exact body
+# with a call to bc_was_wipe_trigger, which is the same four lines under a name.
 bc_rivalry_step_value = {
 	if = {
-		limit = { exists = scope:wipe }
+		limit = {
+			exists = scope:wipe
+			trigger_if = {
+				limit = { exists = scope:wipe }
+				scope:wipe = yes
+			}
+		}
 		value = 2
 	}
 	else = {
@@ -322,7 +369,34 @@ bc_rivalry_step_value = {
 if/else_if/else of exactly this shape. This is the same precedent plan 2's
 `bc_chronicle_flag_days_value` rests on.
 
-- [ ] **Step 3: Validate and commit**
+**`trigger_if` inside a script value's `limit` is shipped vanilla, in this exact shape** —
+`journey_province_reference_value`, `00_activity_values.txt:2150-2161`. Its `if`'s `limit`
+holds a bare `exists = county.holder` next to a `trigger_if` whose own `limit` re-tests
+`exists = county.holder.liege` before comparing against it: a sibling existence row plus a
+nested guarded comparison, which is what the block above is. Verified by reading the file.
+
+- [ ] **Step 3: Verify the conjunction landed whole, then validate and commit**
+
+```bash
+cd /d/ck3/mods/battle_chronicles
+grep "scope:wipe" common/script_values/bc_script_values.txt | grep -vc "#"
+grep "trigger_if" common/script_values/bc_script_values.txt | grep -vc "#"
+```
+
+Expected **3** and **1**. The three are the sibling `exists`, the `trigger_if`'s own `limit`
+copy of it, and the `= yes` comparison.
+
+**The `grep -v "#"` is not optional.** The comment block written in step 2 names
+`scope:wipe` on three of its own lines, so the unfiltered count is 6 and this check would
+report correct code as broken — the same trap the sweeps in plans 3 and 5 document. If you
+reworded the comment, the filtered count is still 3, which is why the filter is the right
+fix rather than a bigger expected number.
+
+**This is worth a grep because the failure is silent.** Drop the `trigger_if` and you are
+left with a bare `exists = scope:wipe`, which is plausibly right and plausibly returns 2 on
+every battle in the game; `validate` passes either way because it never evaluates a trigger.
+A **2** here means the guard was flattened. Nothing in game would show it until every
+commander in the world had been escalating at double rate for a decade.
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -335,9 +409,16 @@ cd /d/ck3/mods/battle_chronicles
 git add common/script_values/bc_script_values.txt
 git commit -m "feat: add bc_rivalry_step_value
 
-One step size read by all four of C's arithmetic sites. Inert at 1 until plan 5
-saves scope:wipe, which is deliberate - threading a parameter through five
-effects later is how the design's own earlier draft broke the create branch."
+One step size read by all four of C's arithmetic sites, rather than a literal 1
+threaded through five effects later - which is how the design's own earlier draft
+broke the create branch.
+
+The wipe branch is live immediately. scope:wipe is engine-provided on both
+combat-end hooks, documented in AGOT's own on_action headers; plan 5 does not
+create it, it only wraps the read in a named trigger. The comparison is nested
+under a trigger_if because shipped AGOT uses both `exists = scope:wipe` and
+`scope:wipe = yes` for this scope, so it is unsettled whether it can exist
+carrying no."
 ```
 
 ---
@@ -563,7 +644,8 @@ git add common/scripted_effects/bc_rivalry_effects.txt
 git commit -m "feat: add rivalry escalation on a notable loss
 
 The create branch takes the step value rather than a literal 1, so a first loss
-that is also a wipe goes straight to rival once plan 5 saves scope:wipe. Losing
+that is also a wipe goes straight to rival - immediately, since scope:wipe is
+engine-provided rather than something plan 5 turns on. Losing
 to a different man while a grudge is running does nothing - one running grudge
 per commander."
 ```
@@ -1557,7 +1639,7 @@ git commit -m "docs: record the plan 4 runtime findings"
 |---|---|---|
 | Nemesis-specific phase event text | Needs its own localization pass and its own weight retune. C is complete without it | a later plan |
 | Gating whole events on `bc_facing_nemesis_trigger` | Same, plus it would need new events rather than an addition to existing ones | a later plan |
-| The `scope:wipe` step of 2 | Section 5's. `bc_rivalry_step_value` is written to accept it and is inert until then | plan 5 |
+| Naming the wipe test `bc_was_wipe_trigger` | The trigger is plan 5's. The **step of 2 itself is in this plan and live** — `scope:wipe` is engine-provided, so `bc_rivalry_step_value` returns 2 on a wipe from the day this ships. Plan 5 only replaces the inline conjunction in task 2 with a call to the named trigger | plan 5 |
 | Removing a relation when the foe dies | CK3's own business. The mod removes its variables and leaves the relation graph alone | nowhere |
 | A `bc_rivalry_grudge` cap option | `grudge` is the bottom rung; a cap there differs from `off` only in whether a one-directional -60 opinion applies | nowhere |
 | Reading the combat scope in `bc_facing_nemesis_trigger` | Would fix the first-roll blind spot at the cost of an unverified scope path evaluated on every roll of every battle in the world | nowhere, unless the blind spot proves to matter |

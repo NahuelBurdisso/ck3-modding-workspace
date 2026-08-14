@@ -1625,9 +1625,12 @@ Per sub-project, beyond the DIAG pass:
 
 Collected because each one killed at least one earlier draft.
 
-- **`send_interface_toast` bodies do not reliably run for an AI character.** State must
-  never live inside a toast; toasts about AI subjects route to the liege. Being
-  confirmed as DIAG Q4.
+- ~~**`send_interface_toast` bodies do not reliably run for an AI character.**~~
+  **DISPROVEN by DIAG Q4, 2026-08-14** — see the results section at the end of this file.
+  A toast body runs for an AI subject exactly as it does for a human. State still stays
+  out of toasts (vanilla writes it that way, and a presentational block is the wrong place
+  to hide state), and toasts about AI subjects still route to the liege because nobody is
+  playing a courtier — but neither rule may be justified by this claim any more.
 - **Modifiers are wiped at combat end** by the mod's own cleanup, so persistence must
   be variables and cooldowns must be flags.
 - **`effect = { }` in an `on_action` does not merge across files** — one is kept, winner
@@ -1647,3 +1650,39 @@ Collected because each one killed at least one earlier draft.
 - **`ck3.py errors` cannot see mod script errors** — it tail-slices a ~500k-line log and
   mod errors appear near the top. Use `ck3.py probe`, which reads end to end and groups
   by file.
+- **A scripted effect must READ every parameter its call sites pass.** An unread parameter
+  is not ignored — the whole definition fails to compile and every call site silently does
+  nothing. Learned the expensive way; see the DIAG results below.
+
+---
+
+## DIAG pass results (plan 1 task 15, run 2026-08-14)
+
+One session, 137 combat ends per grader. These numbers are what plans 2-6 are calibrated
+against; do not re-derive them by guessing.
+
+| Q | question | answer |
+|---|---|---|
+| Q1 | commander trait density | n=267: **0 traits 153, 1 trait 110, 2 traits 3, 3+ traits 1**. Plan 3's `number_of_commander_traits < 3` gate passes 99.6% of the time. **Keep it** — it is not a real filter but it costs nothing and it covers the 1-in-267 case. |
+| Q2 | is a `scope = combat` event reachable? | **Half yes.** The event fired **151×** from `on_combat_start`, so a `scope = combat` event is valid despite having no precedent in vanilla or AGOT. But `combat_attacker.side_commander` and `combat_defender.side_commander` resolved **zero** times from inside it, and `?=` hid both failures. **Plan 5's eve pop-up must not be written against those two links.** |
+| Q3 | battle size distribution | Per side: **5k+ 46, 3k 42, 2k 31, 1k 14, under-1k 4.** The invented 2,000 boundary in `bc_battle_open_effect` splits the low band 73/18 rather than leaving one lump. **Keep the boundary as written.** |
+| Q4 | does a toast body run for an AI subject? | **Yes.** human 0, AI 117, marker inside the toast 117 → **B == H + A**. The `subject AI == 0` inconclusive row was not hit, so this is a verdict, not another ambiguity. |
+| Q5 | terrain census | rough 58, forest 32, winter 20, open 19, jungle 8, **desert 0**, `NONE MATCHED` **0**. The `agot_is_<x>_terrain` ladder is exhaustive over everything observed, so plan 3 task 5's copy of it is current. Desert's zero is **recorded, not acted on** — one campaign is one corner of Westeros. |
+
+Also from this run: `win notable` 79 / `lose notable` 79 and `win not notable` 58 / `lose
+not notable` 58 (symmetric, as they must be), and `BC: nickname awarded` 5 under the real
+gate.
+
+**And one defect that made the entire ledger dead.** `bc_record_moment_effect` declared
+`SWING` and read it nowhere, so the engine logged `Compiling source for
+bc_record_moment_effect failed for unknown arguments: SWING` 13× at load and **all 18 call
+sites did nothing** — zero `BC: moment` lines all session, with no other symptom anywhere.
+Fixed by reading the parameter with a two-arm log rather than dropping it, so plan 6's
+wound gate keeps the `SWING = down` hook it is written against. `BC: moment` itself is
+therefore still **unproven at runtime** and needs one more run.
+
+Three follow-on `Variable 'X' is used but is never set` lines (`bc_battle_style`,
+`bc_battle_tier`, `bc_battle_wounded`, twice each) — the first two resolve once the seam
+compiles; the third is genuine until plan 6 writes the variable. It also corrects a claim
+made in passing elsewhere in these docs: **`remove_variable` on a never-set variable does
+log.**

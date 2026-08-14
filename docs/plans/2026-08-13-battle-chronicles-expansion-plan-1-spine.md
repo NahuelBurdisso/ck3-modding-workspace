@@ -1,4 +1,4 @@
-# Battle Chronicles Expansion — Plan 1: The Spine (stages 0 and 1)
+﻿# Battle Chronicles Expansion — Plan 1: The Spine (stages 0 and 1)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -214,7 +214,7 @@ will pollute the stage-1 log.
 - Modify: `mods/battle_chronicles/events/bc_events.txt`
 - Modify: `mods/battle_chronicles/common/combat_phase_events/bc_knight_phase_events.txt:103-108`
 
-- [ ] **Step 1: Confirm what is there before removing it**
+- [x] **Step 1: Confirm what is there before removing it**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -237,7 +237,7 @@ Both are phantom hits that will make the counts look wrong.
 If the counts still differ, **stop and re-read the files** — the plan was written against
 a known state and a different one means someone else has edited the mod.
 
-- [ ] **Step 2: Remove the eleven markers in `bc_events.txt`**
+- [x] **Step 2: Remove the eleven markers in `bc_events.txt`**
 
 Delete each `debug_log = "BC: DIAG ..."` line **and the comment block that introduces
 it**. There are three such blocks. In `bc_chronicles.0090` remove the whole
@@ -273,7 +273,7 @@ return zero rows indistinguishable from "no battles happened".
 going and the guard is staying — the file's own comment explains why (CK3 guarantees no
 evaluation order among siblings in a `limit`).
 
-- [ ] **Step 3: Remove the knight toast probe**
+- [x] **Step 3: Remove the knight toast probe**
 
 In `bc_knight_phase_events.txt`, delete the comment at `:103-107` and the
 `debug_log = "BC: toast body ran (knight breach)"` at `:108`.
@@ -284,7 +284,7 @@ marker alone cannot distinguish an AI subject from a human one, which is why the
 produced contradicts the mod's own design rule. Removing it here and restoring it there
 keeps one generation of markers in the log instead of two.
 
-- [ ] **Step 4: Verify nothing else was caught**
+- [x] **Step 4: Verify nothing else was caught**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -rn "DIAG\|toast body ran" --exclude-dir=.git common/ events/
@@ -293,7 +293,7 @@ cd /d/ck3/mods/battle_chronicles && grep -rn "DIAG\|toast body ran" --exclude-di
 Expected: **no output.** `README.md` is deliberately outside the search path — its record
 of the earlier toast investigation is history and stays.
 
-- [ ] **Step 5: Validate**
+- [x] **Step 5: Validate**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -301,7 +301,7 @@ cd /d/ck3/tools && python ck3.py validate --strict
 
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -323,7 +323,7 @@ never executed means a later failure has two possible causes.
 **Files:**
 - Modify (temporarily): `mods/battle_chronicles/events/bc_events.txt`
 
-- [ ] **Step 1: Temporarily weaken the gate**
+- [x] **Step 1: Temporarily weaken the gate**
 
 In `bc_chronicles.0091`, delete these three rows from the nickname `limit` block, leaving
 `has_any_nickname = no` as the only condition:
@@ -352,14 +352,14 @@ Mark it so it cannot be forgotten:
 # TEMPORARY — force-execution probe, task 2. REVERT BEFORE TASK 4.
 ```
 
-- [ ] **Step 2: Clear the logs, with the game closed**
+- [x] **Step 2: Clear the logs, with the game closed**
 
 Delete `error.log` and `debug.log` from
 `D:\Documents\Paradox Interactive\Crusader Kings III\logs`. **`error.log` accumulates
 across sessions** — skip this and step 3's sweep reports errors from runs that predate the
 change, which is the failure mode the sweep procedure exists to prevent.
 
-- [ ] **Step 3: Deploy and run**
+- [x] **Step 3: Deploy and run**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py deploy
@@ -376,7 +376,7 @@ gate about a quarter of the time. If several wins produce `BC: win notable` and 
 one more. Overwriting a canon nickname is harmless here — the save is disposable, and the
 step 6 revert restores the mod regardless of what the save holds.
 
-- [ ] **Step 4: Confirm the path executed**
+- [x] **Step 4: Confirm the path executed**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "nickname awarded"
@@ -395,13 +395,13 @@ game-rule option key, the launcher's `BC Spike` line, or a `BC: ` marker the mod
 itself. A group naming a `bc_` key that is none of those means the nickname path is broken
 and must be fixed here, before task 4, which is the entire reason this task exists.
 
-- [ ] **Step 5: Confirm the toast was addressed correctly**
+- [x] **Step 5: Confirm the toast was addressed correctly**
 
 Check whether the toast appeared in-game. If the commander who won the name was AI and
 no toast appeared on his liege, that is a real bug in the shipped routing — record it
 and fix it now.
 
-- [ ] **Step 6: Revert with git, not by re-typing**
+- [x] **Step 6: Revert with git, not by re-typing**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git checkout -- events/bc_events.txt
@@ -415,7 +415,7 @@ Note that this discards *any* uncommitted change to `bc_events.txt`. Task 1 comm
 own edits to that same file, so at this point there should be nothing else in flight —
 confirm with `git status --short events/bc_events.txt` first if unsure.
 
-- [ ] **Step 7: Verify the file is byte-identical to where task 1 left it**
+- [x] **Step 7: Verify the file is byte-identical to where task 1 left it**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -427,7 +427,7 @@ Expected: `git diff --exit-code` exits **0** with no output, and the grep prints
 The `--exclude-dir=.git` matters: without it the grep also matches `.git/COMMIT_EDITMSG`
 and reports a phantom failure.
 
-- [ ] **Step 8: Record the result — there is no commit here**
+- [x] **Step 8: Record the result — there is no commit here**
 
 This task deliberately ends with **no commit**. It made a temporary change and reverted
 it, so the tree is unchanged and `git commit` would either be empty or, worse, capture a
@@ -462,7 +462,7 @@ combat end.
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt:101-115`
 
-- [ ] **Step 1: Confirm the no-op premise**
+- [x] **Step 1: Confirm the no-op premise**
 
 `remove_character_modifier` on an absent modifier must be a no-op, or flattening
 introduces error spam. Verify against shipped code:
@@ -475,7 +475,7 @@ Expected: an unguarded flat list of 16 `remove_character_modifier` lines, of whi
 most 4 can ever be held. That is 12 guaranteed no-ops per call, shipped by Paradox, by
 design.
 
-- [ ] **Step 2: Replace `bc_cleanup_effect`**
+- [x] **Step 2: Replace `bc_cleanup_effect`**
 
 ```
 # --- cleanup ----------------------------------------------------------------
@@ -500,7 +500,7 @@ bc_cleanup_effect = {
 }
 ```
 
-- [ ] **Step 3: Confirm `bc_clear_faltering_effect` was NOT touched**
+- [x] **Step 3: Confirm `bc_clear_faltering_effect` was NOT touched**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -n "bc_clear_faltering_effect" -A 16 common/scripted_effects/bc_scripted_effects.txt | head -30
@@ -513,12 +513,12 @@ Expected: still three **guarded** `if` blocks, unchanged.
 six-line list, every rally would strip the commander's momentum along with his setback.
 The two effects look almost identical and must not be merged.
 
-- [ ] **Step 4: Confirm `bc_cleanup_effect` no longer calls it**
+- [x] **Step 4: Confirm `bc_cleanup_effect` no longer calls it**
 
 The old `bc_cleanup_effect` opened with `bc_clear_faltering_effect = yes`. The flat list
 covers those three modifiers directly, so that call is now redundant and must be gone.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -557,7 +557,7 @@ one by the time this task runs.
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt` —
   the `bc_aftermath_nickname_effect` / `bc_aftermath_nickname_toast_effect` region
 
-- [ ] **Step 1: Write the new shared effect**
+- [x] **Step 1: Write the new shared effect**
 
 ```
 # --- addressed toasts -------------------------------------------------------
@@ -613,7 +613,7 @@ bc_addressed_toast_effect = {
 }
 ```
 
-- [ ] **Step 2: Rewrite `bc_aftermath_nickname_effect` to call it**
+- [x] **Step 2: Rewrite `bc_aftermath_nickname_effect` to call it**
 
 Replace its routing fork (`:288-297`) with:
 
@@ -634,11 +634,11 @@ same effect.
 Leave the `random_list` of 27 nicknames and the `debug_log = "BC: nickname awarded"`
 exactly as they are.
 
-- [ ] **Step 3: Delete `bc_aftermath_nickname_toast_effect`**
+- [x] **Step 3: Delete `bc_aftermath_nickname_toast_effect`**
 
 It now has no callers.
 
-- [ ] **Step 4: Verify it has no callers**
+- [x] **Step 4: Verify it has no callers**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -rn "bc_aftermath_nickname_toast_effect" --exclude-dir=.git .
@@ -655,7 +655,7 @@ value is that it stays runnable later, and a bare form is one commit away from a
 failure. Today the bare form returns three lines in
 `common/scripted_effects/bc_scripted_effects.txt` — two calls and the definition.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -681,7 +681,7 @@ lifecycles and the reward half is the half that grows under B, C and D.
 - Create: `mods/battle_chronicles/common/scripted_effects/bc_reward_effects.txt`
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt`
 
-- [ ] **Step 1: Create the new file with a header**
+- [x] **Step 1: Create the new file with a header**
 
 ```
 # Battle Chronicles - the reward path.
@@ -699,7 +699,7 @@ lifecycles and the reward half is the half that grows under B, C and D.
 # to name a character in a toast take it as a saved scope.
 ```
 
-- [ ] **Step 2: Move four effects across, verbatim**
+- [x] **Step 2: Move four effects across, verbatim**
 
 Cut from `bc_scripted_effects.txt` and paste into `bc_reward_effects.txt`, **with their
 comment blocks intact** — the comments carry the reasoning for `random_memory` over
@@ -711,7 +711,7 @@ nickname dependency, none of which is re-derivable:
 3. `bc_aftermath_nickname_effect`
 4. `bc_addressed_toast_effect` (from task 4)
 
-- [ ] **Step 3: Confirm nothing was lost or duplicated**
+- [x] **Step 3: Confirm nothing was lost or duplicated**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -746,7 +746,7 @@ error in CK3 — the literal text `type = $TYPE$` reaches the toast, `validate` 
 braces and passes, and the toast renders with no styling or fails silently at runtime. This
 is the same class of failure as `$TIER$ = decisive`.
 
-- [ ] **Step 4: Validate, check collisions, commit**
+- [x] **Step 4: Validate, check collisions, commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts
@@ -801,7 +801,7 @@ consolidation. The listing below shows structure and the comments that are new o
 it is not a licence to drop everything it omits. Diff the old and new files before
 committing and account for every removed comment line.
 
-- [ ] **Step 1: Create `bc_aftermath_events.txt`**
+- [x] **Step 1: Create `bc_aftermath_events.txt`**
 
 ```
 namespace = bc_chronicles
@@ -958,13 +958,13 @@ Two details carried across from the originals that look like noise and are not:
 - **The province check is an enclosing `if`, not part of the knight `limit`.** It is a
   property of the battle; re-asking it once per knight is noise.
 
-- [ ] **Step 2: Delete `.0090`, `.0091` and `.0092` from `bc_events.txt`**
+- [x] **Step 2: Delete `.0090`, `.0091` and `.0092` from `bc_events.txt`**
 
 `bc_events.txt` keeps only `bc_chronicles.0001`, `.0002` and `.0003` — the three
 player-facing pop-ups. Update its header comment: it currently describes a file holding
 both pop-ups and hidden graders, and it now holds only pop-ups.
 
-- [ ] **Step 3: Rewrite the on_action hooks**
+- [x] **Step 3: Rewrite the on_action hooks**
 
 ```
 on_combat_end_winner = {
@@ -985,7 +985,7 @@ on_combat_end_loser = {
 alphabetical filename, and that this bug ate a whole probe run. That warning is why this
 file uses `events = { }`, and it applies again in task 13.
 
-- [ ] **Step 4: Update the two README passages that describe `.0090`**
+- [x] **Step 4: Update the two README passages that describe `.0090`**
 
 `.0090` ceases to exist, and `README.md` documents it twice as live behaviour. Both are
 load-bearing prose, not incidental mentions.
@@ -1020,7 +1020,7 @@ outcome structural instead of inferred, and it is also what lets cleanup, gradin
 and scratch clearing run in a written, provable order within each one.
 ```
 
-- [ ] **Step 5: Confirm `.0090` is gone everywhere**
+- [x] **Step 5: Confirm `.0090` is gone everywhere**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -rn "0090" --exclude-dir=.git common/ events/ README.md
@@ -1041,7 +1041,7 @@ step 4's two README replacements name only `.0091` and `.0092`. If you paste a c
 that mentions the old id, this step will fail — correctly. Reword the comment; do not add
 a filter.
 
-- [ ] **Step 6: Validate, index, conflicts**
+- [x] **Step 6: Validate, index, conflicts**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts
@@ -1049,7 +1049,7 @@ cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && pyt
 
 Expected: all exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1082,7 +1082,7 @@ from the phase event where `scope:combat_side` does exist.
 **Files:**
 - Create: `mods/battle_chronicles/common/scripted_effects/bc_ledger_effects.txt`
 
-- [ ] **Step 1: Create the file with its header**
+- [x] **Step 1: Create the file with its header**
 
 ```
 # Battle Chronicles - the ledger.
@@ -1113,7 +1113,7 @@ from the phase event where `scope:combat_side` does exist.
 # fires.
 ```
 
-- [ ] **Step 2: Write `bc_battle_open_effect`**
+- [x] **Step 2: Write `bc_battle_open_effect`**
 
 ```
 # --- opening the battle -----------------------------------------------------
@@ -1220,7 +1220,7 @@ it for that reason, not because the direct form is impossible.
 **On `?=` for the foe:** a side can be leaderless. `bc_battle_foe` is then cleared rather
 than left stale, and C never arms for that battle, which is correct.
 
-- [ ] **Step 3: Validate**
+- [x] **Step 3: Validate**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1229,7 +1229,7 @@ cd /d/ck3/tools && python ck3.py validate --strict
 Expected: exit 0. The effect has no callers yet, which is fine and intentional — task 9
 wires it.
 
-- [ ] **Step 4: Check for collisions — this task creates a new filename**
+- [x] **Step 4: Check for collisions — this task creates a new filename**
 
 ```bash
 cd /d/ck3/tools && python ck3.py index && python ck3.py conflicts
@@ -1244,7 +1244,7 @@ minutes. Task 5 already does this, for the same reason, and task 6 does it again
 `bc_diag_events.txt` is the one exception — it is temporary and is covered by task 16's
 full sweep, which runs `index` and `conflicts` after it is deleted or renamed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1264,7 +1264,7 @@ so write-if-unset would freeze a replaced commander's values permanently."
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_ledger_effects.txt`
 
-- [ ] **Step 1: Write the marker first — this is the assertion**
+- [x] **Step 1: Write the marker first — this is the assertion**
 
 The seam's correctness is proven by one log line per moment carrying the tier it
 actually resolved to. Confirm the marker does not exist yet:
@@ -1275,7 +1275,7 @@ cd /d/ck3/tools && python ck3.py probe "BC: moment"
 
 Expected: **exit 1** (no match). This is the failing test.
 
-- [ ] **Step 2: Write the seam**
+- [x] **Step 2: Write the seam**
 
 ```
 # --- the seam ---------------------------------------------------------------
@@ -1313,7 +1313,7 @@ bc_record_moment_effect = {
 was never set is not safe — this is vanilla's own shape, from `combat_events.txt:90-107`,
 and the mod already follows it in `bc_notable_battle_counter_effect`.
 
-- [ ] **Step 3: Write the ceiling and the style high-water mark**
+- [x] **Step 3: Write the ceiling and the style high-water mark**
 
 ```
 # The ceiling, then the style write. Split out of the seam only because the
@@ -1408,7 +1408,7 @@ the duplication.** The only thing that differs is the guard, and there is no way
 one guard that covers both without reintroducing the non-short-circuiting read above. Two
 duplicated lines is the price of not logging an error every moment of every battle.
 
-- [ ] **Step 4: Validate**
+- [x] **Step 4: Validate**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1424,7 +1424,7 @@ runtime in task 15 by all three of `BC: moment minor` / `major` / `decisive` app
 in the log. If only `BC: moment minor` ever appears, the comparison is silently failing
 and both upper arms are dead.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1446,7 +1446,7 @@ or more seam calls.
 **Files:**
 - Modify: `mods/battle_chronicles/common/combat_phase_events/bc_commander_phase_events.txt`
 
-- [ ] **Step 1: Add `bc_battle_open_effect` to all seven**
+- [x] **Step 1: Add `bc_battle_open_effect` to all seven**
 
 In every one of the seven `effect` blocks, immediately after `save_scope_as = bc_commander`
 and **before** `bc_mark_chronicle_effect`:
@@ -1465,7 +1465,7 @@ matters for the pop-up branches: `bc_banner_falls` marks the chronicle and then
 by then `bc_battle_size` must already be written, because the option has no combat scope
 to write it from.
 
-- [ ] **Step 2: Add seam calls to the four events with no pop-up branch**
+- [x] **Step 2: Add seam calls to the four events with no pop-up branch**
 
 | event | call |
 |---|---|
@@ -1479,7 +1479,7 @@ Place each **immediately after** the existing momentum call
 State first, presentation second — the file's own header states this rule and explains
 that the entire momentum system once lived inside toast blocks and reached almost nobody.
 
-- [ ] **Step 3: Add seam calls to the three events with a pop-up branch**
+- [x] **Step 3: Add seam calls to the three events with a pop-up branch**
 
 These fire the seam **only in the `else` branch**, the toast branch. The pop-up branch's
 seam call lives in the option (task 10), because in that branch the option *is* the
@@ -1491,7 +1491,7 @@ outcome.
 | `bc_rally_the_line` | `bc_record_moment_effect = { TIER = minor KIND = ordered SWING = up }` |
 | `bc_van_breaks_through` | `bc_record_moment_effect = { TIER = major KIND = bloodied SWING = up }` |
 
-- [ ] **Step 4: Verify every effect block was reached**
+- [x] **Step 4: Verify every effect block was reached**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1501,7 +1501,7 @@ grep -c "bc_record_moment_effect" common/combat_phase_events/bc_commander_phase_
 
 Expected: **7** and **7**.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1520,7 +1520,7 @@ state, which is the whole reason `bc_battle_open_effect` exists.
 **Files:**
 - Modify: `mods/battle_chronicles/events/bc_events.txt`
 
-- [ ] **Step 1: Add one seam call per option**
+- [x] **Step 1: Add one seam call per option**
 
 | event | option | call |
 |---|---|---|
@@ -1538,7 +1538,7 @@ not match on position alone, match on the `name = bc_chronicles.000X.y` key.
 
 Place each after the existing momentum effect in that option.
 
-- [ ] **Step 2: Do NOT add `bc_battle_open_effect` here**
+- [x] **Step 2: Do NOT add `bc_battle_open_effect` here**
 
 A pop-up is raised by a phase event that has already run it. Adding it here would be a
 no-op at best; at worst an implementer would reach for a combat scope that does not exist
@@ -1546,7 +1546,7 @@ and write a silently-failing line. `bc_events.txt`'s header records the invarian
 sentence — "Nothing in here touches combat scopes" — and task 6 rewrites the lines around
 it, so quote it by that text rather than by line.
 
-- [ ] **Step 3: Verify the count**
+- [x] **Step 3: Verify the count**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -c "bc_record_moment_effect" events/bc_events.txt
@@ -1554,7 +1554,7 @@ cd /d/ck3/mods/battle_chronicles && grep -c "bc_record_moment_effect" events/bc_
 
 Expected: **8**.
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1572,7 +1572,7 @@ Three events, and this is the task with the sharp edges.
 **Files:**
 - Modify: `mods/battle_chronicles/common/combat_phase_events/bc_knight_phase_events.txt`
 
-- [ ] **Step 1: Read this before editing — one real behaviour change**
+- [x] **Step 1: Read this before editing — one real behaviour change**
 
 `bc_knight_holds_the_breach` and `bc_knight_shames_himself` already push momentum onto
 the side commander through `scope:combat_side.side_commander ?= { ... }`, so a seam call
@@ -1591,7 +1591,7 @@ holding together *is* the battle staying ordered. **But it is the one place stag
 "no new player-visible behaviour" claim is not strictly true, and it must be recorded in
 the commit message so a later bisect finds it.**
 
-- [ ] **Step 2: Add `bc_battle_open_effect` to all three**
+- [x] **Step 2: Add `bc_battle_open_effect` to all three**
 
 It goes **inside** `scope:combat_side.side_commander ?= { ... }`, because every `bc_`
 write lands on the commander and the effect's own writes assume `this` is him.
@@ -1616,7 +1616,7 @@ Opening the battle is not a lockout — it writes two variables that are overwri
 every phase event anyway — so the rule is not violated in substance. Say so in a comment
 at the call site, or someone will "fix" it later.
 
-- [ ] **Step 3: Add the seam calls**
+- [x] **Step 3: Add the seam calls**
 
 | event | call | placement |
 |---|---|---|
@@ -1628,7 +1628,7 @@ The third placement is load-bearing: outside that `if`, the seam would record a 
 for an event that produced no story, inflating `bc_battle_moments` and pushing the
 escalation ladder up on nothing.
 
-- [ ] **Step 4: Verify no `bc_` variable can reach a knight**
+- [x] **Step 4: Verify no `bc_` variable can reach a knight**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1640,7 +1640,7 @@ Read the surrounding lines and confirm it by eye. A seam call that escapes that 
 writes scratch onto a knight, which is the failure mode Section 1 of the spec exists to
 prevent and which nothing at runtime will report.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1673,7 +1673,7 @@ rather than being amended by a later plan that would have no reason to look here
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_ledger_effects.txt`
 - Modify: `mods/battle_chronicles/events/bc_aftermath_events.txt`
 
-- [ ] **Step 1: Write the clearing effect**
+- [x] **Step 1: Write the clearing effect**
 
 ```
 # --- scratch clearing -------------------------------------------------------
@@ -1695,7 +1695,7 @@ bc_clear_scratch_effect = {
 }
 ```
 
-- [ ] **Step 2: Call it LAST in both graders, OUTSIDE the game-rule gate**
+- [x] **Step 2: Call it LAST in both graders, OUTSIDE the game-rule gate**
 
 In both `bc_chronicles.0091` and `.0092`, as the final statement of `immediate`:
 
@@ -1705,7 +1705,7 @@ In both `bc_chronicles.0091` and `.0092`, as the final statement of `immediate`:
 		}
 ```
 
-- [ ] **Step 3: Confirm the placement by eye — this is the whole task**
+- [x] **Step 3: Confirm the placement by eye — this is the whole task**
 
 Two properties, both of which will silently break things if wrong:
 
@@ -1720,7 +1720,7 @@ Two properties, both of which will silently break things if wrong:
 The natural way to write the two-column split — group all the ungated work together — is
 exactly wrong. Add a comment saying so at the call site.
 
-- [ ] **Step 4: Record the one leak this does not close**
+- [x] **Step 4: Record the one leak this does not close**
 
 **A pop-up answered after the battle has already ended writes scratch that nothing will
 clear.** `bc_chronicles.0001/0002/0003` are player events sitting in the queue. If the
@@ -1740,7 +1740,7 @@ case and must keep working.
 **Add this as a comment in `bc_ledger_effects.txt` next to `bc_clear_scratch_effect`**, so
 whoever hits it does not rediscover it, and check for it in task 15 step 6.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1765,7 +1765,7 @@ unclaimed** — AGOT's `combat_on_actions.txt:3-4` is a bare `on_combat_start = 
   by reaching forward into task 14 step 1 (see step 4), because an `events = { }` entry
   pointing at an event that does not exist is a runtime error. The two commit together.
 
-- [ ] **Step 1: Add the hook**
+- [x] **Step 1: Add the hook**
 
 ```
 # Root = Combat here, NOT a combat side — see event_scopes.log and the DIAG event
@@ -1778,14 +1778,14 @@ on_combat_start = {
 }
 ```
 
-- [ ] **Step 2: Do not add anything else to this file**
+- [x] **Step 2: Do not add anything else to this file**
 
 No `effect = { }`. The header comment records that the engine keeps exactly one
 `effect` per on_action, chosen by alphabetical filename within `common/on_action`, and
 that a mod loading dead last still loses to `combat_on_actions.txt`. This exact bug ate a
 probe run on 2026-08-12.
 
-- [ ] **Step 3: Validate**
+- [x] **Step 3: Validate**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1799,13 +1799,13 @@ does not exist is a dangling reference — a runtime error, and a commit that le
 mod broken, which violates this plan's own rule that every task ends in a working state.
 The hook and the event it points at are one atomic change and must be one commit.
 
-- [ ] **Step 4: Create `bc_chronicles.0900` — jump to task 14 step 1, then come back**
+- [x] **Step 4: Create `bc_chronicles.0900` — jump to task 14 step 1, then come back**
 
 Task 14 step 1 creates `events/bc_diag_events.txt` containing `bc_chronicles.0900`. Do
 that step now. Nothing else in task 14 depends on this ordering, and nothing in task 14
 step 1 depends on the rest of task 13.
 
-- [ ] **Step 5: Validate again, now that the reference resolves**
+- [x] **Step 5: Validate again, now that the reference resolves**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1813,7 +1813,7 @@ cd /d/ck3/tools && python ck3.py validate --strict
 
 Expected: exit 0.
 
-- [ ] **Step 6: Commit the hook and the event together**
+- [x] **Step 6: Commit the hook and the event together**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1849,7 +1849,7 @@ code was written this way for exactly this reason.
 - Modify: `mods/battle_chronicles/events/bc_aftermath_events.txt` (Q1, Q3, Q5 hooks)
 - Modify: `mods/battle_chronicles/common/combat_phase_events/bc_knight_phase_events.txt` (Q4)
 
-- [ ] **Step 1: Q2 — does a `scope = combat` event work at all?**
+- [x] **Step 1: Q2 — does a `scope = combat` event work at all?**
 
 This is the riskiest question in the expansion. `scope = combat` is listed as a valid
 event scope but **nothing in vanilla or AGOT declares it** — `scope = combat_side` is
@@ -1889,7 +1889,7 @@ bc_chronicles.0900 = {
 If the first marker never appears, the eve pop-up in plan 5 dies and nothing else moves —
 that is the whole dependency.
 
-- [ ] **Step 2: Q1 — trait census**
+- [x] **Step 2: Q1 — trait census**
 
 A four-rung ladder. B gates on `number_of_commander_traits < 3`; if the median commander
 already holds 3, B is dead on arrival, the same way `has_any_nickname = no` disqualified
@@ -1923,7 +1923,7 @@ passed."
 			}
 ```
 
-- [ ] **Step 3: Q3 — subdivide the `under 5k` bucket**
+- [x] **Step 3: Q3 — subdivide the `under 5k` bucket**
 
 The 2,000 boundary between size buckets 1 and 2 is the one number in the expansion with
 no evidence behind it. In **both** graders, at the top of `immediate`, outside every
@@ -1956,7 +1956,7 @@ measures only the battles that already passed:
 world, not the mod — a bug in `bc_battle_open_effect` would otherwise make the
 measurement agree with itself and prove nothing.
 
-- [ ] **Step 4: Q4 — does a toast body run for an AI subject?**
+- [x] **Step 4: Q4 — does a toast body run for an AI subject?**
 
 **This question is not merely under-evidenced. The mod's own README already answers it,
 and answers it the opposite way from the rule the whole mod is built on.** Both claims
@@ -2064,7 +2064,7 @@ second is a presentation decision that stands regardless — a toast about an AI
 still belongs on his commander. So a "bodies do run" answer **simplifies** task 4's
 justification; it does not delete task 4.
 
-- [ ] **Step 5: Q5 — which terrain buckets do battles actually happen in?**
+- [x] **Step 5: Q5 — which terrain buckets do battles actually happen in?**
 
 **Q5 used to ask a different question, and that question is now closed.** It asked whether
 plain `terrain =` keys resolve in Westeros. They do not, and no run is needed to know it:
@@ -2206,7 +2206,7 @@ That last row is deliberately conservative, and it is where this question differ
 and Q3. Those measure properties of *every* battle, so a run is a fair sample. Terrain is
 a property of *where the war is*, and a single campaign is not a sample of Westeros.
 
-- [ ] **Step 6: Validate, index, conflicts, deploy**
+- [x] **Step 6: Validate, index, conflicts, deploy**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy
@@ -2214,7 +2214,7 @@ cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && pyt
 
 Expected: all exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -2234,7 +2234,7 @@ rather than the mod."
 
 **This is the runtime checkpoint. Everything before it is unproven.**
 
-- [ ] **Step 1: Clear the logs — with the game closed**
+- [x] **Step 1: Clear the logs — with the game closed**
 
 Delete `error.log` and `debug.log` from
 `D:\Documents\Paradox Interactive\Crusader Kings III\logs`.
@@ -2244,7 +2244,7 @@ sessions and already holds 225 matching lines from earlier runs. See "Read this 
 task 1". This also discards the previous run's `debug.log`, so if anything from it is
 still unrecorded, write it into the README first.
 
-- [ ] **Step 2: Fight battles**
+- [x] **Step 2: Fight battles**
 
 Launch the game. Fight several battles of visibly different sizes, and win at least one
 and lose at least one. Let at least one battle run long enough to produce five or more
@@ -2263,7 +2263,7 @@ session either.
 plentiful without going looking. Go looking anyway: that header has never been tested
 against this specific question, and the cost of being wrong is a wasted seven-minute run.
 
-- [ ] **Step 3: Sweep for errors first**
+- [x] **Step 3: Sweep for errors first**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "bc_"
@@ -2282,7 +2282,11 @@ marker.** A missing-variable error
 repeated once per knight per combat is the highest-volume failure this design can
 produce, and every number below would be measured against a broken build.
 
-- [ ] **Step 4: Read the seam markers**
+- [ ] **Step 4: Read the seam markers** — BLOCKED, needs a second run. The 2026-08-14 run
+  returned **zero** `BC: moment` lines: `bc_record_moment_effect` declared `SWING` and read
+  it nowhere, which stops the whole effect compiling and silently kills all 18 call sites.
+  Fixed, unproven. Neither failure signature described below was in play — the effect never
+  ran at all, which is a third mode this step did not anticipate.
 
 ```bash
 python ck3.py probe "BC: moment"
@@ -2298,7 +2302,7 @@ upper arms of the ladder fall through to the `else`. Distinguish the two cases b
 any single battle produced five or more markers. If one did and they were all `minor`, the
 comparison is broken.
 
-- [ ] **Step 5: Answer the five questions**
+- [x] **Step 5: Answer the five questions**
 
 ```bash
 python ck3.py probe "DIAG Q1"
@@ -2327,7 +2331,9 @@ opens `side_commander` unguarded from an `on_combat_end_winner` event), so treat
 blocker on the whole plan and not as a Q1 answer. Zero rows with **no** `BC: win notable`
 in the log is the ordinary case: too few notable battles, keep playing.
 
-- [ ] **Step 6: Confirm scratch does not leak**
+- [ ] **Step 6: Confirm scratch does not leak** — deferred to the same second run as step 4.
+  Most of the scratch variables are written by the seam, which was not compiling, so a
+  console check on the 2026-08-14 save would have shown "clean" for the wrong reason.
 
 The single most important runtime property of this plan. Run `debug_show_variables` in the
 console on **three** characters, because the three claims are different and only the first
@@ -2346,7 +2352,7 @@ is covered by looking at a commander:
    the second battle's marker count, you have hit the answered-late pop-up leak recorded
    in task 12 step 4 — note it, it does not block.
 
-- [ ] **Step 7: Write the results down — two commits, two repos**
+- [x] **Step 7: Write the results down — two commits, two repos**
 
 The numbers are the only record of how the later plans' thresholds were chosen. The
 existing calibration header in `bc_scripted_triggers.txt` exists because the last set was

@@ -2642,7 +2642,7 @@ hill-like, `the_bog` and `taiga_bog` are bog-like, and no helper appears twice.
 ```bash
 cd /d/ck3/mods/battle_chronicles
 grep -c "terrain = [a-z]" common/scripted_triggers/bc_scripted_triggers.txt
-grep -c "agot_is_" common/scripted_triggers/bc_scripted_triggers.txt
+grep "agot_is_" common/scripted_triggers/bc_scripted_triggers.txt | grep -vc "#"
 grep -n "agot_is_" common/scripted_triggers/bc_scripted_triggers.txt | grep -v "#"
 ```
 
@@ -2651,7 +2651,17 @@ under `bc_terrain_favours_us_trigger` and five under `bc_terrain_bogs_us_down_tr
 with no key appearing twice.
 
 **The first count is the one that matters and it must be exactly 0, not "lower".** A
-single surviving bare key is the entire bug, and it validates clean.
+single surviving bare key is the entire bug, and it validates clean. Before this task it
+returns **6** — the five bare keys plus the old comment's own `terrain = x` example, which
+step 2's replacement comment rewrites as "a terrain check" precisely so this grep can mean
+what it says.
+
+**The second command filters comments and a plain `grep -c` would not.** The replacement
+comment contains the line ``# NEVER `terrain = X`. ALWAYS `agot_is_X_terrain = yes`.``, so
+an unfiltered `grep -c "agot_is_"` returns **10** on a correct file. That line is doing real
+work — it is the instruction a future editor needs at the moment they are looking at these
+two triggers — so the grep gives way, not the comment. Note the same line is why the *first*
+grep still reads 0: `X` is uppercase and `[a-z]` does not match it.
 
 Then confirm the helpers this file now depends on all exist:
 

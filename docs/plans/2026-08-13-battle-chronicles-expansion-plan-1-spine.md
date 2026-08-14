@@ -763,11 +763,12 @@ namespace = bc_chronicles
 # AGOT is DURING combat inside is_army_in_combat = yes, and its value at combat
 # end is unproven. Two events makes the outcome structural instead of inferred.
 #
-# NEITHER CARRIES A `trigger`. The old .0090 deliberately had none because it is
-# the only caller of bc_cleanup_effect, and putting momentum stripping behind the
-# aftermath off switch would leave `advantage +-10` modifiers bleeding twenty days
-# into the next battle for any player who touched that setting. The game rule
-# therefore lives on an INNER `if` around the grading branch only.
+# NEITHER CARRIES A `trigger`. The old cleanup event these two replace had none
+# either, deliberately: it was the only caller of bc_cleanup_effect, and putting
+# momentum stripping behind the aftermath off switch would leave `advantage +-10`
+# modifiers bleeding twenty days into the next battle for any player who touched
+# that setting. The game rule therefore lives on an INNER `if` around the grading
+# branch only.
 #
 # BODY ORDER IS LOAD-BEARING and is part of the design:
 #   1. cleanup, OUTSIDE the gate
@@ -979,6 +980,15 @@ error, not a validation error.
 
 `--exclude-dir=.git` and an explicit path list, per this plan's own convention — a bare
 `.` matches the git object store and every deployed copy.
+
+**No `grep -v "#"` filter here, and that is deliberate.** Everywhere else in this plan a
+verification grep whose pattern could appear in shipped comment text is filtered. Here the
+opposite choice is made: nothing this task ships is allowed to name the old id at all, so
+an unfiltered grep is both a stricter check and a simpler one. That is why step 1's header
+comment says "the old cleanup event these two replace" rather than naming `.0090`, and why
+step 4's two README replacements name only `.0091` and `.0092`. If you paste a comment
+that mentions the old id, this step will fail — correctly. Reword the comment; do not add
+a filter.
 
 - [ ] **Step 6: Validate, index, conflicts**
 
@@ -2326,6 +2336,8 @@ exactly what task 1 had to clean up.
 - Modify: `mods/battle_chronicles/events/bc_aftermath_events.txt` (Q1, Q3, Q5)
 - Modify: `mods/battle_chronicles/common/combat_phase_events/bc_knight_phase_events.txt` (Q4)
 - Modify: `mods/battle_chronicles/common/on_action/bc_on_actions.txt`
+- Modify: `mods/battle_chronicles/common/scripted_effects/bc_reward_effects.txt` (one comment, step 3)
+- Modify: `mods/battle_chronicles/common/scripted_effects/bc_ledger_effects.txt` (one comment, step 3)
 
 - [ ] **Step 1: Remove Q1, Q3, Q4 and Q5**
 
@@ -2355,7 +2367,65 @@ Two cases:
   `bc_diag_events.txt` entirely. Record the failure in the spec — plan 5's eve section
   needs rewriting before it can be executed.
 
-- [ ] **Step 3: Verify**
+- [ ] **Step 3: Retire the two permanent comments that name a DIAG question**
+
+**Two comments this plan ships are written in the future tense and will outlive the
+questions they name.** They are not diagnostics and must not be deleted — they are the
+justification for two invented constants — but they cannot keep saying a measurement is
+pending after it has been taken. They are also what step 4's grep will trip over.
+
+Both were written before the answers existed, so **substitute the numbers you actually
+recorded in task 15 step 5**; the bracketed text below marks what varies.
+
+In `common/scripted_effects/bc_reward_effects.txt` (shipped by task 5), the
+`bc_addressed_toast_effect` header currently reads:
+
+```
+# Whether the toast BODY additionally fails to execute for an AI character is a
+# separate and currently OPEN question - README.md:158-159 says it executes,
+# README.md:48-51 says it does not. DIAG Q4 settles it. This effect is correct
+# either way; only the strength of the "keep state out of toasts" rule depends on
+# the answer.
+```
+
+Rewrite it as:
+
+```
+# Whether the toast BODY additionally executes for an AI character was an open
+# question - README.md said both things in two places. It was measured at combat
+# end across [N] toasts with a non-player subject: [the body ran / the body did
+# not run]. README.md now records the answer next to the claim it corrects. This
+# effect is correct either way; only the strength of the "keep state out of
+# toasts" rule depended on it.
+```
+
+In `common/scripted_effects/bc_ledger_effects.txt` (shipped by task 7), the size ladder
+currently reads:
+
+```
+	# (bc_scripted_triggers.txt:153). 2,000 is INVENTED - the calibration run
+	# recorded `under 5k` as one undivided bucket and never subdivided it. DIAG Q3
+	# measures it.
+```
+
+Rewrite it as:
+
+```
+	# (bc_scripted_triggers.txt:153). 2,000 was INVENTED - the calibration run
+	# recorded `under 5k` as one undivided bucket and never subdivided it. It was
+	# then measured over [N] battles: [the observed distribution], so the boundary
+	# [stands / moved to X]. Do not re-guess it; re-derive it by restoring the
+	# ladder from git history, the same rule the README states for the aftermath
+	# thresholds.
+```
+
+**If Q4 recorded no verdict** — task 14 step 4's first row, `subject AI == 0` — say exactly
+that in the first comment rather than inventing an answer: "measured once and the run
+proved nothing; every toast had a human subject." A comment that overstates what was
+measured is worse than one that admits the gap, and this is the specific failure the
+five-row table exists to prevent.
+
+- [ ] **Step 4: Verify**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -rn "DIAG" --exclude-dir=.git common/ events/
@@ -2363,11 +2433,17 @@ cd /d/ck3/mods/battle_chronicles && grep -rn "DIAG" --exclude-dir=.git common/ e
 
 Expected: **no output.**
 
+**This grep is unfiltered on purpose and it is why step 3 exists.** It matches comment text
+as readily as code, and after step 3 nothing shipped is allowed to contain the string
+`DIAG` at all. Do not satisfy it by adding `| grep -v "#"` — the two comments were the
+whole point, and filtering them out would leave stale prose in the mod forever while the
+check reported clean.
+
 **If Q2 failed and you deleted `bc_diag_events.txt`, delete the `on_combat_start` block in
 the same commit.** Leaving the hook behind recreates exactly the dangling reference that
 task 13 was restructured to avoid.
 
-- [ ] **Step 4: Full verification sweep**
+- [ ] **Step 5: Full verification sweep**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy
@@ -2375,7 +2451,7 @@ cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && pyt
 
 Expected: all exit 0.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 **Name the files. Do not use `git add -A`.** Task 15 is a runtime task run against a live
 game, and the mod directory is the deploy target — a blanket add sweeps up whatever the
@@ -2385,7 +2461,9 @@ game or a stray deploy left behind.
 cd /d/ck3/mods/battle_chronicles
 git add events/bc_aftermath_events.txt \
         common/combat_phase_events/bc_knight_phase_events.txt \
-        common/on_action/bc_on_actions.txt
+        common/on_action/bc_on_actions.txt \
+        common/scripted_effects/bc_reward_effects.txt \
+        common/scripted_effects/bc_ledger_effects.txt
 ```
 
 Then stage the DIAG event file according to the step 2 branch:

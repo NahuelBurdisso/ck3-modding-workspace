@@ -905,7 +905,12 @@ silently, which is why it is checked after the edits as well as before.
 cd /d/ck3/tools && python ck3.py validate --strict
 ```
 
-Expected: exit 0 **with no missing-localization WARN naming any `bc_rivalry_` key**.
+Expected: exit 0. **Nothing more — and in particular, not the absence of a
+missing-localization WARN.** `ck3lib/validate.py:182-185` checks only top-level definition
+keys in the three categories at `:37`: `common/traits`, `common/decisions`,
+`common/character_interactions`. Every key this task adds is *referenced* from a scripted
+effect or belongs to `common/game_rules`, none of which that check can see. Steps 3 and 4
+are the real gates on this task's localization; this command only says the files parse.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles

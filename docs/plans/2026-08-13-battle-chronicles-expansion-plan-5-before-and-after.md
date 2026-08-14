@@ -766,7 +766,12 @@ Then read both graders by eye and confirm, for each:
 cd /d/ck3/tools && python ck3.py validate --strict
 ```
 
-Expected: exit 0, **with no missing-localization WARN naming `bc_dead_knights`**.
+Expected: exit 0, and nothing else. **Do not read this as confirming the loc keys.**
+`ck3lib/validate.py:182-185` checks top-level definition keys only, and only in the three
+categories at `:37` — `common/traits`, `common/decisions`,
+`common/character_interactions`. A key referenced from an event's toast is in none of them,
+so `--strict` is silent about `bc_dead_knights_toast` whether it exists or not. The four
+counts at the top of this step are the check.
 
 - [ ] **Step 6: Commit**
 
@@ -1232,7 +1237,12 @@ silently, which is why it is checked after the edits as well as before.
 cd /d/ck3/tools && python ck3.py validate --strict
 ```
 
-Expected: exit 0 **with no missing-localization WARN naming any `bc_chronicles.0011` key**.
+Expected: exit 0, and nothing else. **`--strict` cannot see event loc keys.**
+`ck3lib/validate.py:182-185` checks top-level definition keys in the three categories at
+`:37` only — `common/traits`, `common/decisions`, `common/character_interactions`. `events/`
+is not among them, so an event `desc` pointing at a key that does not exist passes this
+command cleanly and renders its raw key in the pop-up. Step 3's 8-and-7 pairing is the
+check that catches it.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles

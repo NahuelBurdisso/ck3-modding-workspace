@@ -639,6 +639,11 @@ cd /d/ck3/mods/battle_chronicles
 grep -c "^ bc_\|^ rule_bc_\|^ setting_bc_" localization/english/bc_l_english.yml
 head -c 8 localization/english/bc_l_english.yml | cat -A
 grep -c "bc_wounded_commander" common/scripted_effects/bc_ledger_effects.txt
+for k in bc_wounded_toast bc_wounded_toast_desc; do
+  u=$(grep -c "= $k$" common/scripted_effects/bc_ledger_effects.txt)
+  d=$(grep -c "^ $k:" localization/english/bc_l_english.yml)
+  echo "$k use=$u def=$d"
+done
 ```
 
 Against the baseline recorded in task 1 step 1, the count must have risen by exactly **8** —
@@ -646,13 +651,30 @@ Against the baseline recorded in task 1 step 1, the count must have risen by exa
 silently, which is why it is checked after the edits as well as before. The third must be
 **2** — the `save_scope_as` and the `SUBJECT =`.
 
+The loop must print `use=1 def=1` on both rows. **This is the only check in this plan that
+pairs a toast key with its definition**, and it exists because step 5's `validate --strict`
+cannot: the key is referenced, not defined, so `--strict` never looks at it.
+
+**The `= $k$` anchor is what makes the two rows independent.** `bc_wounded_toast` is a
+substring of `bc_wounded_toast_desc`, so an unanchored count would read **2** on the first
+row and hide a missing `TITLE`. The `$` end-anchor works because both are written as
+`TITLE = bc_wounded_toast` and `DESC = bc_wounded_toast_desc`, each alone on its line.
+
 - [ ] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
 ```
 
-Expected: exit 0, **with no missing-localization WARN naming `bc_wounded_toast`**.
+Expected: exit 0, and nothing else. **There will be no WARN about `bc_wounded_toast` either
+way.** `ck3lib/validate.py:182-185` checks top-level definition keys and only in the three
+categories at `:37` — `common/traits`, `common/decisions`,
+`common/character_interactions`. This key is *referenced* from a scripted effect, so the
+check never looks at it, and its silence means nothing. Step 4's count is the gate.
+
+That distinction matters more here than anywhere else in this plan: `wounded_1` carries
+`flag = no_message`, so a missing key does not degrade the notification — it *is* the
+notification, rendered as raw key text.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles

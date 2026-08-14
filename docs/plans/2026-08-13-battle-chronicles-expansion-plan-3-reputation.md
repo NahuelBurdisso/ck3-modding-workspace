@@ -499,8 +499,22 @@ Saving it in the grader instead would put it forty lines from its only consumer.
 
 **`DESC = bc_style_award_$TRAIT$_desc` builds a loc key by substitution.** That is legal —
 `$PARAM$` substitutes textually — and it is why task 8 defines six `_desc` keys named
-after the six traits exactly. **A typo here is a missing loc key, which `validate --strict`
-catches**, unlike almost everything else in this mod.
+after the six traits exactly.
+
+**Nothing automated will catch a typo in that name, and an earlier draft of this step said
+otherwise.** It claimed `validate --strict` catches the missing key. It does not.
+`ck3lib/validate.py:182-185` runs the missing-localization check over `def_categories`,
+which holds **top-level definition keys**, and only for the three categories in
+`LOC_EXPECTED` at `:37` — `common/traits`, `common/decisions`,
+`common/character_interactions`. A loc key *referenced* from a scripted effect is not a
+definition and is not in any of those three directories, so it is invisible to the check
+in both directions: the tool will not warn when it is missing and will not warn when it is
+misspelled. At runtime a bad key renders as the raw key text inside the toast.
+
+**A typo in these six names is caught by task 8 step 4 and nowhere else.** That step pairs
+every `TRAIT =` argument in this file against a real key in the loc file. It cannot run
+here, because until task 8 none of the keys exist and every row would read `loc=0`. Type
+the six names carefully and let task 8 confirm them.
 
 - [ ] **Step 3: Validate and commit**
 
@@ -508,9 +522,8 @@ catches**, unlike almost everything else in this mod.
 cd /d/ck3/tools && python ck3.py validate --strict
 ```
 
-Expected: exit 0 **with six missing-localization WARNs** for the keys task 8 has not
-written yet, plus one for `bc_style_award_toast`. A WARN is not a failure — check the exit
-code.
+Expected: exit 0. **Do not expect any WARN about these keys, now or after task 8** — see
+step 2.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1326,12 +1339,46 @@ cd /d/ck3/tools && python ck3.py validate --strict
 
 The key count must have risen by exactly **14**. The BOM must still be present — editors
 strip it silently, which is why it is checked after the edit as well as before.
-`validate --strict` must exit 0 **with no missing-localization WARN naming any `bc_` key**.
+`validate --strict` must exit 0.
 
-That last condition is the real test of step 2: if a `$TRAIT$`-substituted desc key was
-misspelled in task 4 or 5, this is the only check in the entire plan that catches it.
+**It will not say anything about these keys, and you must not read its silence as a pass.**
+`ck3lib/validate.py:182-185` only checks top-level definitions in the three categories at
+`:37` — `common/traits`, `common/decisions`, `common/character_interactions`. Every key
+above is *referenced* from a scripted effect, so none of them is in scope for that check.
+An earlier draft of this step called the absence of a WARN "the real test of step 2" and
+"the only check in the entire plan that catches it". Both statements were wrong: the check
+it named cannot fail.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Pair the twelve substituted keys against their call sites**
+
+This is the real test of task 4 step 2 and task 5, and it is only runnable now, because
+until this task the keys did not exist.
+
+```bash
+cd /d/ck3/mods/battle_chronicles
+for t in aggressive_attacker unyielding_defender flexible_leader cautious_leader reckless organizer; do
+  a=$(grep -c "bc_style_award_toast_effect = { TRAIT = $t }" common/scripted_effects/bc_reputation_effects.txt)
+  l=$(grep -c "^ bc_style_award_${t}_desc:" localization/english/bc_l_english.yml)
+  echo "style $t arm=$a loc=$l"
+done
+for t in desert_warrior open_terrain_expert rough_terrain_expert forest_fighter jungle_stalker winter_soldier; do
+  a=$(grep -c "bc_terrain_award_toast_effect = { TRAIT = $t }" common/scripted_effects/bc_reputation_effects.txt)
+  l=$(grep -c "^ bc_terrain_award_${t}_desc:" localization/english/bc_l_english.yml)
+  echo "terrain $t arm=$a loc=$l"
+done
+grep -c "^ bc_style_award_toast:" localization/english/bc_l_english.yml
+grep -c "^ bc_terrain_award_toast:" localization/english/bc_l_english.yml
+```
+
+Expected: **twelve rows reading `arm=1 loc=1`**, then **1** and **1** for the two shared
+titles. A row reading `arm=1 loc=0` is a misspelled substituted key — either the call site
+or the key here, and the loop cannot tell you which, only that the two do not agree.
+
+**The loop is written against the trait names, not against the file**, deliberately. A
+version that harvested names out of the effect file and paired them with themselves would
+agree with itself no matter what either file says.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles

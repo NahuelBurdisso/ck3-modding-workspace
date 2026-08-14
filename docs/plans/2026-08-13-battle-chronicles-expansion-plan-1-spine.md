@@ -22,10 +22,36 @@ under a second. The verification loop is:
 | step | command | pass condition |
 |---|---|---|
 | syntax | `cd /d/ck3/tools && python ck3.py validate --strict` | exit 0 |
-| | **`validate` is syntax-only** — brace balance, BOM, loc keys, descriptor keys, structure. `--strict` adds one missing-localization WARN and nothing else (`ck3lib/validate.py:149`, `:182`). It has **no knowledge of trigger, effect or scope keys**, so a well-formed reference to a key that does not exist passes cleanly. Never gate a semantic question on `validate`. | |
+| | **`validate` is syntax-only** — brace balance, BOM, loc keys, descriptor keys, structure. It has **no knowledge of trigger, effect or scope keys**, so a well-formed reference to a key that does not exist passes cleanly. Never gate a semantic question on `validate`. | |
 | collisions | `python ck3.py index` then `python ck3.py conflicts` | exit 0. **`conflicts` reads a sqlite index that only `index` rebuilds — a stale index makes it always pass, so never run it alone** |
 | deploy | `python ck3.py deploy` | exit 0 |
 | runtime | launch the game, fight a battle, then `python ck3.py probe <pattern>` | see below |
+
+**`--strict` adds almost nothing, and the plans that follow this one depend on knowing
+exactly how little.** `ck3lib/validate.py:182-185` walks `def_categories` — the **top-level
+definition keys** the parser collected — and warns for any whose key is absent from the
+mod's localization. It does that only for the three categories in `LOC_EXPECTED` at `:37`:
+`common/traits`, `common/decisions`, `common/character_interactions`.
+
+**Battle Chronicles has none of those three directories, and no plan in this expansion
+creates one.** `ls common/` in the mod returns `character_memory_types`,
+`combat_phase_events`, `game_rules`, `modifiers`, `on_action`, `opinion_modifiers`,
+`script_values`, `scripted_effects`, `scripted_triggers` — and `:182` is `--strict`'s only
+effect in the whole file. **So `validate --strict` and `validate` do exactly the same thing
+here.** Every plan writes `--strict` out of habit and because a later plan might add a
+trait file; the flag is not currently buying anything.
+
+Three consequences, all of which cost this expansion review time:
+
+- **A loc key merely *referenced* is never checked.** Toast titles and descs, event `desc`
+  branches, `$PARAM$`-substituted keys — all invisible. `--strict` is silent whether they
+  exist or not, so its silence proves nothing about them.
+- **`common/modifiers` and `common/game_rules` are not in the set.** A modifier with no loc
+  key validates clean forever and renders its raw name in the player's battle UI.
+- Therefore **never write a pass condition of the form "exit 0 with no missing-localization
+  WARN naming X"** unless X is a top-level definition in one of those three directories.
+  Everywhere else that phrasing describes a check that cannot fail. Pair the key against
+  its call site instead; plans 2 through 6 each carry such a check.
 
 **`ck3.py probe` exits 1 when nothing matches.** For a marker sweep, exit 0 is the pass
 condition. For an error sweep, non-zero *would* be the pass condition — but read the next

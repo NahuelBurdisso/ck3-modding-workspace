@@ -482,10 +482,26 @@ bc_add_verb_effect = {
 # would be dead and nothing would say so. Same rule and same reason as the tier
 # comparison in bc_record_effective_tier_effect; the precedents are cited there.
 #
-# `ordered`/`down`, `entrenched`/`down` and `wild`/`up` are unreachable from the
-# eighteen call sites that ship today. They are written anyway because SWING is a
-# parameter of the seam, not of this table, and plan 6's wound gate reads SWING on
-# every KIND. Do not delete the rows as dead code.
+# ONLY THE `ordered` ROW TESTS SWING, AND THAT ASYMMETRY IS DELIBERATE. Do not
+# "fix" it in either direction - neither by adding a SWING test to the other three
+# rows nor by deleting it from this one.
+#
+# The eighteen call sites plan 1 ships use nine of the twelve (KIND, SWING)
+# pairs. The three that never occur are `entrenched`/`down`, `wild`/`up` and
+# `ordered`/`down`. So for bloodied, entrenched and wild a SWING test would be
+# either always-true or always-false today, buying nothing and inviting a
+# reader to trust a distinction the data does not support. `ordered` is the one
+# KIND where the design wants the pair, and `ordered`/`up` is reachable - three
+# call sites use it.
+#
+# SWING IS STILL A PARAMETER OF THE SEAM, NOT OF THIS TABLE. Plan 6's wound gate
+# reads it on every KIND, including the three this ladder ignores. Dropping it
+# from the seam because this table barely uses it would break that plan.
+#
+# ALL FOUR MODIFIERS ARE REACHABLE, so an absent verb in testing is a bug and not
+# a gap in the call sites: bc_bloodied from 3 sites, bc_shieldwall from 3,
+# bc_spent_horse from 4, bc_pursuit from 3. Counted from plan 1's call-site
+# tables; the same four numbers go in the README at the end of this plan.
 bc_apply_verb_effect = {
 	if = {
 		limit = { flag:$KIND$ = flag:bloodied }
@@ -1360,8 +1376,9 @@ Write into `README.md`:
   shipped call sites — `bc_bloodied` from three, `bc_shieldwall` from three,
   `bc_spent_horse` from four, `bc_pursuit` from three — so a verb that never appears
   after several varied battles is worth investigating rather than shrugging at. What is
-  unreachable is three `(KIND, SWING)` *pairs*: `wild`/`up`, `entrenched`/`down` and
-  `ordered`/`down`;
+  unreachable is three `(KIND, SWING)` *pairs* out of twelve — `wild`/`up`,
+  `entrenched`/`down` and `ordered`/`down` — which is why only the `ordered` row of the
+  verb ladder tests `SWING` at all;
 - the pre-existing late-pop-up modifier hazard from this plan's preamble;
 - that `bc_mark_chronicle_effect` and `bc_chronicle_ready_trigger` are now knight-only,
   and why;

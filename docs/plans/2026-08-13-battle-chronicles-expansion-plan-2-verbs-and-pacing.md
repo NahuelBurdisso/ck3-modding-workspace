@@ -1138,13 +1138,27 @@ through the tier ladder to `bc_write_style_effect`, `flag:$SWING$` in the verb l
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-grep -rn '\$[A-Z]*\$ = [a-z]' common/scripted_effects/ common/scripted_triggers/
+grep -rn '\$[A-Z_]*\$ = [a-z]' common/scripted_effects/ common/scripted_triggers/ common/script_values/ | grep -v 'flag:\$'
 ```
 
 Expected: **no output**. Any hit is a `$PARAM$ = literal` comparison, which substitutes
 to an unknown key and is a silent no-op that `validate` passes. This is the single
 highest-consequence class of error in this mod and it is invisible to every other check
 in this plan.
+
+Three details, each of which an earlier draft of this step got wrong:
+
+- **`[A-Z_]`, not `[A-Z]`.** A parameter named `$MY_PARAM$` contains an underscore, and
+  `[A-Z]*` stops at it. Plans 3 and 4 already use the wider class; this one had not caught
+  up.
+- **The `flag:\$` filter is required, and without it this step fails on correct code.**
+  `flag:$TIER$ = flag:decisive` — the shipped, correct idiom — matches the pattern, because
+  the right-hand side begins with the lowercase `f` of `flag:`. An unfiltered run reports
+  every correct comparison in the tier and verb ladders as a defect, which is worse than no
+  check at all: it trains the reader to ignore the output.
+- **`common/script_values/` belongs in the path list.** Script values take `$PARAM$` too,
+  and this plan puts a parameterless one there (`bc_chronicle_flag_days_value`) while plan 1
+  puts parameterised ladders next to it.
 
 - [ ] **Step 5: Full static pass**
 

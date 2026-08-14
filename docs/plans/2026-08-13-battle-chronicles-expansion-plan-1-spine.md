@@ -22,13 +22,42 @@ under a second. The verification loop is:
 | step | command | pass condition |
 |---|---|---|
 | syntax | `cd /d/ck3/tools && python ck3.py validate --strict` | exit 0 |
+| | **`validate` is syntax-only** — brace balance, BOM, loc keys, descriptor keys, structure. `--strict` adds one missing-localization WARN and nothing else (`ck3lib/validate.py:149`, `:182`). It has **no knowledge of trigger, effect or scope keys**, so a well-formed reference to a key that does not exist passes cleanly. Never gate a semantic question on `validate`. | |
 | collisions | `python ck3.py index` then `python ck3.py conflicts` | exit 0. **`conflicts` reads a sqlite index that only `index` rebuilds — a stale index makes it always pass, so never run it alone** |
 | deploy | `python ck3.py deploy` | exit 0 |
 | runtime | launch the game, fight a battle, then `python ck3.py probe <pattern>` | see below |
 
-**`ck3.py probe` exits 1 when nothing matches.** For an error sweep, **non-zero exit is
-the pass condition** — it means no `bc_` error was logged. For a marker sweep, exit 0 is
-the pass condition. Read that twice; it inverts between the two uses.
+**`ck3.py probe` exits 1 when nothing matches.** For a marker sweep, exit 0 is the pass
+condition. For an error sweep, non-zero *would* be the pass condition — but read the next
+paragraph before relying on that, because as of 2026-08-13 it cannot be reached.
+
+**The error sweep does not work against an uncleared log, and this was measured, not
+assumed.** `error.log` accumulates across sessions. Run today, before this plan changes
+anything, `python ck3.py probe "bc_"` exits **0** with 225 matching lines already in it.
+A sweep whose pass condition can never be met is not a gate. So:
+
+1. **With the game closed**, delete `error.log` and `debug.log` from
+   `D:\Documents\Paradox Interactive\Crusader Kings III\logs`. The game recreates both on
+   launch. This is the only way to make the sweep falsifiable. Do it before every runtime
+   checkpoint, and note that it discards the previous run's logs — if the previous run's
+   findings are not yet written into the README, write them first.
+2. Then run, then sweep.
+
+**Even on a cleared log the sweep will not come back empty, and that is a pre-existing
+bug, not this plan's.** All 225 lines are of one shape:
+
+```
+Failed to read key reference: bc_frequency_low: bc_frequency_low, near line: 945
+  in file: "save games/autosave_exit.ck3"
+```
+
+The mod's three game rules fail to resolve when a save that was created with them is
+read. That is worth chasing — game rules are baked into a save at creation, so this may
+mean rule state is not surviving a load — but it is **out of scope for plan 1** and is
+recorded here so nobody rediscovers it mid-task. **Sweep pass condition: every group
+returned is a `Failed to read key reference` line whose `in file:` is a save game.
+Anything else is a real error and blocks the task.** Do not broaden this whitelist
+without recording why.
 
 **Never use `ck3.py errors`.** It tail-slices a ~500k-line log and mod script errors
 appear near the top, so it cannot see them. `probe` reads end to end and groups by file.
@@ -70,7 +99,7 @@ writes into files that already exist.
 |---|---|---|
 | `common/scripted_effects/bc_scripted_effects.txt` | modify (shrinks) | momentum ladder, `bc_clear_faltering_effect`, flattened `bc_cleanup_effect`, chronicle-mark effects, pop-up cooldown |
 | `common/scripted_effects/bc_reward_effects.txt` | **create** (task 5) | everything on the reward path: `bc_addressed_toast_effect`, `bc_aftermath_nickname_effect`, `bc_notable_battle_counter_effect`, `bc_battle_memory_effect` |
-| `common/scripted_effects/bc_ledger_effects.txt` | **create** (task 7) | `bc_battle_open_effect`, `bc_record_moment_effect`, `bc_add_verb_effect`, scratch clearing |
+| `common/scripted_effects/bc_ledger_effects.txt` | **create** (task 7) | `bc_battle_open_effect`, `bc_record_moment_effect` and its two helpers, `bc_clear_scratch_effect`. **Not** `bc_add_verb_effect`, which needs the family-2 modifiers and belongs to plan 2, and **not** the nemesis wipe, which has nothing to wipe until plan 4 |
 | `common/scripted_triggers/bc_scripted_triggers.txt` | modify | unchanged in this plan except its header |
 | `events/bc_events.txt` | modify (shrinks) | player-facing pop-ups only |
 | `events/bc_aftermath_events.txt` | **create** (task 6) | the two consolidated combat-end graders |
@@ -95,6 +124,13 @@ nickname path) must precede task 4 (refactor it), because that path has never ru
 runtime and refactoring an unverified path makes an old bug indistinguishable from a
 new one.
 
+**One task pair is interleaved rather than sequential.** Task 13 adds the `on_combat_start`
+hook and task 14 step 1 defines the only event that hook names. Neither is committable
+alone — a hook naming a nonexistent event is a dangling reference — so task 13 reaches
+forward into task 14 for one step and the two ship in a single commit. That is spelled out
+in task 13 and is the only place in this plan where task boundaries do not match commit
+boundaries.
+
 ---
 
 ### Task 1: Strip every stale DIAG marker
@@ -110,15 +146,24 @@ will pollute the stage-1 log.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-grep -rn "DIAG" . ; grep -rn "toast body ran" .
+grep -rn "DIAG" --exclude-dir=.git common/ events/
+grep -rn "toast body ran" --exclude-dir=.git common/ events/
 ```
 
-Expected: eleven `DIAG` hits in `events/bc_events.txt` and one
+Expected: **15 `DIAG` hits in `events/bc_events.txt`** — 11 `debug_log` lines plus 4
+comment lines at `:153`, `:288`, `:293` and `:304` — and one
 `"BC: toast body ran (knight breach)"` at
 `common/combat_phase_events/bc_knight_phase_events.txt:108`.
 
-If the counts differ, **stop and re-read the files** — the plan was written against a
-known state and a different one means someone else has edited the mod.
+The 11-versus-15 distinction matters: the markers to remove are 11, the grep hits are 15,
+and the four extras are the comments that introduce them, which go too.
+
+**Scope the grep to `common/` and `events/`.** A bare `grep -rn "DIAG" .` from the mod
+root also matches `.git/COMMIT_EDITMSG`, and the toast grep also matches `README.md:159`.
+Both are phantom hits that will make the counts look wrong.
+
+If the counts still differ, **stop and re-read the files** — the plan was written against
+a known state and a different one means someone else has edited the mod.
 
 - [ ] **Step 2: Remove the eleven markers in `bc_events.txt`**
 
@@ -151,10 +196,11 @@ by DIAG Q4 in task 14, which asks it properly.
 - [ ] **Step 4: Verify nothing else was caught**
 
 ```bash
-cd /d/ck3/mods/battle_chronicles && grep -rn "DIAG\|toast body ran" .
+cd /d/ck3/mods/battle_chronicles && grep -rn "DIAG\|toast body ran" --exclude-dir=.git common/ events/
 ```
 
-Expected: **no output.**
+Expected: **no output.** `README.md` is deliberately outside the search path — its record
+of the earlier toast investigation is history and stays.
 
 - [ ] **Step 5: Validate**
 
@@ -188,17 +234,22 @@ never executed means a later failure has two possible causes.
 
 - [ ] **Step 1: Temporarily weaken the gate**
 
-In `bc_chronicles.0091`, change the nickname `limit` block to fire on any notable win:
+In `bc_chronicles.0091`, delete these three rows from the nickname `limit` block, leaving
+`has_any_nickname = no` as the only condition:
 
 ```
-if = {
-	limit = {
-		has_any_nickname = no
-	}
-	save_scope_as = bc_named_commander
-	bc_aftermath_nickname_effect = yes
-}
+		exists = var:bc_notable_battles
+		var:bc_notable_battles >= 3
+		martial >= 14
 ```
+
+**Delete only those three lines. Touch nothing else in the block.** The surrounding
+`if`/`limit`/`save_scope_as` structure and — critically — the three rationale comment
+blocks interleaved with it (`bc_events.txt:346-351`, `:357-363`, `:366-368`) must survive
+untouched. They explain why `exists` is belt-and-braces, why the gate reads `martial` and
+not `prowess`, and why the scope is saved. An earlier draft of this task told you to
+re-paste the whole block from the plan, which would have silently deleted about fifteen
+lines of load-bearing rationale.
 
 **Leave `save_scope_as = bc_named_commander` exactly where it is.** The effect's toast
 uses it for `left_icon`, and a scripted effect does not rebind ROOT — ROOT here is the
@@ -226,15 +277,16 @@ cd /d/ck3/tools && python ck3.py probe "nickname awarded"
 
 Expected: **exit 0 with at least one hit.**
 
-Then sweep for errors:
+Then sweep for errors, using the procedure in "Read this before task 1" — **the logs must
+have been cleared with the game closed before step 2's run, or this proves nothing**:
 
 ```bash
 python ck3.py probe "bc_"
 ```
 
-Expected: **exit 1** (nothing matched — no `bc_` error was logged). If it exits 0, read
-what it found; the nickname path is broken and must be fixed here, before task 4, which
-is the entire reason this task exists.
+Expected: every group returned is a `Failed to read key reference` line from a save game.
+Any other line means the nickname path is broken and must be fixed here, before task 4,
+which is the entire reason this task exists.
 
 - [ ] **Step 4: Confirm the toast was addressed correctly**
 
@@ -242,40 +294,54 @@ Check whether the toast appeared in-game. If the commander who won the name was 
 no toast appeared on his liege, that is a real bug in the shipped routing — record it
 and fix it now.
 
-- [ ] **Step 5: Revert the gate**
-
-Restore the original `limit` block verbatim:
-
-```
-if = {
-	limit = {
-		has_any_nickname = no
-		exists = var:bc_notable_battles
-		var:bc_notable_battles >= 3
-		martial >= 14
-	}
-	save_scope_as = bc_named_commander
-	bc_aftermath_nickname_effect = yes
-}
-```
-
-- [ ] **Step 6: Verify the temporary marker is gone**
+- [ ] **Step 5: Revert with git, not by re-typing**
 
 ```bash
-cd /d/ck3/mods/battle_chronicles && grep -rn "TEMPORARY" .
+cd /d/ck3/mods/battle_chronicles && git checkout -- events/bc_events.txt
 ```
 
-Expected: no output.
+**Do not hand-restore the deleted rows.** The file is under version control and the
+change was never committed, so `git checkout --` restores it exactly, comments and all.
+Re-typing is how the rationale blocks get lost.
 
-- [ ] **Step 7: Commit**
+Note that this discards *any* uncommitted change to `bc_events.txt`. Task 1 commits its
+own edits to that same file, so at this point there should be nothing else in flight —
+confirm with `git status --short events/bc_events.txt` first if unsure.
+
+- [ ] **Step 6: Verify the file is byte-identical to where task 1 left it**
 
 ```bash
-git add events/bc_events.txt
-git commit -m "test: force-execute the nickname path before refactoring it
+cd /d/ck3/mods/battle_chronicles
+git diff --exit-code events/bc_events.txt
+grep -rn "TEMPORARY" --exclude-dir=.git common/ events/
+```
 
-The gate needs three conditions no observed battle has cleared, so the reward
-path had never run. Temporarily reduced to has_any_nickname = no, confirmed the
-effect executes and the toast is addressed, then restored the gate verbatim."
+Expected: `git diff --exit-code` exits **0** with no output, and the grep prints nothing.
+The `--exclude-dir=.git` matters: without it the grep also matches `.git/COMMIT_EDITMSG`
+and reports a phantom failure.
+
+- [ ] **Step 7: Record the result — there is no commit here**
+
+This task deliberately ends with **no commit**. It made a temporary change and reverted
+it, so the tree is unchanged and `git commit` would either be empty or, worse, capture a
+botched restore. What this task produces is *knowledge*, and knowledge goes in the README:
+
+Append to `mods/battle_chronicles/README.md` under the runs section, then commit **that**:
+
+```markdown
+- **Resolved:** `bc_aftermath_nickname_effect` executes. Forced by temporarily
+  reducing the gate to `has_any_nickname = no`; `BC: nickname awarded` appeared,
+  the toast was addressed to <who>, and the gate was restored with
+  `git checkout --`.
+```
+
+```bash
+git add README.md
+git commit -m "docs: record that the nickname reward path executes
+
+Its three gates had never been cleared by an observed battle, so the path was
+unproven before task 4 refactors it. Forced it once with a weakened gate,
+confirmed it runs, reverted the gate. No source change."
 ```
 
 ---
@@ -311,7 +377,7 @@ design.
 #
 # FLAT, NOT GUARDED. remove_character_modifier on an absent modifier is a no-op
 # — vanilla's own vizierate_remove_extravagance_modifiers_effect
-# (00_diarchy_scripted_effects.txt:2325-2341) is an unguarded list of 16 of
+# (00_diarchy_scripted_effects.txt:2318-2335) is an unguarded list of 16 of
 # which at most 4 are ever held. Guards here bought nothing and made the list a
 # place where a new modifier gets forgotten.
 #
@@ -358,9 +424,18 @@ git commit -m "refactor: flatten bc_cleanup_effect to an unguarded removal list"
 
 ### Task 4: Extract `bc_addressed_toast_effect`
 
-Every award in this expansion needs the same routing: a toast about an AI subject has to
-be raised on his liege, because a `send_interface_toast` body does not reliably run for
-a character nobody is playing. That routing exists once, buried in the nickname effect.
+Every award in this expansion needs the same routing: a toast about an AI subject is
+raised on his liege instead. That routing exists once, buried in the nickname effect.
+
+**Two independent reasons, and only one of them is in doubt.** The first is *addressing* —
+a toast about a courtier knight belongs on his commander, because nobody is playing a
+courtier knight and a toast raised on him reaches no one. That reason is not contested and
+does not depend on any open question. The second is *reliability* — the belief that a
+`send_interface_toast` body does not run at all for a character nobody is playing. **That
+one is contradicted by the mod's own README** (`:158-159` versus `:48-51`) and is what
+DIAG Q4 in task 14 exists to settle. Extract the routing on the strength of the first
+reason. If Q4 comes back "bodies do run", this task does not get reverted — only its
+comment gets corrected.
 
 **Extract the routing, not the toast.** The routing is the `is_ai = no` /
 `else_if exists = liege` fork at `bc_scripted_effects.txt:288-297`.
@@ -376,9 +451,15 @@ it is **not** reusable as-is because its `left_icon` is hardcoded to
 ```
 # --- addressed toasts -------------------------------------------------------
 #
-# A send_interface_toast body only reliably runs for a character a player is
-# actually playing, and nearly every commander in the world is AI. A toast about
-# an AI subject therefore has to be raised on somebody who might be human.
+# A toast is ADDRESSED, not broadcast. Nearly every commander and every knight in
+# the world is AI, and a toast raised on a man nobody is playing reaches nobody —
+# so a toast ABOUT an AI subject is raised on somebody who might be human.
+#
+# Whether the toast BODY additionally fails to execute for an AI character is a
+# separate and currently OPEN question - README.md:158-159 says it executes,
+# README.md:48-51 says it does not. DIAG Q4 settles it. This effect is correct
+# either way; only the strength of the "keep state out of toasts" rule depends on
+# the answer.
 #
 # CALLED ON THE SUBJECT. Tests is_ai on THIS, raises on THIS or on `liege`.
 #
@@ -531,14 +612,30 @@ one grader per hook.
 
 **The reason is ordering, not efficiency.** `.0090` carries no `trigger` while
 `.0091`/`.0092` do; all three fire from the same hooks; and the order between separate
-events on one hook is undefined. Grading reads scratch that cleanup will later clear, so
-grading must provably run first. Two events cannot express that. One can, in written
-order — CK3 executes sibling effects in the order written.
+events on one hook is undefined. Grading reads scratch variables that **scratch clearing**
+will remove, so grading must provably run before the clearing. Separate events cannot
+express that. One event per hook can, in written order.
+
+**Be precise about which of the two "clears" this is about — they are different things
+and only one of them constrains grading.** `bc_cleanup_effect` strips momentum
+*modifiers*; `bc_clear_scratch_effect` (task 12) removes scratch *variables*. Grading
+reads variables and no modifier, so cleanup is free to run first and does. The order is
+cleanup → grading → scratch clearing, exactly as the file header states. Do not
+"correct" the code to put grading first.
 
 **Files:**
 - Create: `mods/battle_chronicles/events/bc_aftermath_events.txt`
 - Modify: `mods/battle_chronicles/events/bc_events.txt` (remove `.0090`, `.0091`, `.0092`)
 - Modify: `mods/battle_chronicles/common/on_action/bc_on_actions.txt`
+
+**Carry the rationale comments across — the code below is not the whole file.** The three
+events being replaced carry substantial comment blocks explaining decisions that are still
+live: why the grade runs in `immediate` rather than in the trigger
+(`bc_events.txt:180-184`), why the loser event does not touch `bc_notable_battles`
+(`:186-187`), and the belt-and-braces `exists` note (`:346-351`). Those survive the
+consolidation. The listing below shows structure and the comments that are new or changed;
+it is not a licence to drop everything it omits. Diff the old and new files before
+committing and account for every removed comment line.
 
 - [ ] **Step 1: Create `bc_aftermath_events.txt`**
 
@@ -824,25 +921,6 @@ from the phase event where `scope:combat_side` does exist.
 # commander at every phase event tracks a mid-battle replacement on the other
 # side, which capture-once does not.
 bc_battle_open_effect = {
-	# Housekeeping for C, which does not ship until plan 4. Kept here because this
-	# is the ONE effect context guaranteed to run at every phase event: both
-	# named read sites for bc_nemesis are pure TRIGGER contexts, and no effect
-	# runs in a trigger, so a "wipe on failed read" rule is unimplementable.
-	#
-	# It lags the read by one phase event — is_valid runs before effect — and that
-	# is harmless: the read guard is `exists` PLUS `is_alive`, and CK3 keeps dead
-	# characters as real objects, so is_alive on one is a clean `no`, not an
-	# error. This wipe stops the variable living on a commander forever; it is not
-	# what makes the read safe.
-	if = {
-		limit = {
-			exists = var:bc_nemesis
-			NOT = { var:bc_nemesis = { is_alive = yes } }
-		}
-		remove_variable = bc_nemesis
-		remove_variable = bc_nemesis_losses
-	}
-
 	scope:combat_side.enemy_side.side_commander ?= {
 		save_scope_as = bc_open_foe
 	}
@@ -852,6 +930,13 @@ bc_battle_open_effect = {
 			name = bc_battle_foe
 			value = scope:bc_open_foe
 		}
+	}
+	else = {
+		# Self-contained: without this, a leaderless enemy side leaves the
+		# PREVIOUS battle's foe in place. bc_clear_scratch_effect (task 12)
+		# happens to cover this today, but that is a different effect in a
+		# different task, and this one should not depend on it.
+		remove_variable = bc_battle_foe
 	}
 
 	# A BUCKET, 1/2/3 — never a raw troop count.
@@ -885,13 +970,35 @@ bc_battle_open_effect = {
 }
 ```
 
-**On `?=` for the foe:** a side can be leaderless. The variable is then simply left
-unset and C never arms for that battle, which is correct.
+**The nemesis-wipe housekeeping is NOT in this plan.** An earlier draft put a guarded
+`remove_variable = bc_nemesis` at the top of this effect, on the grounds that this is the
+one effect context guaranteed to run at every phase event while both of C's read sites
+are pure trigger contexts. That reasoning still holds — but **nothing in plan 1 ever
+writes `bc_nemesis`**, so the block would be untestable dead code shipped a plan early,
+and the runtime checkpoint in task 15 could not falsify it. It belongs in plan 4, added
+to this effect, and plan 4 must nest the two guard rows rather than making them siblings
+in one `limit` for the same non-short-circuiting reason as `bc_write_style_effect`.
 
-**Note the `save_scope_as` indirection.** `set_variable value =` needs a resolvable
-target; reaching through `?=` and saving first keeps the write out of the arm where the
-scope does not resolve. Do not collapse it into a single `set_variable` with a `?=` path
-— that path is a *scope link*, not a value expression.
+**Note the `save_scope_as` indirection — and note that it is a guard, not a necessity.**
+`set_variable value =` *can* take a multi-link scope path directly. Vanilla does exactly
+that, through these same two links, at `combat_on_actions.txt:39-44`:
+
+```
+set_variable = {
+	name = cid_title_to_give
+	value = prev.enemy_side.side_commander.primary_title
+}
+```
+
+Both links are real: `event_targets.log:1409-1411` gives `enemy_side` (`combat_side` →
+`combat_side`) and `:1415-1417` gives `side_commander` (`combat_side` → `character`). So
+`value = scope:combat_side.enemy_side.side_commander` would work — **on a side that has a
+commander.** The indirection buys the leaderless case: `?=` absorbs the failed link, and
+the `exists` test then turns "no commander" into a branch instead of a broken read. Keep
+it for that reason, not because the direct form is impossible.
+
+**On `?=` for the foe:** a side can be leaderless. `bc_battle_foe` is then cleared rather
+than left stale, and C never arms for that battle, which is correct.
 
 - [ ] **Step 3: Validate**
 
@@ -902,7 +1009,22 @@ cd /d/ck3/tools && python ck3.py validate --strict
 Expected: exit 0. The effect has no callers yet, which is fine and intentional — task 9
 wires it.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Check for collisions — this task creates a new filename**
+
+```bash
+cd /d/ck3/tools && python ck3.py index && python ck3.py conflicts
+```
+
+Expected: exit 0 for both. **This step is not optional here even though most tasks skip
+it.** A new file in `common/scripted_effects/` is precisely when a collision can appear,
+and `conflicts` reads a sqlite index that only `index` rebuilds — running `conflicts`
+against yesterday's index would pass vacuously and prove nothing. `index` takes about two
+minutes. Task 5 already does this, for the same reason, and task 6 does it again. **Tasks
+5, 6 and 7 each create a permanent new filename and each run it.** Task 14's
+`bc_diag_events.txt` is the one exception — it is temporary and is covered by task 16's
+full sweep, which runs `index` and `conflicts` after it is deleted.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -984,10 +1106,20 @@ and the mod already follows it in `bc_notable_battle_counter_effect`.
 #   moments 1-2  ->  minor
 #   moments 3-4  ->  major
 #   moments 5+   ->  decisive
+#
+# THE COMPARISON IS `flag:$TIER$ = flag:decisive`, NOT `$TIER$ = decisive`. A bare
+# `$TIER$ = decisive` substitutes textually to `decisive = decisive`, and `decisive`
+# is not a script value, trigger or scope anywhere in vanilla, AGOT or the playset —
+# it is an unknown key, which is a silent no-op, not a validation failure. Wrapping
+# both sides in `flag:` is the shipped idiom for comparing a parameter against a
+# literal: vanilla 00_animal_effects.txt:1659 (`flag:$BONUS$ = flag:court_physician`)
+# and :1778-1793 (`flag:$METHOD$ = flag:gift` and two siblings), AGOT
+# 00_agot_character_data_effects.txt:1427-1463. Call sites are unaffected — they
+# still pass TIER = decisive.
 bc_record_effective_tier_effect = {
 	if = {
 		limit = {
-			$TIER$ = decisive
+			flag:$TIER$ = flag:decisive
 			var:bc_battle_moments >= 5
 		}
 		bc_write_style_effect = { RANK = 3 KIND = $KIND$ }
@@ -995,7 +1127,10 @@ bc_record_effective_tier_effect = {
 	}
 	else_if = {
 		limit = {
-			OR = { $TIER$ = decisive  $TIER$ = major }
+			OR = {
+				flag:$TIER$ = flag:decisive
+				flag:$TIER$ = flag:major
+			}
 			var:bc_battle_moments >= 3
 		}
 		bc_write_style_effect = { RANK = 2 KIND = $KIND$ }
@@ -1017,26 +1152,35 @@ bc_record_effective_tier_effect = {
 # This needs a high-water mark, which is what bc_battle_tier is for. It cannot be
 # derived from bc_battle_moments, because a call site may request `minor` at any
 # rung of the ladder.
+#
+# THE ABSENCE CASE IS A SEPARATE BRANCH, NOT AN `OR` ROW. Writing it as
+# `OR = { NOT = { exists = var:bc_battle_tier }  var:bc_battle_tier <= $RANK$ }`
+# looks equivalent and is not: CK3 does not short-circuit, so on the first moment of
+# every battle — when the variable does not exist yet — the second row still
+# evaluates and logs a read of a missing variable, once per moment, forever. The
+# mod already states this rule in its own source, in the imperative:
+# bc_events.txt:346-351, "Do not rely on evaluation order to make it safe - CK3
+# guarantees no order of evaluation among siblings, in a limit or anywhere else."
+# The nested shape below is the same one bc_notable_battle_counter_effect uses
+# (bc_scripted_effects.txt:197-211).
 bc_write_style_effect = {
 	if = {
-		limit = {
-			OR = {
-				NOT = { exists = var:bc_battle_tier }
-				var:bc_battle_tier <= $RANK$
-			}
-		}
+		limit = { NOT = { exists = var:bc_battle_tier } }
+		set_variable = { name = bc_battle_tier value = $RANK$ }
+		set_variable = { name = bc_battle_style value = flag:$KIND$ }
+	}
+	else_if = {
+		limit = { var:bc_battle_tier <= $RANK$ }
 		set_variable = { name = bc_battle_tier value = $RANK$ }
 		set_variable = { name = bc_battle_style value = flag:$KIND$ }
 	}
 }
 ```
 
-**On the `$TIER$ = decisive` comparison.** CK3 substitutes `$TIER$` textually, so this
-resolves to `decisive = decisive`, which is not a valid trigger. **Verify this before
-relying on it** — if `validate --strict` rejects it, switch the parameter to a numeric
-rank at every call site (`TIER = 1|2|3`) and compare integers, which is unambiguous.
-Prefer the numeric form if there is any doubt; the KIND table in the spec maps cleanly
-onto 1/2/3.
+**The two branches are byte-identical in body, and that is correct — do not "factor out"
+the duplication.** The only thing that differs is the guard, and there is no way to write
+one guard that covers both without reintroducing the non-short-circuiting read above. Two
+duplicated lines is the price of not logging an error every moment of every battle.
 
 - [ ] **Step 4: Validate**
 
@@ -1044,9 +1188,15 @@ onto 1/2/3.
 cd /d/ck3/tools && python ck3.py validate --strict
 ```
 
-Expected: exit 0. **If it complains about the `$TIER$` comparison, take the numeric-rank
-branch above now** rather than deferring it — every call site in tasks 9-11 depends on
-which form is chosen.
+Expected: exit 0.
+
+**Do not read this as confirmation that the tier comparison works.** `validate` is
+syntax-only and has no knowledge of trigger keys, so it would have passed the broken
+`$TIER$ = decisive` form just as happily. The comparison form is settled by the vanilla
+precedent cited in the code comment above, not by this command, and it is proven at
+runtime in task 15 by all three of `BC: moment minor` / `major` / `decisive` appearing
+in the log. If only `BC: moment minor` ever appears, the comparison is silently failing
+and both upper arms are dead.
 
 - [ ] **Step 5: Commit**
 
@@ -1385,17 +1535,47 @@ probe run on 2026-08-12.
 cd /d/ck3/tools && python ck3.py validate --strict
 ```
 
-Expected: exit 0. `bc_chronicles.0900` does not exist yet — task 14 writes it. **Do not
-deploy between this task and the next**; a dangling event reference in an `events = { }`
-list is a runtime error.
+Expected: exit 0.
 
-- [ ] **Step 4: Commit**
+**Step 4 is not "commit". Do task 14 step 1 now, before committing anything here.**
+`bc_chronicles.0900` does not exist yet, and an `events = { }` list naming an event that
+does not exist is a dangling reference — a runtime error, and a commit that leaves the
+mod broken, which violates this plan's own rule that every task ends in a working state.
+The hook and the event it points at are one atomic change and must be one commit.
+
+- [ ] **Step 4: Create `bc_chronicles.0900` — jump to task 14 step 1, then come back**
+
+Task 14 step 1 creates `events/bc_diag_events.txt` containing `bc_chronicles.0900`. Do
+that step now. Nothing else in task 14 depends on this ordering, and nothing in task 14
+step 1 depends on the rest of task 13.
+
+- [ ] **Step 5: Validate again, now that the reference resolves**
+
+```bash
+cd /d/ck3/tools && python ck3.py validate --strict
+```
+
+Expected: exit 0.
+
+- [ ] **Step 6: Commit the hook and the event together**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-git add common/on_action/bc_on_actions.txt
-git commit -m "feat: hook on_combat_start, which is unclaimed in the loaded playset"
+git add common/on_action/bc_on_actions.txt events/bc_diag_events.txt
+git commit -m "feat: hook on_combat_start, which is unclaimed in the loaded playset
+
+Committed together with bc_chronicles.0900, the event it dispatches. The hook
+alone is a dangling reference. Both are provisional: the event is DIAG Q2, and
+whether either survives is decided in task 16 by whether a scope = combat event
+fires at all."
 ```
+
+**On the scope of `on_combat_start`.** Vanilla and AGOT both comment `# Root = Combat` at
+the top of `combat_on_actions.txt:1-2`, and this plan is written against that. Note that
+`on_actions.log:10151-10153` disagrees, giving `Expected Scope: none`. The comment is more
+likely right than the generated log, but if Q2's first marker never appears, **this
+discrepancy is the first thing to suspect** — before concluding that `scope = combat`
+events do not work.
 
 ---
 
@@ -1455,9 +1635,19 @@ that is the whole dependency.
 
 - [ ] **Step 2: Q1 — trait census**
 
-In `bc_chronicles.0091`'s `side_commander ?=` block, as a four-rung ladder. B gates on
-`number_of_commander_traits < 3`; if the median commander already holds 3, B is dead on
-arrival, the same way `has_any_nickname = no` disqualified 3 of 4 sampled AGOT commanders.
+A four-rung ladder. B gates on `number_of_commander_traits < 3`; if the median commander
+already holds 3, B is dead on arrival, the same way `has_any_nickname = no` disqualified
+3 of 4 sampled AGOT commanders.
+
+**Placement: in BOTH graders, inside a `side_commander ?=` at the top of `immediate`,
+OUTSIDE the notability gate** — the same placement as Q3, for the same reason. An earlier
+draft put it in `bc_chronicles.0091` only and inside the gate, which samples exclusively
+commanders who have just won a notable battle. That is precisely the population most
+likely to be decorated, so it would overstate the trait count and kill B on a biased
+sample. The mod already states this rule about its own instrumentation at
+`bc_events.txt:180-184`: "the calibration markers below have to fire on EVERY combat end,
+including the ones that fail the bar, or they measure only the battles that already
+passed."
 
 ```
 			if = {
@@ -1512,33 +1702,84 @@ measurement agree with itself and prove nothing.
 
 - [ ] **Step 4: Q4 — does a toast body run for an AI subject?**
 
-The whole of `bc_addressed_toast_effect` rests on the answer being no. The claim is
-well-supported but under-evidenced: the mod's own comments hedge with "only *reliably*
-runs", and **vanilla puts real state inside toast bodies on AI-reachable paths** —
-`add_legitimacy = minor_legitimacy_loss` at `combat_on_actions.txt:587`, inside
-`side_primary_participant`, which is usually AI.
+**This question is not merely under-evidenced. The mod's own README already answers it,
+and answers it the opposite way from the rule the whole mod is built on.** Both claims
+are in that one file:
 
-In `bc_addressed_toast_effect`, add a marker outside the toast and one inside it, in the
-`is_ai` arm that is **not** taken — i.e. instrument the liege arm:
+- `README.md:48-51`, the design rule: "No gameplay effect ever sits inside a
+  `send_interface_toast`. A toast only reaches the player playing the scoped character,
+  so anything nested in one is unreliable for the AI."
+- `README.md:158-159`, the 2026-08-13 calibration result: "**Resolved:** a
+  `send_interface_toast` body **does** run for an AI character — `fired
+  bc_knight_holds_the_breach` 14 == `toast body ran` 14."
+
+They cannot both be right, and the later one is marked Resolved. Vanilla sides with the
+later one: `add_legitimacy = minor_legitimacy_loss` sits inside a toast body at
+`combat_on_actions.txt:587`, within `side_primary_participant`, which is usually AI.
+
+**But the 14 == 14 result has a confound that invalidates it.** That probe was on
+`bc_knight_holds_the_breach`, whose toast is raised on `scope:combat_side.side_commander`
+(`bc_knight_phase_events.txt:94-109`). If every one of those 14 fires happened in a
+battle the player was fighting, with the player as that side's commander, then the
+subject was **human every time** and the run measured nothing about AI. Nothing in the
+README records the AI/human split of those 14. The debug log that would settle it has
+since rotated — `probe "BC:"` returns nothing today — so it cannot be recovered.
+
+So Q4 stands, but it must be instrumented to make the AI/human split explicit, which is
+exactly what the original probe failed to do. In `bc_addressed_toast_effect`:
 
 ```
+bc_addressed_toast_effect = {
+	if = {
+		limit = { is_ai = no }
+		debug_log = "BC: DIAG Q4 player arm entered"
+		send_interface_toast = {
+			type = event_toast_effect_good
+			title = $TITLE$
+			desc = $DESC$
+			left_icon = $SUBJECT$
+			debug_log = "BC: DIAG Q4 body ran, player arm"
+		}
+	}
 	else_if = {
 		limit = { exists = liege }
-		debug_log = "BC: DIAG Q4 liege arm entered"
+		if = {
+			limit = { liege = { is_ai = no } }
+			debug_log = "BC: DIAG Q4 liege arm entered, liege HUMAN"
+		}
+		else = {
+			debug_log = "BC: DIAG Q4 liege arm entered, liege AI"
+		}
 		liege = {
 			send_interface_toast = {
 				type = event_toast_effect_good
 				title = $TITLE$
 				desc = $DESC$
 				left_icon = $SUBJECT$
-				debug_log = "BC: DIAG Q4 toast body ran on liege"
+				debug_log = "BC: DIAG Q4 body ran, liege arm"
 			}
 		}
 	}
+}
 ```
 
-If "entered" appears without "toast body ran", the routing rule is confirmed and every
-award in plans 3-5 must stay outside its toast.
+**How to read the counts — this is the whole point of the split:**
+
+| observation | conclusion |
+|---|---|
+| `liege AI` > 0 **and** `body ran, liege arm` == (`liege HUMAN` + `liege AI`) | Bodies **do** run for AI. The design rule is false. Say so in the README, and reconsider whether `bc_addressed_toast_effect` is needed at all. |
+| `body ran, liege arm` == `liege HUMAN` only, with `liege AI` > 0 | Bodies are **skipped** for AI. The rule holds and every award in plans 3-5 must stay outside its toast. |
+| `liege AI` == 0 | **The run proved nothing** — same confound as before. Do not record a verdict. Play on until an AI-liege case appears. |
+
+That third row is not a formality; it is the failure mode that produced the contradiction
+in the first place, and it must be checked before any verdict is written down.
+
+**Note what survives either answer.** `bc_addressed_toast_effect` does two things:
+it keeps state out of toast bodies, and it addresses the toast to somebody who might be
+human instead of broadcasting it at an AI courtier. Only the first depends on Q4. The
+second is a presentation decision that stands regardless — a toast about an AI knight
+still belongs on his commander. So a "bodies do run" answer **simplifies** task 4's
+justification; it does not delete task 4.
 
 - [ ] **Step 5: Q5 — do the vanilla terrain keys resolve in Westeros?**
 
@@ -1623,35 +1864,57 @@ rather than the mod."
 
 **This is the runtime checkpoint. Everything before it is unproven.**
 
-- [ ] **Step 1: Fight battles**
+- [ ] **Step 1: Clear the logs — with the game closed**
+
+Delete `error.log` and `debug.log` from
+`D:\Documents\Paradox Interactive\Crusader Kings III\logs`.
+
+**Skipping this makes step 2 unfalsifiable**, because `error.log` accumulates across
+sessions and already holds 225 matching lines from earlier runs. See "Read this before
+task 1". This also discards the previous run's `debug.log`, so if anything from it is
+still unrecorded, write it into the README first.
+
+- [ ] **Step 2: Fight battles**
 
 Launch the game. Fight several battles of visibly different sizes, and win at least one
 and lose at least one. Let at least one battle run long enough to produce five or more
 moments, so the `decisive` rung of the escalation ladder is exercised.
 
-- [ ] **Step 2: Sweep for errors first**
+**Q4 additionally needs a battle whose commander is an AI with a liege** — a vassal's
+levy commander, not your own. Without one, Q4's result is the same uninformative
+all-human sample that produced the contradiction it exists to resolve.
+
+- [ ] **Step 3: Sweep for errors first**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "bc_"
 ```
 
-Expected: **exit 1** — nothing matched, so no `bc_` error was logged.
+Expected: every group returned is a `Failed to read key reference` line whose `in file:`
+is a save game. That family is the known pre-existing anomaly described in "Read this
+before task 1" and is not this plan's doing.
 
-If it exits 0, **stop and fix before reading any marker.** A missing-variable error
+**Anything else — stop and fix before reading any marker.** A missing-variable error
 repeated once per knight per combat is the highest-volume failure this design can
 produce, and every number below would be measured against a broken build.
 
-- [ ] **Step 3: Read the seam markers**
+- [ ] **Step 4: Read the seam markers**
 
 ```bash
 python ck3.py probe "BC: moment"
 ```
 
-Expected: minor markers common, major markers present, decisive markers rare or absent in
-a short session. **If `decisive` appears in a battle with fewer than five moments the
+Expected: minor markers common, major markers present, decisive markers rare in a long
+enough session. **If `decisive` appears in a battle with fewer than five moments the
 ceiling is inverted** — check the `>=` in `bc_record_effective_tier_effect`.
 
-- [ ] **Step 4: Answer the five questions**
+**If `BC: moment minor` is the only marker that ever appears, do not write this off as a
+short session.** That is the exact signature of the `flag:$TIER$` comparison failing: both
+upper arms of the ladder fall through to the `else`. Distinguish the two cases by whether
+any single battle produced five or more markers. If one did and they were all `minor`, the
+comparison is broken.
+
+- [ ] **Step 5: Answer the five questions**
 
 ```bash
 python ck3.py probe "DIAG Q1"
@@ -1668,11 +1931,11 @@ Record the counts. They gate the later plans:
 | Q1 median is 3+ | plan 3's `number_of_commander_traits < 3` gate is dead — B must be redesigned before it ships |
 | Q2 first marker absent | plan 5's eve pop-up dies. Nothing else is affected |
 | Q3 | sets the real bucket-1/2 boundary. If `2k` and `3k` are both near-empty, move the boundary to where the mass is |
-| Q4 "entered" without "toast body ran" | routing rule confirmed. If **both** appear, `bc_addressed_toast_effect` is unnecessary and plans 3-5 simplify |
+| Q4 | read it against the three-row table in task 14 step 4, **including the third row**. If `liege AI` never appeared, the run proved nothing and no verdict is recorded. A "bodies do run" verdict does not delete `bc_addressed_toast_effect` — it only relaxes the "state never inside a toast" rule for plans 3-5, and it must be written into `README.md` next to the two claims it settles |
 | Q5 `NONE MATCHED` appears | an unhandled terrain exists — find it before plan 3 |
 | Q5 desert/jungle never appear | drop `desert_warrior` and `jungle_stalker` from plan 3 |
 
-- [ ] **Step 5: Confirm scratch does not leak**
+- [ ] **Step 6: Confirm scratch does not leak**
 
 The single most important runtime property of this plan. In the console, on a commander
 who has just finished a battle:
@@ -1684,7 +1947,7 @@ debug_show_variables
 Expected: **no `bc_battle_*` variable present.** If any remain, task 12's placement is
 wrong — check that clearing is outside the game-rule gate.
 
-- [ ] **Step 6: Write the results down**
+- [ ] **Step 7: Write the results down**
 
 Append the counts to the spec under a new `## DIAG results 2026-08-13` heading. This is a
 workspace commit, not a mod commit:
@@ -1736,10 +1999,14 @@ Two cases:
 - [ ] **Step 3: Verify**
 
 ```bash
-cd /d/ck3/mods/battle_chronicles && grep -rn "DIAG" .
+cd /d/ck3/mods/battle_chronicles && grep -rn "DIAG" --exclude-dir=.git common/ events/
 ```
 
 Expected: **no output.**
+
+**If Q2 failed and you deleted `bc_diag_events.txt`, delete the `on_combat_start` block in
+the same commit.** Leaving the hook behind recreates exactly the dangling reference that
+task 13 was restructured to avoid.
 
 - [ ] **Step 4: Full verification sweep**
 
@@ -1771,9 +2038,16 @@ proves its call sites through those."
 - [ ] No `bc_` variable exists on any commander at the start of a new battle.
 - [ ] No `bc_` variable exists on any knight, ever.
 - [ ] `validate --strict`, `index`, `conflicts` and `deploy` all exit 0.
-- [ ] `probe "bc_"` exits **1**.
-- [ ] All five DIAG answers are recorded in the spec.
-- [ ] No DIAG marker remains in the mod.
+- [ ] On a **cleared** log, `probe "bc_"` returns only `Failed to read key reference`
+      lines from save games, and nothing else.
+- [ ] All three of `BC: moment minor` / `major` / `decisive` have appeared. If only
+      `minor` ever appears, the `flag:$TIER$` comparison is silently failing and both
+      upper arms of the ceiling are dead.
+- [ ] All five DIAG answers are recorded — Q1/Q3/Q5 in the spec, Q4 in the mod's README
+      next to the claim it corrects or confirms.
+- [ ] Q4 was answered on a run that actually contained an AI liege. If `liege AI` was
+      never logged, no verdict is recorded.
+- [ ] No DIAG marker remains in `common/` or `events/`.
 
 ## What comes next
 

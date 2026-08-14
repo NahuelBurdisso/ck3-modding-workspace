@@ -151,10 +151,17 @@ grep -n "rule_bc_\|setting_bc_" localization/english/bc_l_english.yml
 grep -c "^ bc_\|^ rule_bc_\|^ setting_bc_" localization/english/bc_l_english.yml
 ```
 
-Three rules exist — `bc_frequency`, `bc_swing`, `bc_aftermath` — each with
-`categories = { flavor }`, a `default =`, and three empty-brace options. The loc convention
-is four keys per rule plus two per option: `rule_<key>`, `rule_<key>_desc`,
-`setting_<option>`, `setting_<option>_desc`.
+Three rules ship today — `bc_frequency`, `bc_swing`, `bc_aftermath` — each with
+`categories = { flavor }`, a `default =`, and three empty-brace options.
+
+**Four if plan 6 has landed**, which adds `bc_wounds` with **two** options rather than three.
+Plan 6 is declared independent of this plan, so the order they land in is not fixed. Nothing
+in this task depends on the number; read the file and append after whatever is last.
+
+The loc convention is **two keys per rule plus two per option** — `rule_<key>`,
+`rule_<key>_desc`, then `setting_<option>` and `setting_<option>_desc` for each. A
+three-option rule is therefore **eight** keys, which is what the three shipped rules have:
+24 lines for 3 rules. **Not "four per rule".**
 
 **Write the key count down.** Task 6 step 4 checks the total rose by exactly 15 across both
 localization tasks, and that is not a check you can run without the number from before.
@@ -204,8 +211,12 @@ applied. Not worth a setting.
 
 - [ ] **Step 3: Add the eight localization keys**
 
-Append to the game-rules block of `localization/english/bc_l_english.yml`, after
-`setting_bc_aftermath_generous_desc`. **One leading space per line**, matching the file:
+Append to the game-rules block of `localization/english/bc_l_english.yml`, **after the last
+existing `setting_bc_` line**. **One leading space per line**, matching the file:
+
+**"After the last `setting_bc_` line", not "after `setting_bc_aftermath_generous_desc`."**
+Plan 6 task 1 also adds a rule and also appends to this block, and the two plans are declared
+independent of each other — anchoring on a specific rule's last key would interleave them.
 
 ```
  rule_bc_rivalry:0 "Battle Chronicles: Rivalry"
@@ -224,9 +235,33 @@ Append to the game-rules block of `localization/english/bc_l_english.yml`, after
 cd /d/ck3/tools && python ck3.py validate --strict
 ```
 
-Expected: exit 0. `validate` checks descriptor keys and loc-file structure; a game rule
-whose options have no `setting_*` keys is exactly what `--strict` warns about, so **there
-must be no WARN naming `bc_rivalry`**.
+Expected: exit 0.
+
+**`validate` proves only brace balance and BOM here. It does not know what a game rule is.**
+`grep -n "game_rule\|setting_\|rule_" ck3.py` returns nothing — the tool has no game-rule
+awareness at all, so it cannot tell you that `bc_rivalry_off` needs a `setting_bc_rivalry_off`
+key. A rule whose options have no `setting_` keys renders as raw tokens in the game-rule screen
+and validates perfectly.
+
+Check it statically instead, scoped to this rule:
+
+```bash
+cd /d/ck3/mods/battle_chronicles
+grep -n "^ rule_bc_rivalry" localization/english/bc_l_english.yml
+grep -n "^ setting_bc_rivalry" localization/english/bc_l_english.yml
+grep -n "bc_rivalry" common/game_rules/bc_game_rules.txt
+```
+
+Expected **2**, then **6**, then **5** lines — the rule name and its `_desc`; three options
+times name and `_desc`; and in the rules file the rule, its `default =`, and the three option
+blocks. Every option token in the third must appear in the second.
+
+**Scoped to `bc_rivalry`, and `^ `-anchored.** A total over all rules would be wrong the moment
+plan 6 lands, and the leading-space anchor is what counts key definitions rather than any
+mention of the name in a `_desc` body.
+
+The rule only truly renders correctly when someone opens the game-rule screen. Plan 6 task 6
+step 2 does that; if plan 6 is not being run, do it once by hand.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles

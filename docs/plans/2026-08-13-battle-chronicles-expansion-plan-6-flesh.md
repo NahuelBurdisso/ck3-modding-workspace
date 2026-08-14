@@ -318,9 +318,13 @@ rule that defaults off is a feature nobody sees.
 
 - [ ] **Step 4: Add the six rule localization keys**
 
-Append to `localization/english/bc_l_english.yml`, immediately after the
-`setting_bc_aftermath_generous_desc` line so the four rules stay together. **One leading
-space per line.**
+Append to `localization/english/bc_l_english.yml`, **after the last existing `setting_bc_`
+line**, so the rule keys stay in one block. **One leading space per line.**
+
+**"After the last `setting_bc_` line", not "after `setting_bc_aftermath_generous_desc`."**
+Plan 4 task 1 also adds a game rule and also appends to this block, and plan 6 is declared
+independent of plan 4 — the order the two land in is not fixed. Anchoring on a specific rule's
+last key would interleave them.
 
 ```
 
@@ -1009,11 +1013,15 @@ seven minutes it cost to get there.
 cd /d/ck3/tools && python ck3.py launch
 ```
 
-At the new-game screen, open the game rules and find the four `Battle Chronicles:` entries.
+At the new-game screen, open the game rules and find the `Battle Chronicles:` entries. There
+are **at least four** — `Frequency`, `Swing`, `Aftermath` and the new `Wounds` — and **five if
+plan 4 has landed**, which adds `Rivalry`. Plan 6 is independent of plan 4, so the total is not
+a number this plan can assert. **Check `Wounds` specifically; ignore the count.**
 
 | what to see | what it means if wrong |
 |---|---|
-| four rules, named in English | a raw `rule_bc_wounds` token means task 1's loc did not land |
+| an entry reading `Battle Chronicles: Wounds` | a raw `rule_bc_wounds` token means task 1's loc did not land |
+| every other `Battle Chronicles:` entry still named in English | task 1 appended into the middle of another rule's key block |
 | `Battle Chronicles: Wounds` has **two** options, `Off` and `Default` | raw `setting_bc_wounds_off` tokens mean the option keys are missing |
 | `Default` is preselected | `default = bc_wounds_default` did not take |
 | the rule's description names the two guarantees | this is the only place in the game a player can read them before the mod does it to them |

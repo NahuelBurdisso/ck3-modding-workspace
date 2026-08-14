@@ -449,6 +449,7 @@ bc_style_award_toast_effect = {
 	set_variable = { name = bc_award_taken value = 1 }
 	debug_log = "BC: style award"
 	bc_addressed_toast_effect = {
+		TYPE = event_toast_effect_good
 		TITLE = bc_style_award_toast
 		DESC = bc_style_award_$TRAIT$_desc
 		SUBJECT = scope:bc_award_subject
@@ -710,6 +711,7 @@ bc_terrain_award_toast_effect = {
 	set_variable = { name = bc_award_taken value = 1 }
 	debug_log = "BC: terrain award"
 	bc_addressed_toast_effect = {
+		TYPE = event_toast_effect_good
 		TITLE = bc_terrain_award_toast
 		DESC = bc_terrain_award_$TRAIT$_desc
 		SUBJECT = scope:bc_award_subject
@@ -1179,12 +1181,35 @@ would pass cleanly and silently do nothing forever.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-grep -rn '\$[A-Z]*\$ = [a-z]' common/scripted_effects/
+grep -rn '\$[A-Z_]*\$ = [a-z]' common/scripted_effects/ | grep -v 'flag:\$'
 ```
 
 Expected: **no output**. A hit is a `$PARAM$ = literal` comparison, which substitutes to an
 unknown key and is a silent no-op. The only parameter comparison in B is
 `flag:$OUTCOME$ = flag:win`.
+
+**The `grep -v` is not optional and neither is `[A-Z_]`.** Without the filter this check
+reports its own correct code as a failure — `flag:$OUTCOME$ = flag:win` contains
+`$OUTCOME$ = f` and matches the pattern. A genuinely bad line reads `$OUTCOME$ = win` with
+no `flag:` on it and survives the filter. `[A-Z]` alone would miss a parameter named
+`$SOME_PARAM$`.
+
+- [ ] **Step 2b: Every toast call names a TYPE**
+
+```bash
+cd /d/ck3/mods/battle_chronicles
+grep -rc "bc_addressed_toast_effect = {" common/scripted_effects/ | grep -v ':0'
+grep -rc "TYPE = event_toast_effect_" common/scripted_effects/ | grep -v ':0'
+grep -n "TYPE = event_toast_effect_" common/scripted_effects/bc_reputation_effects.txt
+```
+
+The first two totals must be equal. The third must show **exactly two lines, both
+`event_toast_effect_good`** — earning a trait is good news.
+
+`TYPE` is a required parameter of `bc_addressed_toast_effect` as of plan 1 task 4, because
+plans 4 and 5 route bad news through the same effect. **An omitted parameter is not an error
+in CK3**: the literal text `type = $TYPE$` reaches `send_interface_toast` and `validate` sees
+balanced braces. Only this count catches it.
 
 - [ ] **Step 3: No missing-variable read**
 

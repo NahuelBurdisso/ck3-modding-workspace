@@ -535,11 +535,22 @@ one by the time this task runs.
 # ROOT, and in the liege arm the scope has already moved by the time left_icon is
 # evaluated — so left_icon = $SUBJECT$ only names the right man if the caller
 # saved him first.
+#
+# TYPE IS A PARAMETER AND IT IS REQUIRED. Not everything routed through here is
+# good news: plan 4 announces the man who has beaten you twice and plan 5
+# announces your dead knights. Hardcoding event_toast_effect_good would put a
+# green tick on both. Callers pass event_toast_effect_good or
+# event_toast_effect_bad - the mod already uses both (bc_banner_falls uses _bad).
+#
+# THERE IS NO DEFAULT. CK3 substitutes parameters textually and does not error on
+# a missing one, so an omitted TYPE would emit the literal text `type = $TYPE$`
+# and validate would pass it. Every call site names the type explicitly; the
+# caller sweep in task 5 step 3 is what enforces it.
 bc_addressed_toast_effect = {
 	if = {
 		limit = { is_ai = no }
 		send_interface_toast = {
-			type = event_toast_effect_good
+			type = $TYPE$
 			title = $TITLE$
 			desc = $DESC$
 			left_icon = $SUBJECT$
@@ -549,7 +560,7 @@ bc_addressed_toast_effect = {
 		limit = { exists = liege }
 		liege = {
 			send_interface_toast = {
-				type = event_toast_effect_good
+				type = $TYPE$
 				title = $TITLE$
 				desc = $DESC$
 				left_icon = $SUBJECT$
@@ -565,11 +576,17 @@ Replace its routing fork (`:288-297`) with:
 
 ```
 	bc_addressed_toast_effect = {
+		TYPE = event_toast_effect_good
 		TITLE = bc_aftermath_nickname_toast
 		DESC = bc_aftermath_nickname_toast_desc
 		SUBJECT = scope:bc_named_commander
 	}
 ```
+
+**`TYPE` first, and spelled out.** The old `bc_aftermath_nickname_toast_effect` hardcoded
+`event_toast_effect_good`; winning a name is good news and the value is unchanged. It is
+passed rather than defaulted because plans 4 and 5 pass `event_toast_effect_bad` through the
+same effect.
 
 Leave the `random_list` of 27 nicknames and the `debug_log = "BC: nickname awarded"`
 exactly as they are.
@@ -656,6 +673,23 @@ Expected: each defined **exactly once**, all four in `bc_reward_effects.txt`.
 
 A duplicate definition is silent in CK3 — one wins and nothing is logged — so this check
 is not optional.
+
+**Then sweep the `bc_addressed_toast_effect` callers for a missing `TYPE`:**
+
+```bash
+cd /d/ck3/mods/battle_chronicles
+grep -c "bc_addressed_toast_effect = {" common/ -r
+grep -rc "TYPE = event_toast_effect_" common/scripted_effects/ | grep -v ':0'
+```
+
+**The two numbers must be equal**, minus nothing — every call passes a `TYPE`. As of plan 1
+both are **1** (the nickname). Plans 3, 4 and 5 each add call sites and each must keep the
+two equal.
+
+**This check exists because nothing else can catch it.** An omitted parameter is not an
+error in CK3 — the literal text `type = $TYPE$` reaches the toast, `validate` sees balanced
+braces and passes, and the toast renders with no styling or fails silently at runtime. This
+is the same class of failure as `$TIER$ = decisive`.
 
 - [ ] **Step 4: Validate, check collisions, commit**
 

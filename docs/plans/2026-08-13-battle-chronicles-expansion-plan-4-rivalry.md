@@ -763,6 +763,13 @@ not an event; it is the overwhelmingly common case and logging it would flood `d
 # duplicated deliberately rather than factored out - factoring it into a trigger
 # would put the two a file apart, which is the pair most likely to drift.
 #
+# ALL THREE ARMS PASS event_toast_effect_bad. This is the mod's first bad-news
+# routed toast; plan 1 made TYPE a required parameter of
+# bc_addressed_toast_effect precisely so this one is not a green tick. An omitted
+# TYPE is not an error in CK3 - the literal `type = $TYPE$` reaches the toast and
+# validate passes it - so task 10 step 7 counts the call sites against the TYPE
+# rows.
+#
 # UNDER bc_rivalry_off THERE IS NO TOAST AT ALL. The counter moved but nothing
 # happened to the man, and announcing "he is your rival now" when he is not would
 # be the one place the off switch leaked.
@@ -779,6 +786,7 @@ bc_rivalry_toast_effect = {
 				has_game_rule = bc_rivalry_nemesis
 			}
 			bc_addressed_toast_effect = {
+				TYPE = event_toast_effect_bad
 				TITLE = bc_rivalry_toast
 				DESC = bc_rivalry_nemesis_desc
 				SUBJECT = scope:bc_rivalry_subject
@@ -787,6 +795,7 @@ bc_rivalry_toast_effect = {
 		else_if = {
 			limit = { var:bc_nemesis_losses >= 2 }
 			bc_addressed_toast_effect = {
+				TYPE = event_toast_effect_bad
 				TITLE = bc_rivalry_toast
 				DESC = bc_rivalry_rival_desc
 				SUBJECT = scope:bc_rivalry_subject
@@ -794,6 +803,7 @@ bc_rivalry_toast_effect = {
 		}
 		else = {
 			bc_addressed_toast_effect = {
+				TYPE = event_toast_effect_bad
 				TITLE = bc_rivalry_toast
 				DESC = bc_rivalry_grudge_desc
 				SUBJECT = scope:bc_rivalry_subject
@@ -1360,7 +1370,24 @@ Expected: **exactly four hits** — the create branch, the escalate branch, the 
 and the decrement. A literal `1` or `2` in any of those four places is the exact bug
 Section 4 records an earlier draft making.
 
-- [ ] **Step 7: Full static pass**
+- [ ] **Step 7: Every toast call names a TYPE**
+
+```bash
+cd /d/ck3/mods/battle_chronicles
+grep -rc "bc_addressed_toast_effect = {" common/scripted_effects/ | grep -v ':0'
+grep -rc "TYPE = event_toast_effect_" common/scripted_effects/ | grep -v ':0'
+grep -rn "TYPE = event_toast_effect_" common/scripted_effects/bc_rivalry_effects.txt
+```
+
+The first two totals must be equal. The third must show **exactly three lines, all
+`event_toast_effect_bad`** — losing to the same man twice is not good news, and this is the
+mod's first routed toast that is not.
+
+An omitted `TYPE` produces no error anywhere: CK3 substitutes parameters textually, the
+literal string `type = $TYPE$` reaches `send_interface_toast`, and `validate` sees balanced
+braces. **Only this count catches it.**
+
+- [ ] **Step 8: Full static pass**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy

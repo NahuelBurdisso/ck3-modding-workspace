@@ -138,6 +138,7 @@ was right in live play rather than in a one-session sample.
 | `events/bc_aftermath_events.txt` | modify (task 7) | both graders call the chain |
 | `localization/english/bc_l_english.yml` | modify (task 8) | award toast titles and descriptions |
 | `common/scripted_triggers/bc_scripted_triggers.txt` | **untouched** | B's gates are inline; none is reused |
+| `README.md` | modify (tasks 1, 2, final task) | Q1's trait-count reading and the "notable battle" definition are written here **before** task 3, not after — task 3's ladders depend on both |
 
 **No new triggers file.** Every gate in B is used exactly once, at the point it is
 written. Extracting them would put the `has_trait` check a file away from the `add_trait`

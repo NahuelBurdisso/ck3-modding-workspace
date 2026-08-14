@@ -155,6 +155,7 @@ All begin `BC: `, so plan 1's sweep row 3 covers them.
 | `events/bc_aftermath_events.txt` | modify (task 7) | both graders call C |
 | `common/combat_phase_events/bc_commander_phase_events.txt` | modify (task 9) | the read-back |
 | `localization/english/bc_l_english.yml` | modify (tasks 1, 6) | 15 keys total |
+| `README.md` | modify (final task) | the run log — above all whether the grudge appeared with its reason text, which is the only evidence the target form is right |
 
 **C gets its own effects file.** `bc_scripted_effects.txt` already carries the seam, the
 nickname and the cleanup; C is five effects with one shared invariant, and mixing them in

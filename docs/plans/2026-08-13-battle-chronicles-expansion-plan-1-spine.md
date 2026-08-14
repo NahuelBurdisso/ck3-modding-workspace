@@ -178,6 +178,7 @@ writes into files that already exist.
 | `common/on_action/bc_on_actions.txt` | modify | combat-end hooks now name one grader each; `on_combat_start` added |
 | `common/combat_phase_events/bc_commander_phase_events.txt` | modify | `bc_battle_open_effect` + seam calls |
 | `common/combat_phase_events/bc_knight_phase_events.txt` | modify | `bc_battle_open_effect` + seam calls, both inside `side_commander ?=` |
+| `README.md` | modify (final task) | the run log — DIAG verdicts Q1-Q3 and the counts behind them. **Every later plan reads this file to find out what this one learned**, so a result left only in a commit message is a result the next plan cannot use |
 
 `bc_rivalry_effects.txt` and `bc_ledger_triggers.txt` are named in the spec's Files
 table but hold nothing until plans 3 and 4. **Do not create empty files.**

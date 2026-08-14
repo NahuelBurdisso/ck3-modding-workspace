@@ -248,6 +248,7 @@ is needed to measure it.
 | `common/game_rules/bc_game_rules.txt` | modify (task 1) | the `bc_wounds` rule |
 | `common/scripted_effects/bc_ledger_effects.txt` | modify (tasks 2, 3, 4) | `bc_wound_effect`; `SWING` threaded into `bc_record_effective_tier_effect` |
 | `localization/english/bc_l_english.yml` | modify (tasks 1, 3) | 8 keys |
+| `README.md` | modify (final task) | the run log, appended in the existing `## First live run (2026-08-12)` style |
 
 **`bc_wound_effect` lives in `bc_ledger_effects.txt`, beside the seam, not in
 `bc_scripted_effects.txt`.** It is called from exactly one place, that place is two effects

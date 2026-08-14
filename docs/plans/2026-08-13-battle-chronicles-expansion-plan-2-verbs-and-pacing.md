@@ -91,6 +91,7 @@ the option-level momentum calls the same way.
 | `common/combat_phase_events/bc_commander_phase_events.txt` | modify | 14 call sites swapped to the commander-only variants |
 | `common/combat_phase_events/bc_knight_phase_events.txt` | **untouched** | its 8 call sites keep the shared variants — this is the point of Section 6 |
 | `localization/english/bc_l_english.yml` | modify | 8 new keys + 6 backfilled `_desc` |
+| `README.md` | modify (final task) | the run log — the Q3 boundary, which verbs were observed, and whether `BC: floor admitted` appeared |
 
 **Do not create `bc_ledger_triggers.txt` or `bc_rivalry_effects.txt`.** They still hold
 nothing until plans 3 and 4.

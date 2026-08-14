@@ -166,6 +166,7 @@ All begin `BC: `, so plan 1's sweep row 3 covers them.
 | `common/scripted_effects/bc_eve_effects.txt` | **create** (task 7) | `bc_eve_offer_effect` |
 | `common/on_action/bc_on_actions.txt` | modify (task 9) | the `on_combat_start` hook |
 | `localization/english/bc_l_english.yml` | modify (tasks 5, 8) | 9 keys total |
+| `README.md` | modify (final task) | the run log — the wipe, the dead knights, and the eve if Q2 passed |
 
 **`events/bc_combat_start_events.txt` already exists** if Q2 passed — plan 1 task 16 step 2
 renames `bc_diag_events.txt` to it and leaves `bc_chronicles.0900` stripped to a shell. Task

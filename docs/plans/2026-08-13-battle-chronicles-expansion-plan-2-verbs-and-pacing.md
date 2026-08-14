@@ -653,12 +653,29 @@ Find `bc_record_moment_effect` by name. Append, **after** the existing
 - [ ] **Step 2: Confirm `$SWING$` now has a consumer**
 
 ```bash
-cd /d/ck3/mods/battle_chronicles && grep -n "SWING" common/scripted_effects/bc_ledger_effects.txt
+cd /d/ck3/mods/battle_chronicles
+grep "SWING" common/scripted_effects/bc_ledger_effects.txt | grep -vc "#"
+grep -n "SWING" common/scripted_effects/bc_ledger_effects.txt | grep -v "#"
 ```
 
-Expected: the seam's header comment, the seam's `bc_apply_verb_effect` call, and
-`bc_apply_verb_effect`'s own `flag:$SWING$` row. Plan 1 accepted `SWING` and never read
-it; this is where that ends.
+Expected **2**, and those two lines are:
+
+| line | put there by |
+|---|---|
+| `bc_apply_verb_effect = { KIND = $KIND$ SWING = $SWING$ }` | step 1 of this task |
+| `flag:$SWING$ = flag:up` | task 4's ladder |
+
+**Two, and the number matters.** Plan 1 accepted `SWING` at the seam and never read it —
+this is where that ends, and **2 is exactly the difference between "wired up" and "still
+inert"**. A **1** means step 1 did not land and the parameter is still dropped at the seam.
+A **0** means task 4 never shipped either. A **3** means somebody read `SWING` a second
+time outside the ladder, which is the thing task 4's header forbids: the `(KIND, SWING)`
+table is the only place the mapping lives.
+
+**The `grep -v "#"` is not optional.** An unfiltered count is **8**, not 2 — plan 1's seam
+header names `SWING` on three comment lines and task 4's header on three more. Without the
+filter the check has no discriminating power at all, because every failure mode above still
+leaves six comment lines behind.
 
 - [ ] **Step 3: Confirm no call site was changed**
 
@@ -1131,13 +1148,27 @@ Expected: **no output**. The `(KIND, SWING)` table is the interface.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-grep -n "TIER\|KIND\|SWING" common/scripted_effects/bc_ledger_effects.txt
+grep -n "TIER\|KIND\|SWING" common/scripted_effects/bc_ledger_effects.txt | grep -v "#"
 ```
 
-Expected: all three appear on a right-hand side that is actually read —
-`flag:$TIER$` in the tier ladder, `flag:$KIND$` in the verb ladder and as `$KIND$` passed
-through the tier ladder to `bc_write_style_effect`, `flag:$SWING$` in the verb ladder's
-`ordered` row.
+**The `grep -v "#"` is the whole point of this step.** All three names appear repeatedly in
+the seam's header and in task 4's header — that is what those headers are for — so the
+unfiltered output is dominated by prose and cannot distinguish a consumed parameter from an
+abandoned one. Read only the code.
+
+Every line the filtered command prints must be one of two shapes, and each of the three
+names must appear in at least one of them:
+
+| shape | meaning | where |
+|---|---|---|
+| `flag:$X$ = flag:<literal>` | the parameter is **read** | `flag:$TIER$` in the tier ladder, `flag:$KIND$` in task 4's verb ladder, `flag:$SWING$` in that ladder's `ordered` row |
+| `<EFFECT> = { ... X = $X$ ... }` | the parameter is **passed on** | `$KIND$` through the tier ladder into `bc_write_style_effect`; `KIND` and `SWING` from the seam into `bc_apply_verb_effect` |
+
+A name that appears **only** in the second shape is threaded but never read — it reaches
+some effect that ignores it, which is precisely the state `SWING` was in at the end of plan
+1. A name that appears in neither is dropped at the seam. **`SWING` specifically must show
+exactly two lines**, one of each shape; task 6 step 2 already established that count and
+this step is where it is confirmed to have survived the rest of the plan.
 
 - [ ] **Step 4: Nothing compares a parameter without `flag:`**
 

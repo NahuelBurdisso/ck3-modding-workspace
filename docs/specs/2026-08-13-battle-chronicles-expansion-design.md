@@ -325,7 +325,7 @@ do, both fire from the same two hooks, and the ordering between them is undefine
 Cleanup and grading read the same scratch, and grading must finish before cleanup
 touches it. Two events cannot express that; one event can, in written order.
 
-**The consolidated event carries no `trigger`.** `.0091`/`.0092` currently carry
+**Neither consolidated event carries a `trigger`.** `.0091`/`.0092` currently carry
 `trigger = { NOT = { has_game_rule = bc_aftermath_off } }` and `.0090` deliberately
 carries none — and `.0090` is the *only* caller of `bc_cleanup_effect`. Consolidating
 naively would put momentum stripping behind the aftermath off switch, so a player who
@@ -1113,9 +1113,23 @@ is already one per liege**. Written as a presence test, not an iteration:
 ```
 if = {
 	limit = { any_side_knight = { is_alive = no } }
-	side_commander ?= { bc_addressed_toast_effect = { ... SUBJECT = <this> } }
+	side_commander ?= {
+		save_scope_as = bc_bereaved_commander
+		bc_addressed_toast_effect = {
+			TITLE = bc_dead_knights_toast
+			DESC = bc_dead_knights_toast_desc
+			SUBJECT = scope:bc_bereaved_commander
+		}
+	}
 }
 ```
+
+The `save_scope_as` is not optional. `bc_addressed_toast_effect` writes
+`left_icon = $SUBJECT$`, a scripted effect does not rebind ROOT, and the liege arm has
+already changed scope by the time `left_icon` is evaluated — so `$SUBJECT$` must be a
+saved scope, never `this`. Same reason `bc_chronicles.0091` saves
+`scope:bc_named_commander` before calling the nickname effect
+(`bc_events.txt:366-369`).
 
 The dead are not iterated at all. The toast names no individual knight — that is the
 price of aggregating, and it is why the loc budget for this is two keys rather than

@@ -11,7 +11,7 @@ battle, the grader updates a `last`/`streak` pair for **style** (read from
 `bc_battle_style`, which the seam wrote during the battle) and one for **terrain** (read
 from `scope:bc_battle_province`). Then a single precedence chain — style, then terrain,
 then the existing nickname — awards at most one thing per battle. No new trait art: all
-eleven traits already exist in AGOT.
+twelve traits already exist in AGOT.
 
 **Tech Stack:** CK3 script (Paradox clausewitz script), targeting CK3 1.19.0.6 under the
 AGOT playset. Workspace CLI is `python ck3.py` run from `D:/ck3/tools`.
@@ -43,16 +43,48 @@ Do not start task 3 before task 1 is done.**
 
 ### No new traits, no new art
 
-All eleven traits already exist. AGOT overrides vanilla's `00_traits.txt` wholesale, so
-**AGOT's definitions are what load** — verified: all eleven carry `category = commander`
-and `flag = commander_trait_flag` in AGOT's file. This plan references them and defines
-nothing.
+All twelve traits already exist. AGOT overrides vanilla's `00_traits.txt` wholesale, so
+**AGOT's definitions are what load**. This plan references them and defines nothing.
+
+Twelve, not eleven: `winter_soldier` was added to the terrain ladder once the bare
+`terrain =` bug was fixed and AGOT's `frozen_flats` and `glacier` provinces turned out to
+be reachable after all.
+
+**All twelve carry `flag = commander_trait_flag`. They do NOT all carry
+`category = commander`** — `winter_soldier` is `category = winter_commander`
+(`00_traits.txt:17135`). Nothing in this plan branches on category, so this is a
+documentation correction rather than a behavioural one, but do not repeat the claim.
+The flag is the property that matters, and it is uniform.
+
+They are also not uniform in another way: **four of the six terrain traits are XP-tracked**
+and two are not.
+
+| trait | `track = { }` |
+|---|---|
+| `desert_warrior` | yes |
+| `forest_fighter` | yes |
+| `jungle_stalker` | yes |
+| `winter_soldier` | yes |
+| `open_terrain_expert` | no |
+| `rough_terrain_expert` | no |
+
+`add_trait` is correct for both kinds — it grants a tracked trait at 0 XP, where its
+untracked base effects already apply and the game's own combat XP carries it upward from
+there. **This has direct AGOT precedent for all six**, including the tracked ones:
+`common/scripted_character_templates/00_pool_repopulation_character_templates.txt:126-182`
+grants five of them with bare `add_trait`, and `04_ep2_accolade_character_templates.txt:131`
+grants `winter_soldier` the same way. Do not reach for `add_trait_xp`.
 
 This is also the mod's second and third references to AGOT keys, after the nickname pool.
 The dependency is not new; `descriptor.mod` already declares
-`dependencies = { "A Game of Thrones" }`. **But these eleven are vanilla keys that AGOT
+`dependencies = { "A Game of Thrones" }`. **But these twelve are vanilla keys that AGOT
 happens to override, not AGOT-invented keys** — unlike the nicknames. They resolve in a
-vanilla-only playset too.
+vanilla-only playset too. The terrain *helpers* the bucket ladder calls are a different
+matter: `agot_is_<x>_terrain` is AGOT-invented and has no vanilla equivalent, so it joins
+the AGOT nickname pool as a hard requirement. That is not a new dependency — the nicknames
+got there first — but it does mean the trait ladder and the terrain ladder now sit on
+opposite sides of that line, and only the trait ladder would survive a vanilla-only
+playset.
 
 ### Four new permanent variables, and why that is the whole cost
 
@@ -232,10 +264,11 @@ Expected: **exit 1**. This is the failing test.
 #   bc_terrain_last   flag:<bucket>  THE BUCKET, never the terrain key
 #   bc_terrain_streak integer        consecutive notable battles in that bucket
 #
-# ALL ELEVEN TRAITS ALREADY EXIST. AGOT overrides vanilla's 00_traits.txt
-# wholesale, so AGOT's definitions are what load; all eleven carry
-# `category = commander` and `flag = commander_trait_flag` there. This file
-# defines no traits.
+# ALL TWELVE TRAITS ALREADY EXIST. AGOT overrides vanilla's 00_traits.txt
+# wholesale, so AGOT's definitions are what load; all twelve carry
+# `flag = commander_trait_flag` there. They do NOT all carry
+# `category = commander` - winter_soldier is `category = winter_commander`.
+# Nothing here branches on category. This file defines no traits.
 
 # --- the style streak -------------------------------------------------------
 #
@@ -343,8 +376,11 @@ battle never reads a missing bc_style_last."
 # third notable battle and spends the reward budget on a no-op add_trait.
 #
 # reckless AND cautious_leader ARE `opposites` OF EACH OTHER, and they are the
-# ONLY such pair among the eleven traits B can award - verified across the whole
-# of AGOT's 00_traits.txt, not a window of it. `has_trait` does not catch this: a
+# ONLY such pair among the twelve traits B can award - verified across the whole
+# of AGOT's 00_traits.txt, not a window of it, and re-verified over the full
+# definition span of each terrain trait after winter_soldier joined the ladder
+# (all six span-checked, zero `opposites` between them). `has_trait` does not
+# catch this: a
 # commander holding reckless who builds a `measured` streak passes every gate and
 # the engine then SILENTLY refuses the add_trait. The streak resets, the reward is
 # consumed, and nothing happens - forever. So the opposite is removed and the new
@@ -483,7 +519,7 @@ git commit -m "feat: add the style award ladder
 
 Six styles, six existing traits, no new art. The measured and wild arms remove
 their opposite first - reckless and cautious_leader are opposites of each other
-and are the only such pair among the eleven, so without that the engine silently
+and are the only such pair among the twelve, so without that the engine silently
 refuses the add_trait and the reward is consumed forever."
 ```
 
@@ -514,21 +550,26 @@ thing being awarded.**
 
 - [ ] **Step 2: Write the bucket resolver**
 
-**Read this trap first — it is the one thing in task 5 to get right.** The obvious way to
-write a five-way ladder that reads a province and writes to a commander is this, and it is
-**WRONG. Do not type it:**
+**Read this trap first — it is one of the two things in task 5 to get right.** The obvious
+way to write a six-way ladder that reads a province and writes to a commander is this, and
+it is **WRONG. Do not type it:**
 
 ```
 bc_terrain_bucket_effect = {
 	scope:bc_battle_province = {
 		if = {
-			limit = { OR = { terrain = drylands  terrain = desert  ... } }
+			limit = { OR = { agot_is_drylands_terrain = yes  agot_is_desert_terrain = yes  ... } }
 			root = { set_variable = { name = bc_terrain_this value = flag:desert } }   # WRONG
 		}
 		...
 	}
 }
 ```
+
+(The trigger keys above are already the *correct* AGOT helpers — only the `root` is wrong.
+The other trap, bare `terrain =`, is covered in the header comment of the real version
+below. Both of them fail silently, which is why they are both called out before the code
+rather than after it.)
 
 **`root` is doing real work here and it does not point where it looks like it points.** Inside
 `scope:bc_battle_province = { }` the scope is a **province**, and the variable must land
@@ -559,46 +600,103 @@ wrong as written.** Fix it by saving the commander before entering the province 
 # here is the COMBAT SIDE. The variable would land on the side, and every read of
 # it from the commander would miss.
 #
-# The five buckets between them cover every `terrain =` key in the game, so the
-# `else` is unreachable in principle - which is exactly why it logs. An unhandled
-# terrain key would otherwise write nothing and reset nothing, and the streak
-# would quietly stall. The caller therefore does NOT assume this effect wrote
-# anything; it guards the streak call on `exists = var:bc_terrain_this`.
+# NEVER `terrain = X` UNDER AGOT. ALWAYS `agot_is_X_terrain = yes`.
+# AGOT's common/terrain_types/01_agot_terrains.txt defines road variants as
+# DISTINCT terrain types - `majorroad_hills` is not `hills` - plus seven AGOT-only
+# bases (`frozen_flats`, `glacier`, `highlands`, `the_bog`, `taiga_bog`,
+# `cloudforest`, `terraced_hills`, `canyon`, `urban`) that vanilla has no key for
+# at all. In common/province_terrain/00_province_terrain.txt, of 7007 provinces
+# 1036 sit on a road variant and ~756 on an AGOT-only base: ~26% of the map is
+# INVISIBLE to a bare `terrain =` check, and it fails silently - the province
+# simply matches nothing and falls to the `else`.
 #
-# The mapping mirrors vanilla's own terrain branch, and all five traits carry
-# `category = commander` / `flag = commander_trait_flag` in AGOT's 00_traits.txt.
-# winter_soldier is deliberately absent: there is no `terrain =` key corresponding
-# to winter, so there is no province-derived path to it at all.
+# AGOT ships 23 helpers in common/scripted_triggers/00_agot_terrain_type_triggers.txt,
+# each `OR = { terrain = X  terrain = majorroad_X  terrain = minorroad_X }`.
+# Use them. They are the only correct way to ask what ground a battle is on.
+#
+# THE LADDER IS EXHAUSTIVE OVER ALL 23 HELPERS. That is the point of writing it
+# from the helper list rather than from vanilla's terrain branch: every one of the
+# 23 lands in exactly one bucket, so the `else` is unreachable in principle -
+# which is exactly why it logs. An unhandled terrain would otherwise write nothing
+# and reset nothing, and the streak would quietly stall. The caller therefore does
+# NOT assume this effect wrote anything; it guards the streak call on
+# `exists = var:bc_terrain_this`.
+#
+# SIX buckets, not five. winter IS reachable: AGOT has 184 `frozen_flats` and 81
+# `glacier` provinces, and `winter_soldier` exists at AGOT 00_traits.txt:17133
+# alongside the other five. An earlier draft of this plan asserted "there is no
+# `terrain =` key corresponding to winter" - that was true of VANILLA's key list
+# and false of AGOT's, which is the same mistake as the bare-`terrain =` bug in
+# a different costume. All six traits carry `flag = commander_trait_flag` in
+# AGOT's 00_traits.txt; five are `category = commander` and winter_soldier is
+# `category = winter_commander`. Nothing here reads category.
 bc_terrain_bucket_effect = {
 	save_scope_as = bc_terrain_subject
 	scope:bc_battle_province = {
 		if = {
 			limit = {
-				OR = { terrain = drylands  terrain = desert  terrain = desert_mountains  terrain = oasis }
+				OR = {
+					agot_is_drylands_terrain = yes
+					agot_is_desert_terrain = yes
+					agot_is_desert_mountains_terrain = yes
+					agot_is_oasis_terrain = yes
+					agot_is_canyon_terrain = yes
+				}
 			}
 			scope:bc_terrain_subject = { set_variable = { name = bc_terrain_this value = flag:desert } }
 		}
 		else_if = {
 			limit = {
-				OR = { terrain = farmlands  terrain = plains  terrain = steppe }
+				OR = {
+					agot_is_farmlands_terrain = yes
+					agot_is_plains_terrain = yes
+					agot_is_steppe_terrain = yes
+					agot_is_floodplains_terrain = yes
+					agot_is_urban_terrain = yes
+				}
 			}
 			scope:bc_terrain_subject = { set_variable = { name = bc_terrain_this value = flag:open } }
 		}
 		else_if = {
 			limit = {
-				OR = { terrain = hills  terrain = mountains  terrain = wetlands }
+				OR = {
+					agot_is_hills_terrain = yes
+					agot_is_mountains_terrain = yes
+					agot_is_wetlands_terrain = yes
+					agot_is_the_bog_terrain = yes
+					agot_is_taiga_bog_terrain = yes
+					agot_is_terraced_hills_terrain = yes
+					agot_is_highlands_terrain = yes
+				}
 			}
 			scope:bc_terrain_subject = { set_variable = { name = bc_terrain_this value = flag:rough } }
 		}
 		else_if = {
 			limit = {
-				OR = { terrain = forest  terrain = taiga }
+				OR = {
+					agot_is_forest_terrain = yes
+					agot_is_taiga_terrain = yes
+				}
 			}
 			scope:bc_terrain_subject = { set_variable = { name = bc_terrain_this value = flag:forest } }
 		}
 		else_if = {
-			limit = { terrain = jungle }
+			limit = {
+				OR = {
+					agot_is_jungle_terrain = yes
+					agot_is_cloudforest_terrain = yes
+				}
+			}
 			scope:bc_terrain_subject = { set_variable = { name = bc_terrain_this value = flag:jungle } }
+		}
+		else_if = {
+			limit = {
+				OR = {
+					agot_is_frozen_flats_terrain = yes
+					agot_is_glacier_terrain = yes
+				}
+			}
+			scope:bc_terrain_subject = { set_variable = { name = bc_terrain_this value = flag:winter } }
 		}
 		else = {
 			debug_log = "BC: terrain NONE MATCHED"
@@ -606,6 +704,67 @@ bc_terrain_bucket_effect = {
 	}
 }
 ```
+
+**The bucket table, and why the sizes are uneven:**
+
+| bucket | AGOT helpers folded in | trait |
+|---|---|---|
+| `desert` | drylands, desert, desert_mountains, oasis, canyon | `desert_warrior` |
+| `open` | farmlands, plains, steppe, floodplains, urban | `open_terrain_expert` |
+| `rough` | hills, mountains, wetlands, the_bog, taiga_bog, terraced_hills, highlands | `rough_terrain_expert` |
+| `forest` | forest, taiga | `forest_fighter` |
+| `jungle` | jungle, cloudforest | `jungle_stalker` |
+| `winter` | frozen_flats, glacier | `winter_soldier` |
+
+5 + 5 + 7 + 2 + 2 + 2 = **23**, every helper, once.
+
+`rough` is the largest bucket because Westeros is: hills alone is 1465 provinces, the
+single most common terrain on the map, and `terraced_hills` and `highlands` are AGOT's
+own variations on it. `forest` is only two helpers but 790 + 824 = 1614 provinces, so
+by frequency the two big buckets are `rough` and `forest`, not `rough` and `open`.
+
+`urban` goes in `open` rather than getting its own bucket: there is no urban commander
+trait to award, and a battle in a city is fought on cleared flat ground. `canyon` goes
+in `desert` for the same reason — AGOT places it in the Red Waste and around Asshai.
+
+**Verify the helper list is what this plan claims before writing the ladder:**
+
+```bash
+grep -o "agot_is_[a-z_]*_terrain = {" "D:/SteamLibrary/steamapps/workshop/content/1158310/2962333032/common/scripted_triggers/00_agot_terrain_type_triggers.txt" | grep -v "majorroad\|minorroad\|location_valid" | wc -l
+```
+
+Expected: **23**. If it is not 23, AGOT has changed its terrain list and the ladder
+above is no longer exhaustive — read the file and rebuild the six buckets from it
+rather than shipping a ladder whose `else` is now reachable.
+
+**Two traps in that one command, both of which bit the author of this plan.**
+
+The obvious command is `grep -c "^agot_is_.*_terrain = {"`, and it returns **25** —
+wrong in both directions at once.
+
+- **Too high by 3.** The file defines `agot_is_majorroad_terrain`,
+  `agot_is_minorroad_terrain` and `agot_is_location_valid_vanilla_terrain` alongside
+  the 23 real ones. They are not terrain buckets and must not be folded into one.
+  Hence the `grep -v`.
+- **Too low by 1, invisibly.** `00_agot_terrain_type_triggers.txt` **begins with a
+  UTF-8 BOM** — `od -c` shows `357 273 277 a g o t _ i s _ f a r m l a n d s`. So
+  `agot_is_farmlands_terrain` on line 1 does **not** match a `^`-anchored pattern.
+  The two errors nearly cancel, which is what makes this dangerous: a plausible count
+  hides a missing bucket. `grep -o` is unanchored and immune.
+
+**This BOM is not confined to one file, and it contradicts a rule that holds for
+vanilla.** Vanilla script files carry no BOM; only `.yml` localization does, and this
+mod's own script files follow that convention. AGOT does not: **2945 of 3117 `.txt`
+files under AGOT's `common/` begin with `EF BB BF`** — 94% of them.
+
+So any `^`-anchored grep against an AGOT script file can silently miss the first
+definition in that file, and the failure looks like a plausible number rather than an
+error. Before trusting any AGOT count, either check line 1 with
+`head -c 3 <file> | od -An -tx1` or drop the anchor. `grep -o` and `grep -c` without `^`
+are both immune.
+
+This does not affect what the game loads — CK3 reads the BOM fine. It affects every
+verification command in this plan that reads AGOT.
 
 **Write the saved-scope version, not the `root` version.** The `root` version is shown
 only because it is the obvious thing to write and it is wrong; `bc_scripted_effects.txt`
@@ -655,9 +814,10 @@ bc_terrain_streak_effect = {
 - [ ] **Step 4: Write the terrain award**
 
 ```
-# Five buckets, five traits. Called only when the streak has reached 2 and the
+# Six buckets, six traits. Called only when the streak has reached 2 and the
 # budget gate passed. Reads bc_terrain_this, NOT the province - the bucket was
-# already resolved once and resolving it twice is how the two answers drift apart.
+# already resolved once and resolving it twice is how the two answers drift apart,
+# and re-reading it would also mean writing the bare-`terrain =` bug twice.
 bc_terrain_award_effect = {
 	if = {
 		limit = {
@@ -699,6 +859,14 @@ bc_terrain_award_effect = {
 		add_trait = jungle_stalker
 		bc_terrain_award_toast_effect = { TRAIT = jungle_stalker }
 	}
+	else_if = {
+		limit = {
+			var:bc_terrain_this = flag:winter
+			NOT = { has_trait = winter_soldier }
+		}
+		add_trait = winter_soldier
+		bc_terrain_award_toast_effect = { TRAIT = winter_soldier }
+	}
 	else = {
 		debug_log = "BC: award blocked has trait"
 	}
@@ -719,10 +887,26 @@ bc_terrain_award_toast_effect = {
 }
 ```
 
-**None of the five terrain traits has an `opposites` block**, verified across the whole of
+**None of the six terrain traits has an `opposites` block**, verified across the whole of
 AGOT's `00_traits.txt`, so there is no `remove_trait` arm here. Do not add one
 symmetrically with the style ladder — it would be dead code that implies a rule that does
-not exist.
+not exist. Re-check for `winter_soldier` specifically before writing the arm, since it
+was added to this plan later than the other five:
+
+```bash
+grep -n "winter_soldier = {" -A 40 "D:/SteamLibrary/steamapps/workshop/content/1158310/2962333032/common/traits/00_traits.txt" | grep -n "opposites\|category\|commander_trait_flag"
+```
+
+Expected: a `flag = commander_trait_flag`, **`category = winter_commander`** (not
+`commander` — it is the one exception), and **no** `opposites`. `winter_soldier` spans
+`00_traits.txt:17133-17212`, so a 40-line window does not cover it; the command above
+is deliberately loose, and the authoritative check is over the full span:
+
+```bash
+sed -n '17133,17212p' "D:/SteamLibrary/steamapps/workshop/content/1158310/2962333032/common/traits/00_traits.txt" | grep -c "opposites"
+```
+
+Expected: **0**.
 
 - [ ] **Step 5: Validate and commit**
 
@@ -1101,14 +1285,14 @@ grep -c "^ bc_" localization/english/bc_l_english.yml
 
 Expected: begins `M-oM-;M-?`. UTF-8 with BOM, one leading space per line.
 
-**Write the key count down.** Step 3 checks that it rose by exactly 13, which is not a
+**Write the key count down.** Step 3 checks that it rose by exactly 14, which is not a
 check you can run without the number from before the edit.
 
-- [ ] **Step 2: Write the thirteen keys**
+- [ ] **Step 2: Write the fourteen keys**
 
-Two titles and eleven descriptions — one description per trait, because
+Two titles and twelve descriptions — one description per trait, because
 `bc_style_award_toast_effect` and `bc_terrain_award_toast_effect` build the desc key by
-substituting `$TRAIT$`.
+substituting `$TRAIT$`. Six style, six terrain.
 
 ```
  bc_style_award_toast:0 "A Way of Fighting"
@@ -1124,6 +1308,7 @@ substituting `$TRAIT$`.
  bc_terrain_award_rough_terrain_expert_desc:0 "[bc_award_subject.GetName] has fought twice in broken country and stopped cursing it."
  bc_terrain_award_forest_fighter_desc:0 "Twice under the trees. [bc_award_subject.GetName] has stopped trying to make a forest into a field."
  bc_terrain_award_jungle_stalker_desc:0 "[bc_award_subject.GetName] has come out of the green twice. Not everyone does."
+ bc_terrain_award_winter_soldier_desc:0 "Twice [bc_award_subject.GetName] has drawn up a line on ground that would not hold a stake, and twice he has come off it walking. The cold takes more men than the enemy does, and he has stopped letting it."
 ```
 
 **`[bc_award_subject.GetName]` is why the toast effects save that scope**, and it is the
@@ -1139,7 +1324,7 @@ head -c 8 localization/english/bc_l_english.yml | cat -A
 cd /d/ck3/tools && python ck3.py validate --strict
 ```
 
-The key count must have risen by exactly **13**. The BOM must still be present — editors
+The key count must have risen by exactly **14**. The BOM must still be present — editors
 strip it silently, which is why it is checked after the edit as well as before.
 `validate --strict` must exit 0 **with no missing-localization WARN naming any `bc_` key**.
 
@@ -1151,7 +1336,7 @@ misspelled in task 4 or 5, this is the only check in the entire plan that catche
 ```bash
 cd /d/ck3/mods/battle_chronicles
 git add localization/english/bc_l_english.yml
-git commit -m "feat: localize the eleven reputation awards"
+git commit -m "feat: localize the twelve reputation awards"
 ```
 
 ---
@@ -1172,10 +1357,16 @@ while read t; do
 done < /tmp/bc_traits_used
 ```
 
-Expected: **no `MISSING:` output**. Eleven distinct traits.
+Expected: **no `MISSING:` output**. Twelve distinct traits.
 
 `validate` cannot do this — it has no knowledge of trait keys, so `add_trait = agressive_attacker`
 would pass cleanly and silently do nothing forever.
+
+**The `^$t = {` anchor is safe here, but only by luck.** AGOT's `00_traits.txt` carries a
+UTF-8 BOM, so its first line cannot match a `^`-anchored pattern — line 1 happens to be
+`# Standard Values`, a comment, so no trait is hidden. Do not carry this anchor over to
+another AGOT file without checking what is on line 1 first; the terrain-helper file in
+task 6 is exactly the case where it bites.
 
 - [ ] **Step 2: No parameter is compared without `flag:`**
 

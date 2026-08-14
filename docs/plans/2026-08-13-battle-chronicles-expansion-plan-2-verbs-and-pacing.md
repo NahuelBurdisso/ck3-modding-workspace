@@ -1290,6 +1290,12 @@ cd /d/ck3/tools && python ck3.py probe "bc_"
 Apply plan 1's three-row pass condition unchanged. Row 3 — "a line beginning `BC: `" —
 now legitimately covers this plan's nine new markers.
 
+**None of the nine will actually show up here.** `probe` is case-sensitive without `-i`
+(`ck3lib/launch.py:81`), and not one of this plan's marker texts contains a lowercase
+`bc_` — `BC: size 2`, `BC: verb pursuit`, `BC: chronicle mark commander`, `BC: floor
+admitted`. Steps 3 through 6 are where they are read. Their absence from *this* sweep is
+the expected result and says nothing about whether they fired.
+
 **Watch specifically for a missing-variable read naming `bc_battle_size` or
 `bc_battle_moments`.** Those are the two variables this plan added readers for, and both
 readers are guarded; a hit means a guard is written as a sibling row somewhere instead of

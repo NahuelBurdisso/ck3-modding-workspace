@@ -1298,12 +1298,18 @@ than adding a second one.** Two entries would raise both events on every combat,
 ```bash
 cd /d/ck3/mods/battle_chronicles
 grep -n "on_combat_start" -A 4 common/on_action/bc_on_actions.txt
-grep -rn "bc_chronicles.0900" .
+grep -rn "bc_chronicles.0900" --exclude-dir=.git .
 grep -n "effect = {" common/on_action/bc_on_actions.txt | grep -v "#"
 ```
 
 Expected: one `on_combat_start` block naming exactly `bc_chronicles.0010`; **no output** for
 `.0900`; and **no output** for the third.
+
+**`--exclude-dir=.git` on the second.** It searches from the mod root, and this plan's own
+commit messages discuss `.0900` — without the flag the check would report `.git` objects
+and read as a failure once those commits exist. The `.` in `bc_chronicles.0900` is also a
+regex any-character, which is harmless here and would matter if a key like
+`bc_chronicles_0900` ever existed.
 
 **The third grep must be filtered.** The file's own header warns against `effect = { }` and
 quotes the string twice while doing so, so an unfiltered `grep -c` returns **2** on a correct

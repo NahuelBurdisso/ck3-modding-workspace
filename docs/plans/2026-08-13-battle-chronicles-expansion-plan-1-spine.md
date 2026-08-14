@@ -114,6 +114,22 @@ narrow on purpose: the marker text is *authored by this mod* and always starts `
 whereas an engine complaint about a mod file never does. Do not broaden it to "any line
 mentioning `bc_`" — that is the whole sweep.
 
+**Most of row 3 will not actually appear, and that is not a symptom.** `probe` compiles its
+pattern with Python `re` and passes `re.IGNORECASE` **only** when `-i` is given
+(`ck3lib/launch.py:81`), so the sweep pattern `bc_` is case-sensitive and matches a `BC: `
+marker only when the marker's *text* also contains a lowercase `bc_`. Of the markers listed
+in row 3 that is true of the `BC: fired bc_<event>` family and of nothing else — `BC: combat
+end cleanup`, the four grading lines, `BC: nickname awarded`, the three `BC: moment` lines
+and the `BC: popup` lines are all invisible to `probe "bc_"`. Row 3 lists them because it is
+a *rule about what is allowed through*, and it stays correct if a future marker is renamed
+into range. Seeing only the `fired` family means the sweep is working, not that markers are
+missing; the marker sweeps are separate commands and each names its own text.
+
+**`probe` patterns are Python regex, not grep regex.** `\t`, `\s`, `\d`, `+`, `?` and bare
+`|` all work in a `probe` argument and none of them work in the `grep` calls elsewhere in
+these plans, which are POSIX basic regex. Do not carry a pattern from one to the other
+without rereading it.
+
 **Never use `ck3.py errors`.** It tail-slices a ~500k-line log and mod script errors
 appear near the top, so it cannot see them. `probe` reads end to end and groups by file.
 
@@ -624,11 +640,19 @@ It now has no callers.
 - [ ] **Step 4: Verify it has no callers**
 
 ```bash
-cd /d/ck3/mods/battle_chronicles && grep -rn "bc_aftermath_nickname_toast_effect" .
+cd /d/ck3/mods/battle_chronicles && grep -rn "bc_aftermath_nickname_toast_effect" --exclude-dir=.git .
 ```
 
 Expected: **no output.** (The loc keys `bc_aftermath_nickname_toast` and
 `..._desc` survive — they are keys, not the effect.)
+
+**`--exclude-dir=.git`, for the reason task 1 gives.** A `grep -rn ... .` from the mod root
+searches `.git/COMMIT_EDITMSG` and the packed objects too, and this expansion writes long
+commit messages that name the symbols they change. Step 5's message happens not to contain
+this one, so the flag changes nothing *today* — but "expected: no output" is a check whose
+value is that it stays runnable later, and a bare form is one commit away from a false
+failure. Today the bare form returns three lines in
+`common/scripted_effects/bc_scripted_effects.txt` — two calls and the definition.
 
 - [ ] **Step 5: Validate and commit**
 

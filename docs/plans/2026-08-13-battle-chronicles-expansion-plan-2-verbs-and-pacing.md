@@ -730,12 +730,17 @@ header to say there are now three conventions and which value uses the third.
 # SCOPE: `this`, a character - the commander. NOT scope:combat_side, NOT root.
 # This is the third convention in this file; see the header.
 #
-# SHAPE: every branch is a bare `value = X` and there is NO base value outside
-# the ladder. That is vanilla's own shape for a pure lookup - see
-# swing_scales_discounts_multiplier_value in 00_diarchy_values.txt, an
-# if/else_if/else where all three branches are bare `value =`. Nesting an if
-# inside an if with no scope change is likewise shipped, in
-# swing_scales_influence_cost_value in the same file.
+# SHAPE: every branch is a bare `value = X`, there is NO base value outside the
+# ladder, and the ladder is an if nested inside an if. All three at once are
+# shipped in ONE vanilla value - recent_epidemics_outbreak_mult_value,
+# 06_ce1_epidemics_values.txt:1869-1917. Its outer arm even gates on a variable
+# existing (`has_variable = epidemic_cooldown_general`) exactly as this one does,
+# its inner if/else_if/else leaves are all bare `value = <ident>`, and the only
+# thing outside the ladder is a trailing `min = 0`. Verified by reading the file.
+#
+# The one place this is SAFER than the vanilla original: that value has no outer
+# `else`, so a character matching neither outer arm falls through to nothing.
+# This one has the else below.
 #
 # THE `exists` GUARD IS THE OUTER BRANCH, NOT A SIBLING ROW, for the reason
 # stated at the seam's size gate: CK3 does not short-circuit, so a sibling

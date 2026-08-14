@@ -1339,8 +1339,16 @@ resolve into `bc_reward_effects.txt`; if it does not, plan 1 task 4 left it in
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-grep -rn '\$[A-Z_]*\$ = [a-z]' common/scripted_effects/ | grep -v 'flag:\$'
+grep -rn '\$[A-Z_]*\$ = [a-z]' common/scripted_effects/ common/scripted_triggers/ common/script_values/ | grep -v 'flag:\$'
 ```
+
+**All three directories.** This plan itself writes to two of them — task 2 appends
+`bc_rivalry_step_value` to `common/script_values/bc_script_values.txt` and task 9 appends
+`bc_facing_nemesis_trigger` to `common/scripted_triggers/bc_scripted_triggers.txt`. Neither
+addition takes a parameter today, so the narrow one-directory form would pass; it would
+also pass if a later edit gave one of them a parameter and got the comparison wrong, which
+is the whole point of the check. Run against the shipped mod today the widened command
+prints nothing, so a hit is always new.
 
 Expected: **no output**. The only parameter comparison in C is `flag:$OUTCOME$ = flag:lose`,
 and the `grep -v` exists to drop exactly that line — **without it this check reports its own

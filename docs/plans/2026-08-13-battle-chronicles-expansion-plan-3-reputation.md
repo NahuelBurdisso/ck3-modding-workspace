@@ -1419,12 +1419,19 @@ task 6 is exactly the case where it bites.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-grep -rn '\$[A-Z_]*\$ = [a-z]' common/scripted_effects/ | grep -v 'flag:\$'
+grep -rn '\$[A-Z_]*\$ = [a-z]' common/scripted_effects/ common/scripted_triggers/ common/script_values/ | grep -v 'flag:\$'
 ```
 
 Expected: **no output**. A hit is a `$PARAM$ = literal` comparison, which substitutes to an
 unknown key and is a silent no-op. The only parameter comparison in B is
 `flag:$OUTCOME$ = flag:win`.
+
+**All three directories, even though B writes only to the first.** This step runs after
+plans 1 and 2 have shipped, and both of those put parameterised script into
+`common/script_values/`. Sweeping only the directory this plan happens to touch turns a
+mod-wide regression net into a self-check that can only confirm what task 3 just wrote.
+The two extra paths cost nothing — run against the shipped mod today, the widened command
+prints nothing.
 
 **The `grep -v` is not optional and neither is `[A-Z_]`.** Without the filter this check
 reports its own correct code as a failure — `flag:$OUTCOME$ = flag:win` contains

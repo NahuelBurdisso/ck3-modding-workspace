@@ -682,9 +682,13 @@ grep -c "bc_addressed_toast_effect = {" common/ -r
 grep -rc "TYPE = event_toast_effect_" common/scripted_effects/ | grep -v ':0'
 ```
 
-**The two numbers must be equal**, minus nothing — every call passes a `TYPE`. As of plan 1
-both are **1** (the nickname). Plans 3, 4 and 5 each add call sites and each must keep the
-two equal.
+**The first number must be exactly one MORE than the second, not equal to it.** The pattern
+`bc_addressed_toast_effect = {` matches the effect's own definition line as well as every
+call site, and a definition does not pass a `TYPE` to itself. As of plan 1 the numbers are
+**2** and **1** — the definition plus the nickname caller, and one `TYPE`. Plans 3, 4 and 5
+each add call sites and each must preserve the gap of exactly one.
+
+Equal, or a gap of two or more, both mean a caller is missing its `TYPE`.
 
 **This check exists because nothing else can catch it.** An omitted parameter is not an
 error in CK3 — the literal text `type = $TYPE$` reaches the toast, `validate` sees balanced

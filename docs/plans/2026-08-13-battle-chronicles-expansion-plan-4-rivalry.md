@@ -1363,12 +1363,17 @@ grudge would evaporate at every combat end and C could never escalate past a fir
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-grep -n "bc_rivalry_step_value" common/scripted_effects/bc_rivalry_effects.txt
+grep -n "bc_rivalry_step_value" common/scripted_effects/bc_rivalry_effects.txt | grep -v "#"
 ```
 
 Expected: **exactly four hits** — the create branch, the escalate branch, the floor guard,
 and the decrement. A literal `1` or `2` in any of those four places is the exact bug
 Section 4 records an earlier draft making.
+
+**The `grep -v "#"` is load-bearing.** Task 5 step 2's own comment block contains the line
+`# THE FLOOR GUARD IS \`<= bc_rivalry_step_value\`, NOT A CONSTANT`, in this same file.
+Unfiltered, this check reports the correct count as five and fails on correct code — the
+same shape of defect as the parameter grep in step 3.
 
 - [ ] **Step 7: Every toast call names a TYPE**
 
@@ -1379,7 +1384,11 @@ grep -rc "TYPE = event_toast_effect_" common/scripted_effects/ | grep -v ':0'
 grep -rn "TYPE = event_toast_effect_" common/scripted_effects/bc_rivalry_effects.txt
 ```
 
-The first two totals must be equal. The third must show **exactly three lines, all
+**The first total must be exactly one MORE than the second, not equal to it.** The pattern
+`bc_addressed_toast_effect = {` matches the effect's own definition line as well as every
+call site, and a definition passes no `TYPE` to itself. Equal means a caller is missing one.
+
+The third must show **exactly three lines, all
 `event_toast_effect_bad`** — losing to the same man twice is not good news, and this is the
 mod's first routed toast that is not.
 

@@ -1203,8 +1203,12 @@ grep -rc "TYPE = event_toast_effect_" common/scripted_effects/ | grep -v ':0'
 grep -n "TYPE = event_toast_effect_" common/scripted_effects/bc_reputation_effects.txt
 ```
 
-The first two totals must be equal. The third must show **exactly two lines, both
-`event_toast_effect_good`** — earning a trait is good news.
+**The first total must be exactly one MORE than the second, not equal to it.** The pattern
+`bc_addressed_toast_effect = {` matches the effect's own definition line as well as every
+call site, and a definition passes no `TYPE` to itself. Equal means a caller is missing one.
+
+The third must show **exactly two lines, both `event_toast_effect_good`** — earning a trait
+is good news.
 
 `TYPE` is a required parameter of `bc_addressed_toast_effect` as of plan 1 task 4, because
 plans 4 and 5 route bad news through the same effect. **An omitted parameter is not an error

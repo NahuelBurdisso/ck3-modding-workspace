@@ -129,7 +129,7 @@ writes into files that already exist.
 | `common/scripted_effects/bc_scripted_effects.txt` | modify (shrinks) | momentum ladder, `bc_clear_faltering_effect`, flattened `bc_cleanup_effect`, chronicle-mark effects, pop-up cooldown |
 | `common/scripted_effects/bc_reward_effects.txt` | **create** (task 5) | everything on the reward path: `bc_addressed_toast_effect`, `bc_aftermath_nickname_effect`, `bc_notable_battle_counter_effect`, `bc_battle_memory_effect` |
 | `common/scripted_effects/bc_ledger_effects.txt` | **create** (task 7) | `bc_battle_open_effect`, `bc_record_moment_effect` and its two helpers, `bc_clear_scratch_effect`. **Not** `bc_add_verb_effect`, which needs the family-2 modifiers and belongs to plan 2, and **not** the nemesis wipe, which has nothing to wipe until plan 4 |
-| `common/scripted_triggers/bc_scripted_triggers.txt` | modify | unchanged in this plan except its header |
+| `common/scripted_triggers/bc_scripted_triggers.txt` | modify | unchanged except its header — **and task 17**, which rewrites the two ground triggers off bare `terrain =` keys onto AGOT's helpers. No other task opens this file, which is why task 17 can sit at the end of the plan without disturbing anything |
 | `events/bc_events.txt` | modify (shrinks) | player-facing pop-ups only |
 | `events/bc_aftermath_events.txt` | **create** (task 6) | the two consolidated combat-end graders |
 | `events/bc_diag_events.txt` | **create** (task 14) | the DIAG pass. **Deleted at the end of stage 1** — unless Q2 passes, in which case it is renamed to `events/bc_combat_start_events.txt` and kept as plan 5's placeholder (task 16 step 2) |
@@ -2003,21 +2003,35 @@ second is a presentation decision that stands regardless — a toast about an AI
 still belongs on his commander. So a "bodies do run" answer **simplifies** task 4's
 justification; it does not delete task 4.
 
-- [ ] **Step 5: Q5 — do the vanilla terrain keys resolve in Westeros?**
+- [ ] **Step 5: Q5 — which terrain buckets do battles actually happen in?**
 
-Plan 3's terrain traits read plain `terrain =` keys. **AGOT deliberately abandoned them
-in one place**: `00_martial_lifestyle_effects.txt:45-52` comments out
-`terrain = desert / desert_mountains / oasis / drylands` in favour of
-`agot_is_desert_terrain = yes`, and `:65-66` does the same for `terrain = jungle`. It did
-*not* do this in `commander_trait_leveling_leveling_effect`, which is where plan 3's table
-comes from — so the citation is sound, but `desert_warrior` and `jungle_stalker` may be
-unreachable in a Westeros playset.
+**Q5 used to ask a different question, and that question is now closed.** It asked whether
+plain `terrain =` keys resolve in Westeros. They do not, and no run is needed to know it:
+AGOT's `common/terrain_types/01_agot_terrains.txt` defines road variants as **distinct
+terrain types** (`majorroad_hills` is not `hills`) and adds seven bases vanilla has no key
+for. Of 7007 provinces in `common/province_terrain/00_province_terrain.txt`, 1036 sit on a
+road variant and ~756 on an AGOT-only base — **~26% of the map is invisible to a bare
+`terrain =` check**, silently. AGOT's own
+`00_martial_lifestyle_effects.txt:45-52` and `:65-66` abandoned bare keys for exactly this
+reason. Plan 3's ladder now calls AGOT's 23 `agot_is_<x>_terrain` helpers and the
+already-shipped `bc_terrain_favours_us_trigger` / `bc_terrain_bogs_us_down_trigger` are
+scheduled for the same repair.
+
+**So this ladder must call the helpers too** — a DIAG written with bare keys would measure
+the bug rather than the map, and would do it in the one place designed to catch bugs.
+
+What is left to measure is the **distribution**: with the buckets resolving correctly, are
+all six actually reached by battles? Plan 3 spends a trait arm, a toast, and a loc key on
+each, and an arm for a bucket no battle ever lands in is dead weight. This is a census of
+where wars are fought, not of what terrain exists — Dorne has desert and the Shivering Sea
+has glacier, but armies may never fight in either.
 
 **Placement: at the top of `immediate` in both graders, resolving the province directly —
 NOT inside the `exists = scope:bc_battle_province` block.** That block sits inside both the
 game-rule gate and `bc_battle_is_notable_trigger`, and the calibration run graded only
 about 13% of battles notable, so one run would yield a handful of terrain samples across
-five buckets. Q5 is a census of the map, not of notable battles. Same rule as Q1 and Q3.
+six buckets. Q5 is a census of where battles happen, not of notable battles — and with six
+buckets rather than five, sample size matters more, not less. Same rule as Q1 and Q3.
 
 Resolve the province with `combat.location ?=`, which is what the graders already use to
 populate `scope:bc_battle_province` further down:
@@ -2027,38 +2041,75 @@ one is two for a reason — the extra depth in the other snippets is a nested bl
 is deliberately not inside. If you paste this at five tabs you have put it back inside the
 `exists = scope:bc_battle_province` block that the paragraph above forbids.
 
+**The six arms below must be bucket-for-bucket identical to `bc_terrain_bucket_effect` in
+plan 3 task 5.** That is the entire value of this measurement: if the two ladders disagree
+by one helper, the census counts a bucket the mod will never award and misses one it will.
+Diff them before running.
+
 ```
 		combat.location ?= {
 			if = {
-				limit = { terrain = jungle }
+				limit = {
+					OR = {
+						agot_is_jungle_terrain = yes
+						agot_is_cloudforest_terrain = yes
+					}
+				}
 				debug_log = "BC: DIAG Q5 terrain jungle"
 			}
 			else_if = {
 				limit = {
 					OR = {
-						terrain = drylands
-						terrain = desert
-						terrain = desert_mountains
-						terrain = oasis
+						agot_is_drylands_terrain = yes
+						agot_is_desert_terrain = yes
+						agot_is_desert_mountains_terrain = yes
+						agot_is_oasis_terrain = yes
+						agot_is_canyon_terrain = yes
 					}
 				}
 				debug_log = "BC: DIAG Q5 terrain desert"
 			}
 			else_if = {
 				limit = {
-					OR = { terrain = forest  terrain = taiga }
+					OR = {
+						agot_is_frozen_flats_terrain = yes
+						agot_is_glacier_terrain = yes
+					}
+				}
+				debug_log = "BC: DIAG Q5 terrain winter"
+			}
+			else_if = {
+				limit = {
+					OR = {
+						agot_is_forest_terrain = yes
+						agot_is_taiga_terrain = yes
+					}
 				}
 				debug_log = "BC: DIAG Q5 terrain forest"
 			}
 			else_if = {
 				limit = {
-					OR = { terrain = hills  terrain = mountains  terrain = wetlands }
+					OR = {
+						agot_is_hills_terrain = yes
+						agot_is_mountains_terrain = yes
+						agot_is_wetlands_terrain = yes
+						agot_is_the_bog_terrain = yes
+						agot_is_taiga_bog_terrain = yes
+						agot_is_terraced_hills_terrain = yes
+						agot_is_highlands_terrain = yes
+					}
 				}
 				debug_log = "BC: DIAG Q5 terrain rough"
 			}
 			else_if = {
 				limit = {
-					OR = { terrain = farmlands  terrain = plains  terrain = steppe }
+					OR = {
+						agot_is_farmlands_terrain = yes
+						agot_is_plains_terrain = yes
+						agot_is_steppe_terrain = yes
+						agot_is_floodplains_terrain = yes
+						agot_is_urban_terrain = yes
+					}
 				}
 				debug_log = "BC: DIAG Q5 terrain open"
 			}
@@ -2068,8 +2119,31 @@ is deliberately not inside. If you paste this at five tabs you have put it back 
 		}
 ```
 
-The `NONE MATCHED` arm is the important one: it is how a terrain key the mod does not
-know about announces itself.
+**The rare buckets are deliberately first.** `rough` and `forest` are the two commonest
+terrains in Westeros — hills alone is 1465 provinces, taiga 824, forest 790 — so putting
+them last costs nothing and putting `jungle`, `desert` and `winter` first means a rare hit
+cannot be swallowed by an earlier broad arm. The arms are disjoint by construction, so the
+order does not change any answer; it only makes the ladder easier to reason about.
+
+**`NONE MATCHED` now means something much stronger than it used to.** The six arms are
+exhaustive over all 23 AGOT terrain helpers — 5 + 5 + 7 + 2 + 2 + 2 = 23 — so this arm is
+unreachable in principle. **Any hit at all means AGOT has changed its terrain list**, and
+plan 3's ladder is stale in exactly the same way. Do not shrug it off as an unhandled key;
+re-derive both ladders from
+`common/scripted_triggers/00_agot_terrain_type_triggers.txt` before plan 3 starts.
+
+**How to read the counts:**
+
+| observation | conclusion |
+|---|---|
+| `NONE MATCHED` > 0 | Stop. AGOT's terrain list has changed; both ladders must be rebuilt before plan 3. |
+| all six buckets > 0 | Ship all six arms. |
+| `rough` and `forest` dominate, others thin but non-zero | Expected, and fine. A rare bucket is a rare reward, not a dead one — it does not need to be common to be worth an arm. |
+| a bucket is 0 across the whole run | **Not yet a verdict.** A single run is a small sample and one war is fought in one corner of the map. Record the zero and keep the arm; only drop an arm if a second run in a different region also reports zero. |
+
+That last row is deliberately conservative, and it is where this question differs from Q1
+and Q3. Those measure properties of *every* battle, so a run is a fair sample. Terrain is
+a property of *where the war is*, and a single campaign is not a sample of Westeros.
 
 - [ ] **Step 6: Validate, index, conflicts, deploy**
 
@@ -2181,8 +2255,8 @@ Record the counts. They gate the later plans:
 | Q2 first marker absent | plan 5's eve pop-up dies. Nothing else is affected |
 | Q3 | sets the real bucket-1/2 boundary. If `2k` and `3k` are both near-empty, move the boundary to where the mass is |
 | Q4 | record all three raw counts and read them against the five-row table in task 14 step 4. If `subject AI` is 0 the run proved nothing and **no verdict is recorded**. A "bodies do run" verdict does not delete `bc_addressed_toast_effect` — it only relaxes the "state never inside a toast" rule for plans 3-5 |
-| Q5 `NONE MATCHED` appears | an unhandled terrain exists — find it before plan 3 |
-| Q5 desert/jungle never appear | drop `desert_warrior` and `jungle_stalker` from plan 3 |
+| Q5 `NONE MATCHED` appears | **AGOT has changed its terrain list.** The six arms are exhaustive over all 23 `agot_is_<x>_terrain` helpers, so this is not "an unhandled terrain" — it is a stale ladder, in this DIAG and identically in plan 3 task 5. Rebuild both from `00_agot_terrain_type_triggers.txt` before plan 3 starts |
+| a Q5 bucket is 0 | **record it, change nothing.** One campaign is fought in one corner of Westeros and is not a sample of the map. Drop an arm only if a second run in a different region also reports zero. See the four-row table in task 14 step 5 |
 
 **If Q1 returns zero rows on a run that also logged `BC: win notable`, that — not the trait
 census — is the finding.** Q1 sits inside `side_commander ?=` in the graders. Zero rows
@@ -2340,6 +2414,192 @@ proves its call sites through those."
 
 ---
 
+### Task 17: Repair the two shipped ground triggers
+
+**This task is independent of tasks 1-16 and commutes with all of them.** It touches one
+file that no other task in this plan opens. It is placed last only so that renumbering
+does not invalidate the cross-references in the sixteen tasks above.
+
+**Do it before task 15 anyway.** Task 15 is the one runtime run this plan gets, and these
+two triggers gate two of the eleven moments. Running with them broken means the moment
+distribution that plan 2 retunes against is measured on a bug.
+
+**Files:**
+- Modify: `mods/battle_chronicles/common/scripted_triggers/bc_scripted_triggers.txt:32-61`
+
+- [ ] **Step 1: Confirm the bug is still there and measure it**
+
+```bash
+cd /d/ck3/mods/battle_chronicles
+grep -n "terrain = " common/scripted_triggers/bc_scripted_triggers.txt
+```
+
+Expected: **5 lines** — `hills`, `forest` in `bc_terrain_favours_us_trigger`, and
+`wetlands`, `jungle`, `mountains` in `bc_terrain_bogs_us_down_trigger`. If this returns
+0 lines the task is already done; skip to step 5.
+
+Now measure what those five keys miss:
+
+```bash
+P="D:/SteamLibrary/steamapps/workshop/content/1158310/2962333032/common/province_terrain/00_province_terrain.txt"
+for t in hills forest wetlands jungle mountains the_bog taiga_bog highlands; do
+  echo "$t base=$(grep -c "= $t\$" "$P") major=$(grep -c "= majorroad_$t\$" "$P") minor=$(grep -c "= minorroad_$t\$" "$P")"
+done
+```
+
+Expected, as of AGOT at workshop id `2962333032`:
+
+| terrain | base | majorroad | minorroad |
+|---|---|---|---|
+| `hills` | 1465 | 94 | 139 |
+| `forest` | 790 | 36 | 155 |
+| `wetlands` | 160 | 4 | 14 |
+| `jungle` | 69 | 0 | 1 |
+| `mountains` | 437 | 8 | 24 |
+| `the_bog` | 125 | 14 | 0 |
+| `taiga_bog` | 78 | 1 | 0 |
+| `highlands` | 146 | 5 | 11 |
+
+**`bc_terrain_favours_us_trigger` misses 94 + 139 + 36 + 155 = 424 provinces** it should
+match — 15.8% of the ground it is meant to describe. `bc_terrain_bogs_us_down_trigger`
+misses 51. Neither failure is visible: a province on `majorroad_hills` simply does not
+match `terrain = hills`, no error is logged, and the event silently does not fire.
+
+- [ ] **Step 2: Replace both triggers and their comment**
+
+The comment block above them is as wrong as the code and must go with it. Replace
+`bc_scripted_triggers.txt:32-61` — from the `# --- ground` header through the closing
+brace of `bc_terrain_bogs_us_down_trigger` — with:
+
+```
+# --- ground -----------------------------------------------------------------
+# scope:combat_side.combat.location is a province scope, so a terrain check works
+# there directly. Proven in game (probe 4).
+#
+# NEVER `terrain = X`. ALWAYS `agot_is_X_terrain = yes`. AGOT's
+# common/terrain_types/01_agot_terrains.txt defines road variants as DISTINCT
+# terrain types - `majorroad_hills` is not `hills` - and adds seven bases vanilla
+# has no key for. These two triggers shipped with bare keys and so missed 424 and
+# 51 provinces respectively, silently, from the first live run onward. AGOT's 23
+# helpers in common/scripted_triggers/00_agot_terrain_type_triggers.txt each fold
+# a base key together with its two road variants; that is the only correct way to
+# ask what ground a battle is on.
+#
+# The helpers are base AGOT, not Seasons of Ice and Fire. An earlier version of
+# this comment justified the bare keys as avoiding a hard dependency on a submod.
+# That was the wrong file: 2962333032 is `name="A Game of Thrones"` itself, and
+# descriptor.mod already declares `dependencies = { "A Game of Thrones" }`.
+#
+# `mountains` used to appear in BOTH lists, so in the mountains the ground
+# simultaneously favoured you and bogged you down and the two events fought over
+# the same roll. It belongs to the bogging list: hills and forest already carry
+# "good defensive ground".
+#
+# the_bog and taiga_bog are new to the bogging list and are the point of it. The
+# old comment argued that wetlands and jungle alone are "close to nonexistent in
+# Westeros - the Neck and nothing else". That was right about the Neck and wrong
+# about the key: AGOT models the Neck as `the_bog`, 139 provinces including road
+# variants, which the old trigger did not match at all. highlands and
+# terraced_hills join the favouring list for the same reason - they are AGOT's own
+# variations on hills. terraced_hills currently has zero provinces on the map; it
+# is listed anyway so the pair stays exhaustive over what "hill-like" means if
+# AGOT ever places one.
+
+bc_terrain_favours_us_trigger = {
+	scope:combat_side.combat.location = {
+		OR = {
+			agot_is_hills_terrain = yes
+			agot_is_forest_terrain = yes
+			agot_is_highlands_terrain = yes
+			agot_is_terraced_hills_terrain = yes
+		}
+	}
+}
+
+bc_terrain_bogs_us_down_trigger = {
+	scope:combat_side.combat.location = {
+		OR = {
+			agot_is_wetlands_terrain = yes
+			agot_is_jungle_terrain = yes
+			agot_is_mountains_terrain = yes
+			agot_is_the_bog_terrain = yes
+			agot_is_taiga_bog_terrain = yes
+		}
+	}
+}
+```
+
+**The two lists stay disjoint.** That was a bug once already — `mountains` in both — and
+adding four terrains is exactly when it recurs. `highlands` and `terraced_hills` are
+hill-like, `the_bog` and `taiga_bog` are bog-like, and no helper appears twice.
+
+- [ ] **Step 3: Verify the replacement**
+
+```bash
+cd /d/ck3/mods/battle_chronicles
+grep -c "terrain = [a-z]" common/scripted_triggers/bc_scripted_triggers.txt
+grep -c "agot_is_" common/scripted_triggers/bc_scripted_triggers.txt
+grep -n "agot_is_" common/scripted_triggers/bc_scripted_triggers.txt | grep -v "#"
+```
+
+The first must be **0**. The second must be **9**. The third must list **9 lines**, four
+under `bc_terrain_favours_us_trigger` and five under `bc_terrain_bogs_us_down_trigger`,
+with no key appearing twice.
+
+**The first count is the one that matters and it must be exactly 0, not "lower".** A
+single surviving bare key is the entire bug, and it validates clean.
+
+Then confirm the helpers this file now depends on all exist:
+
+```bash
+for h in hills forest highlands terraced_hills wetlands jungle mountains the_bog taiga_bog; do
+  grep -q "agot_is_${h}_terrain = {" "D:/SteamLibrary/steamapps/workshop/content/1158310/2962333032/common/scripted_triggers/00_agot_terrain_type_triggers.txt" || echo "MISSING: agot_is_${h}_terrain"
+done
+```
+
+Expected: **no output**. `validate` cannot do this — it does not resolve references, so a
+misspelled `agot_is_hils_terrain` passes cleanly and the trigger silently never matches,
+which is the same class of failure being fixed here.
+
+**No `^` anchor in that grep, deliberately.** AGOT ships a UTF-8 BOM on 2945 of its 3117
+`common/*.txt` files, and `agot_is_farmlands_terrain` is on line 1 of this one — a
+`^`-anchored version would report it missing.
+
+- [ ] **Step 4: Full sweep and deploy**
+
+```bash
+cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy
+```
+
+Expected: all exit 0. `conflicts` reads the index, so it must run after `index` — on a
+stale index it can only ever report a pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+cd /d/ck3/mods/battle_chronicles
+git add common/scripted_triggers/bc_scripted_triggers.txt
+git commit -m "fix: the two ground triggers missed 26% of the map
+
+Both shipped with bare vanilla terrain keys. AGOT defines road variants as
+distinct terrain types, so `terrain = hills` does not match `majorroad_hills`:
+bc_terrain_favours_us_trigger missed 424 provinces and bc_terrain_bogs_us_down
+missed 51, silently, since the first live run. Both now call AGOT's
+agot_is_<x>_terrain helpers.
+
+Adds four terrains the bare keys could not name at all. the_bog is the Neck,
+139 provinces, which the bogging trigger was written to describe and never
+matched; highlands and terraced_hills are AGOT's variations on hills. The two
+lists remain disjoint."
+```
+
+**No runtime step.** The fire rates of `ground_favours_us` and `lines_bogged_down` are
+measured by task 15's run, which is why this task belongs before it. Plan 2 retunes their
+weights against those numbers, and a weight tuned against a broken trigger is worse than
+no tuning.
+
+---
+
 ## Done when
 
 - [ ] Three combat-end events are two, and grading provably runs before scratch clearing.
@@ -2366,6 +2626,10 @@ proves its call sites through those."
       If that count is 0, the run only ever named a human subject and the question is
       untouched — record no verdict.
 - [ ] No DIAG marker remains in `common/` or `events/`.
+- [ ] `grep -c "terrain = [a-z]" common/scripted_triggers/bc_scripted_triggers.txt` returns
+      **0**, and the file names nine `agot_is_<x>_terrain` helpers across two disjoint
+      lists. Exactly 0, not "fewer" — one surviving bare key is the whole bug and it
+      validates clean.
 
 ## What comes next
 
@@ -2375,8 +2639,21 @@ proves its call sites through those."
 | 3 | B — reputation | Q1, Q4 |
 | 4 | C — rivalry | this plan |
 | 5 | D — eve, wipe, dead knights | Q2 for the eve only |
-| 6 | family 3 — wounds | plan 2 |
+| 6 | family 3 — wounds | this plan |
 
-Plans 2, 3 and 5 all unblock on the same DIAG run and may ship in any order. Plan 4 needs
-only this one, because `bc_battle_foe` is written by `bc_battle_open_effect` and not by
-the eve. Only plan 6 is strictly downstream of another feature plan.
+**Every feature plan depends on this one and on nothing else.** Plan 6 was previously
+listed as downstream of plan 2; that was wrong. Everything plan 6 needs — the
+`bc_record_effective_tier_effect` ceiling ladder, `var:bc_battle_size` and its measured
+bucket boundaries, `bc_battle_wounded` in the clear list, `bc_addressed_toast_effect` with
+its `TYPE` parameter, and `SWING` in the seam's signature — comes from tasks 4, 7, 8, 11,
+12 and 14 of this plan. Plan 6's own dependency table says so.
+
+So all five may ship in any order once the DIAG run is in. Plan 4 does not even need the
+DIAG run, because `bc_battle_foe` is written by `bc_battle_open_effect` and not by the eve.
+
+Two pieces of scheduled work are deliberately **not** plans of their own:
+
+| work | where it lives | why not a plan |
+|---|---|---|
+| repairing the two shipped ground triggers | task 17 of this plan | one file, no other task touches it, and it must land before task 15's run |
+| a second `wounded` rank, recovery, knight wounds | nowhere yet | listed in plan 6's "what this plan deliberately does not do", pending a first look at how rank 1 actually plays |

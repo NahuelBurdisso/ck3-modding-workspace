@@ -234,11 +234,29 @@ siege cannot produce a stream of prompts.
 2. ~~**Can `is_valid` read the combat's terrain?**~~ **Resolved — yes.** Vanilla
    itself uses `scope:combat_side.combat.location`
    (`00_commander_phase_events.txt:346`, `00_knight_phase_events.txt:1241,1396`).
-   `location` is a province scope, so `terrain = forest` applies directly:
+   `location` is a province scope, so a terrain check applies directly:
 
-       scope:combat_side.combat.location = { terrain = forest }
+       scope:combat_side.combat.location = { agot_is_forest_terrain = yes }
 
    The terrain-gated events stay in scope.
+
+   **Corrected 2026-08-13.** The shipped triggers were written as
+   `terrain = forest`, and that is a bug. AGOT's
+   `common/terrain_types/01_agot_terrains.txt` defines road variants as **distinct
+   terrain types** — `majorroad_forest` is not `forest` — and adds seven bases
+   vanilla has no key for. Of 7007 provinces, 1036 sit on a road variant and ~756
+   on an AGOT-only base: **~26% of the map is invisible to a bare `terrain =`
+   check, silently.** `bc_terrain_favours_us_trigger` and
+   `bc_terrain_bogs_us_down_trigger` (`bc_scripted_triggers.txt:44-61`) therefore
+   miss roughly 424 road-variant hills and forest provinces, and have done since
+   the first live run. `ground_favours_us` was among the rarest moments in that
+   run at 5 fires, on what is the commonest terrain in Westeros — consistent with
+   this bug, though the run was not instrumented to attribute it, so treat the
+   two as consistent rather than as cause and effect. Use AGOT's 23
+   `agot_is_<x>_terrain` helpers
+   (`common/scripted_triggers/00_agot_terrain_type_triggers.txt`), each of which
+   folds a base key together with its two road variants. Repairing the two shipped
+   triggers is scheduled work.
 3. Chance weights are unvalidated guesses. Expect two or three tuning passes.
 4. AGOT's `set_variable` usage (38 occurrences) suggests it tracks combat state
    on characters. Confirm no variable-name overlap; the `bc_` prefix should

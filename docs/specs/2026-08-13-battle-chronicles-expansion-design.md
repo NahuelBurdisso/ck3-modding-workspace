@@ -614,8 +614,8 @@ the same guard the aftermath events already put around the memory writes
 `?=` and may not resolve.
 
 **Style traits are evaluated first, and a terrain trait needs its own streak of 2.**
-Without both rules terrain wins every time and B never ships. The five terrain buckets
-between them cover every `terrain =` key in the game, so *every* notable battle
+Without both rules terrain wins every time and B never ships. The six terrain buckets
+between them cover every AGOT terrain helper, so *every* notable battle
 qualifies for one, and a terrain award needs a single battle where a style award needs
 three. A commander's first three notable battles would spend the entire
 `number_of_commander_traits < 3` budget on terrain, after which the style ladder —
@@ -633,10 +633,10 @@ written explicitly. Two things force this, and neither is optional:
 1. There is no scratch `bc_battle_terrain` to compare against the way `bc_battle_style`
    backs the style streak, and `terrain` is a **trigger**, not something a
    `set_variable value =` can read. So the branch must resolve the province through the
-   same five-way `if` / `else_if` ladder that picks the trait, and that ladder writes
+   same six-way `if` / `else_if` ladder that picks the trait, and that ladder writes
    `flag:<bucket>` — `flag:desert`, `flag:open`, `flag:rough`, `flag:forest`,
-   `flag:jungle` — into `bc_terrain_last` in the same arm that names the trait. One
-   ladder, two outputs, so the bucket and the trait cannot disagree.
+   `flag:jungle`, `flag:winter` — into `bc_terrain_last` in the same arm that names the
+   trait. One ladder, two outputs, so the bucket and the trait cannot disagree.
 2. Storing the raw key would break the streak on terrain that maps to the *same* trait.
    `hills` then `mountains` are both `rough_terrain_expert`, but as raw keys they are a
    mismatch, so the streak would reset and `rough_terrain_expert` would be
@@ -651,29 +651,56 @@ Each is gated on the budget, so an award by an earlier branch closes the later o
 for that battle. This is the same "the trait wins" precedence the nickname rule below
 states, extended one rung.
 
-The terrain→trait mapping mirrors vanilla's own, read out of
-`00_war_effects.txt:2883` onward:
+The terrain→trait mapping started from vanilla's own, read out of
+`00_war_effects.txt:2883` onward, but **it is not vanilla's mapping** — it is built from
+AGOT's 23 `agot_is_<x>_terrain` helpers, because vanilla's terrain key list does not
+describe AGOT's map (see Q5). Each row folds a base terrain together with its
+`majorroad_` and `minorroad_` variants, which is what the helper does:
 
-| terrain | trait | trait line |
+| AGOT terrain helpers | trait | trait line |
 |---|---|---|
-| `drylands`, `desert`, `desert_mountains`, `oasis` | `desert_warrior` | `00_traits.txt:15045` |
-| `farmlands`, `plains`, `steppe` | `open_terrain_expert` | `:15818` |
-| `hills`, `mountains`, `wetlands` | `rough_terrain_expert` | `:16054` |
+| `drylands`, `desert`, `desert_mountains`, `oasis`, `canyon` | `desert_warrior` | `00_traits.txt:15045` |
+| `farmlands`, `plains`, `steppe`, `floodplains`, `urban` | `open_terrain_expert` | `:15818` |
+| `hills`, `mountains`, `wetlands`, `the_bog`, `taiga_bog`, `terraced_hills`, `highlands` | `rough_terrain_expert` | `:16054` |
 | `forest`, `taiga` | `forest_fighter` | `:16532` |
-| `jungle` | `jungle_stalker` | `:15232` |
+| `jungle`, `cloudforest` | `jungle_stalker` | `:15232` |
+| `frozen_flats`, `glacier` | `winter_soldier` | `:17133` |
 
-All five are `category = commander`, `flag = commander_trait_flag`.
+5 + 5 + 7 + 2 + 2 + 2 = **23** — every helper, exactly once. The ladder is exhaustive by
+construction, which is what makes its `else` a hard error rather than a fallback.
 
-**`winter_soldier` is deliberately excluded**, on two solid reasons and one
-speculation that is *not* load-bearing. The solid ones: vanilla's own terrain branch
-lists exactly the five above and omits it, and there is no `terrain =` key
-corresponding to winter, so there is no province-derived path to it in the first
-place — the second alone settles it. The speculation, kept only because it would
-matter if the first two ever stopped holding: `00_traits.txt:17135` gives it
-`category = winter_commander` rather than `commander`, which *might* mean it escapes
-the `number_of_commander_traits` cap — but `:17136` gives it
-`flag = commander_trait_flag`, identical to all five terrain traits, and nothing
-documents whether the count is by category or by flag. Do not cite this as fact.
+`rough` is the largest bucket because Westeros is: hills alone is 1465 provinces, the
+commonest terrain on the map, and `terraced_hills` and `highlands` are AGOT's own
+variations on it. `urban` goes in `open` because there is no urban commander trait and a
+battle in a city is fought on cleared flat ground; `canyon` goes in `desert` because AGOT
+places it in the Red Waste and around Asshai.
+
+**`winter_soldier` was previously excluded, and that exclusion was wrong.** It rested on
+two claims. The first — vanilla's terrain branch lists five and omits it — is true but
+only describes vanilla. The second — "there is no `terrain =` key corresponding to
+winter" — was the load-bearing one, and it is **false under AGOT**: `frozen_flats` (184
+provinces) and `glacier` (81) are real terrain types with real helpers, and
+`winter_soldier` is defined at AGOT `00_traits.txt:17133` alongside the other five. This
+was the same bare-`terrain =` mistake as Q5, in a different costume: a fact about
+vanilla's key list mistaken for a fact about the map.
+
+The third consideration, previously flagged as non-load-bearing speculation, now is
+load-bearing and remains **unproven**. `00_traits.txt:17135` gives `winter_soldier`
+`category = winter_commander` rather than `category = commander`, while `:17136` gives it
+`flag = commander_trait_flag`, identical to the other five. `number_of_commander_traits`
+is documented only as "does the character have this many commander traits?"
+(`triggers.log:6810`) and nothing states whether it counts by category or by flag. Nor is
+the field uniform anywhere else to fall back on — of the six terrain traits, four are
+XP-tracked (`desert_warrior`, `forest_fighter`, `jungle_stalker`, `winter_soldier`) and
+two are not, so "the five are alike and this one differs" is not a reliable heuristic
+here.
+
+**The design does not depend on the answer.** If the cap counts by flag, `winter_soldier`
+is capped like everything else. If it counts by category, a commander can end up holding
+one more commander trait than the budget intends — a mild overshoot, bounded at one,
+reached only by a commander who fought two notable battles on glacier or frozen flats.
+That is an acceptable worst case, and it is not worth a run to settle. Do not cite either
+behaviour as fact.
 
 Also skipped: `logistician`, `military_engineer`, `forder`, `holy_warrior`, `reaver` —
 none of them is a thing a battle can teach you.
@@ -1424,18 +1451,41 @@ paths — `add_legitimacy = minor_legitimacy_loss` at `combat_on_actions.txt:587
 `side_primary_participant`, which is usually AI. Log from inside a toast raised on a
 known-AI character.
 
-**Q5 — do the vanilla terrain keys resolve in Westeros?** Log
-`combat.location`'s terrain at every combat end. AGOT deliberately abandoned plain
-terrain keys in `give_random_commander_trait_effect` —
-`00_martial_lifestyle_effects.txt:45-52` comments out
-`terrain = desert / desert_mountains / oasis / drylands` in favour of
-`agot_is_desert_terrain = yes`, and `:65-66` does the same for `terrain = jungle`. It
-did *not* do this in `commander_trait_leveling_leveling_effect`, which is where
-Section 3's table is read from, so the citation is sound — but it raises the
-possibility that `desert_warrior` and `jungle_stalker` are unreachable in a Westeros
-playset through plain `terrain =` keys. The mod restricts itself to vanilla terrain
-keys on purpose (`bc_scripted_triggers.txt:32-35`, probe-verified), so this is a
-measurement, not a design change: if those terrains never appear, drop the two traits.
+**Q5 — which terrain buckets do battles actually happen in?** Log `combat.location`'s
+bucket at every combat end.
+
+*This question was originally "do the vanilla terrain keys resolve in Westeros?" It is
+now closed, statically, and the answer is no.* AGOT's
+`common/terrain_types/01_agot_terrains.txt` defines road variants as **distinct terrain
+types** — `majorroad_hills` is a different key from `hills` — and adds seven bases
+vanilla has no key for at all (`frozen_flats`, `glacier`, `highlands`, `the_bog`,
+`taiga_bog`, `cloudforest`, `terraced_hills`, plus `canyon` and `urban`). Of 7007
+provinces in `common/province_terrain/00_province_terrain.txt`, 1036 sit on a road
+variant and ~756 on an AGOT-only base: **~26% of the map is invisible to a bare
+`terrain =` check, and it fails silently.** AGOT abandoned plain terrain keys in
+`give_random_commander_trait_effect` for this reason —
+`00_martial_lifestyle_effects.txt:45-52` and `:65-66` — and ships 23
+`agot_is_<x>_terrain` helpers in `common/scripted_triggers/00_agot_terrain_type_triggers.txt`,
+each folding a base key together with its two road variants.
+
+**This is therefore a design change, not just a measurement.** Section 3's terrain ladder
+uses the helpers. The mod's existing restriction to vanilla terrain keys
+(`bc_scripted_triggers.txt:32-35`) was a mistake rather than a deliberate constraint, and
+`bc_terrain_favours_us_trigger` / `bc_terrain_bogs_us_down_trigger` are already shipping
+with it — they miss every road-variant hills and forest province, roughly 424 of them.
+Repairing those two is scheduled work, not part of Q5.
+
+It also opens a bucket that was ruled out on false grounds. **Winter is reachable**:
+AGOT has 184 `frozen_flats` and 81 `glacier` provinces, and `winter_soldier` exists at
+AGOT `00_traits.txt:17133` alongside the other five terrain traits. The ladder is six
+buckets, not five.
+
+What Q5 still measures is the **distribution** — whether all six buckets are reached by
+battles at all, since each costs a trait arm, a toast and a loc key. A zero is recorded
+but does not delete an arm: one campaign is fought in one corner of Westeros and is not a
+sample of the map. A `NONE MATCHED` hit, by contrast, is a hard stop — the six arms are
+exhaustive over all 23 helpers, so any hit means AGOT's terrain list has changed and both
+ladders are stale.
 
 Q2 requires hooking `on_combat_start`, which the mod does not currently do. The hook
 ships in stage 1 carrying nothing but the logging event.

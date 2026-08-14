@@ -37,7 +37,7 @@ different in plan 2.
 
 Plan 1's sweep pass condition row 3 admits *any line beginning `BC: `*, and enumerates
 the markers that existed when it was written. **That enumeration is now incomplete and
-that is fine — row 3 is a rule.** This plan adds eight permanent markers, all of which
+that is fine — row 3 is a rule.** This plan adds nine permanent markers, all of which
 begin `BC: `:
 
 | marker | emitted from | task |
@@ -48,6 +48,7 @@ begin `BC: `:
 | `BC: verb spent horse` | `bc_apply_verb_effect` | 4 |
 | `BC: verb pursuit` | `bc_apply_verb_effect` | 4 |
 | `BC: chronicle mark commander` | `bc_mark_chronicle_commander_effect` | 9 |
+| `BC: floor admitted` | `bc_mark_chronicle_commander_effect` | 9 |
 
 Do not add a marker that does not begin `BC: `. That prefix is the only thing separating
 this mod's own log output from an engine complaint about this mod's files.
@@ -272,8 +273,23 @@ ships both.
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts
 ```
 
-Expected: all exit 0. `--strict` will emit missing-localization WARNs for the four keys;
-task 3 fixes them. **A WARN is not a failure — check the exit code, not the output.**
+Expected: all exit 0, and **no output about the four keys at all**.
+
+**`--strict` will NOT warn that these modifiers are unlocalized, and it is important not
+to expect it to.** Its missing-localization check is scoped to
+`LOC_EXPECTED = {"common/traits", "common/decisions", "common/character_interactions"}`
+(`D:/ck3/tools/ck3lib/validate.py:37`, applied at `:184`). **`common/modifiers` is not in
+that set.** A modifier with no loc key validates perfectly clean, at `--strict`, forever.
+
+That matters more here than it would elsewhere. This mod's whole presentation rests on
+modifier names being prose — `README.md`'s "Modifier names are prose. The combat advantage
+breakdown prints them verbatim next to `Commander Martial Skill`." An unlocalized family-2
+modifier does not vanish; it renders its raw key, `bc_bloodied`, in the middle of the
+player's battle UI. Nothing in the toolchain will tell you.
+
+So task 3's static grep is not a formality that `--strict` also covers. **It is the only
+automated check that exists for these four keys**, and the in-game look at the advantage
+breakdown in task 12 is the only real one.
 
 - [ ] **Step 4: Commit**
 
@@ -351,8 +367,35 @@ cd /d/ck3/tools && python ck3.py validate --strict
 
 The key count must have gone up by exactly **14**. The BOM must still be there — some
 editors strip it silently on save, which is why this is checked after the edit and not
-only before. `validate --strict` must now exit 0 **with no missing-localization WARN for
-any `bc_` modifier**.
+only before. `validate --strict` must exit 0.
+
+**Do not gate this step on the absence of a missing-localization WARN.** There was never
+going to be one: `--strict`'s loc cross-check is scoped to
+`LOC_EXPECTED = {"common/traits", "common/decisions", "common/character_interactions"}`
+(`ck3lib/validate.py:37`), and `common/modifiers` is not in it. A gate phrased "no WARN
+for any `bc_` modifier" is satisfied by a run that produced no such WARN because it could
+not produce one, and it would pass just as cleanly with all fourteen keys missing.
+
+**So pair each of the four modifier keys with its definition explicitly instead:**
+
+```bash
+cd /d/ck3/mods/battle_chronicles
+for m in bc_bloodied bc_shieldwall bc_spent_horse bc_pursuit; do
+  d=$(grep -c "^$m = {" common/modifiers/bc_battle_modifiers.txt)
+  l=$(grep -c "^ $m:" localization/english/bc_l_english.yml)
+  echo "$m def=$d loc=$l"
+done
+```
+
+Expected: **`def=1 loc=1` on all four rows.** A `def=1 loc=0` row is the failure this
+whole step exists to catch, and it is invisible to every other check in this plan — the
+modifier applies correctly, the battle is affected correctly, and the advantage breakdown
+prints the raw key `bc_bloodied` at the player.
+
+The `^ ` in the loc pattern is the required single leading space of the yml format, and
+the `:` stops `bc_pursuit` matching a `bc_pursuit_desc` that does not exist yet. Task 12's
+in-game look at the advantage breakdown is still the authoritative check; this is the one
+that can run without launching the game.
 
 - [ ] **Step 5: Commit — two commits, so do steps 2 and 3 as two cycles**
 
@@ -823,10 +866,12 @@ mod's largest event-spam surface."
 - [ ] **Step 1: Confirm the marker does not exist yet**
 
 ```bash
-cd /d/ck3/tools && python ck3.py probe "BC: chronicle mark commander"
+cd /d/ck3/tools
+python ck3.py probe "BC: chronicle mark commander"
+python ck3.py probe "BC: floor admitted"
 ```
 
-Expected: **exit 1**. This is the failing test.
+Expected: **exit 1** on both. This is the failing test.
 
 - [ ] **Step 2: Add the variant beside `bc_mark_chronicle_effect`**
 
@@ -839,7 +884,29 @@ Expected: **exit 1**. This is the failing test.
 # arm on every single knight in every combat in the world. It would happen to
 # produce the right number and would log a read of nothing, but it would be a
 # lie about why.
+#
+# THE FLOOR DIAG IS FIRST, AND THAT IS LOAD-BEARING. It has to read both pieces
+# of state BEFORE add_character_flag rewrites one of them. Every commander event
+# calls this effect near the top of its `effect` block - after
+# bc_battle_open_effect, before any bc_record_moment_effect, before any
+# trigger_event - so here bc_battle_moments still holds the state from BEFORE
+# this moment. Put this block below add_character_flag and it is always false.
+#
+# WHAT THE LIMIT MEANS: is_valid has already passed
+# bc_chronicle_ready_commander_trigger. If the cooldown flag is set, that
+# trigger's first arm was FALSE, so the only thing that let this event through
+# was the floor arm. The two rows below re-test exactly that pair, so the marker
+# fires when and only when the floor did work the cooldown would have blocked -
+# and reading it needs no attribution of log lines to a particular battle.
 bc_mark_chronicle_commander_effect = {
+	if = {
+		limit = {
+			has_character_flag = bc_chronicle_recent
+			NOT = { exists = var:bc_battle_moments }
+		}
+		debug_log = "BC: floor admitted"
+	}
+
 	add_character_flag = {
 		flag = bc_chronicle_recent
 		days = bc_chronicle_flag_days_value
@@ -865,14 +932,27 @@ grep -n "days = stress_threshold_cooldown_duration" 00_stress_effects.txt
 
 Expected: at least one hit each.
 
-- [ ] **Step 3: Note what the marker does and does not prove**
+- [ ] **Step 3: Note what the two markers do and do not prove**
 
 `BC: chronicle mark commander` proves the new effect is **reached** — that the call-site
 swap in task 10 landed. It does **not** prove the duration resolved correctly; a script
 value's result cannot be logged, because `debug_log` does not interpolate.
 
-The duration is verified indirectly in task 12 by counting `BC: moment` lines against the
-`BC: size` marker for the same battle. Do not claim more than that.
+`BC: floor admitted` proves the **floor arm fires**, and it is the one claim in this plan
+that survives the log's total lack of battle attribution, because its meaning is carried
+entirely by the character's own state at the instant it is written and not by which lines
+sit near it.
+
+**Neither marker verifies the duration, and nothing in this plan does.** An earlier draft
+of this step said the duration "is verified indirectly in task 12 by counting `BC: moment`
+lines against the `BC: size` marker for the same battle." That is the exact procedure task
+12 step 6 forbids — `type = commander` has no `is_ai` gate, so *the same battle* is not a
+thing this log can identify. The claim is withdrawn. Tuning 40/20/10 needs a purpose-built
+DIAG, not this run.
+
+**`BC: floor admitted` is one-directional and step 6 says so.** Its presence proves the
+floor lives. Its absence proves nothing, because the state it tests may simply never have
+arisen.
 
 - [ ] **Step 4: Validate and commit**
 
@@ -896,13 +976,24 @@ Size-scaled cooldown flag. Nothing calls it yet."
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-grep -c "bc_chronicle_ready_trigger" common/combat_phase_events/bc_commander_phase_events.txt
-grep -c "bc_mark_chronicle_effect" common/combat_phase_events/bc_commander_phase_events.txt
-grep -c "bc_chronicle_ready_trigger" common/combat_phase_events/bc_knight_phase_events.txt
-grep -c "bc_mark_chronicle_effect" common/combat_phase_events/bc_knight_phase_events.txt
+grep -c "bc_chronicle_ready_trigger = yes" common/combat_phase_events/bc_commander_phase_events.txt
+grep -c "bc_mark_chronicle_effect = yes" common/combat_phase_events/bc_commander_phase_events.txt
+grep -c "bc_chronicle_ready_trigger = yes" common/combat_phase_events/bc_knight_phase_events.txt
+grep -c "bc_mark_chronicle_effect = yes" common/combat_phase_events/bc_knight_phase_events.txt
 ```
 
 Expected: **7, 7, 4, 4**.
+
+**The ` = yes` is load-bearing, not decoration.** Dropping it gives **8, 7, 5, 5** —
+both files open with a header comment naming these helpers in prose
+(`bc_commander_phase_events.txt:13` names `bc_chronicle_ready_trigger`;
+`bc_knight_phase_events.txt:8` names both). Those are the extra hits. Anchoring on the
+call syntax counts call sites and only call sites, which is what this step is for.
+
+The asymmetry in the unfiltered numbers is real rather than a miscount: the commander
+header names only the trigger, so its bare counts are 8 and 7, while the knight header
+names both, so its bare counts are 5 and 5. A reader who "corrects" one of those to make
+the four agree has introduced an error, not removed one.
 
 If the commander counts are not 7 and 7, plan 1 changed the event count and this task's
 verification numbers are stale — recount before proceeding rather than forcing the
@@ -917,6 +1008,12 @@ and every `bc_mark_chronicle_effect` with `bc_mark_chronicle_commander_effect`, 
 The two name pairs are safe for a blind replace-all *within that file*: neither new name
 contains the old name as a substring, so a second pass cannot double-substitute.
 
+**Let it rewrite the header comment at line 13 too.** That comment explains why the
+trigger, not the weights, is what stops these events firing, and after this task it is the
+commander variant doing that job — leaving the old name there would make the file's own
+documentation name a helper it no longer calls. This is why step 1 counts with ` = yes`
+and step 3 does not need to care: the comment moves with the code.
+
 - [ ] **Step 3: Confirm ordering — this is what makes the script value work**
 
 In each of the seven `effect` blocks, `bc_battle_open_effect = yes` must appear **before**
@@ -926,14 +1023,30 @@ It matters more now than it did then: `bc_battle_open_effect` is what writes
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-grep -n "bc_battle_open_effect\|bc_mark_chronicle_commander_effect" \
+grep -n "bc_battle_open_effect = yes\|bc_mark_chronicle_commander_effect = yes\|bc_record_moment_effect = {" \
   common/combat_phase_events/bc_commander_phase_events.txt
 ```
 
-Expected: 14 lines, alternating open-then-mark, seven times. **Read them in order and
-confirm it by eye.** If any mark precedes its open, the script value falls to its 15-day
-else arm for that event and nothing at runtime reports it — the flag still gets written,
-just with the wrong number.
+**Anchored on call syntax on purpose.** This file's header is prose that names its own
+helpers — line 13 does it today and step 2 above rewrites that line — so an unanchored
+pattern here counts documentation as if it were code. That is the same trap step 1 of this
+task documents at length, and it is worth avoiding twice.
+
+Expected: 21 lines — **open, then mark, then record**, in that order, seven times. All
+seven events carry a `record` line in this file: four record directly (plan 1 task 9 step
+2) and three record inside their `else` branch (step 3), which is later in the block
+either way. The three pop-up branches record from an option in `bc_events.txt` instead,
+which is later still and not in this grep. **Read them in order and confirm it by eye.**
+
+Two different things depend on that order, and neither reports its own failure at runtime:
+
+- **open before mark.** `bc_battle_open_effect` writes `bc_battle_size`; the mark reads it
+  through `bc_chronicle_flag_days_value`. A mark that precedes its open falls to the
+  15-day `else` arm silently — the flag still gets written, just with the wrong number.
+- **mark before record.** `bc_record_moment_effect` creates `bc_battle_moments`, and the
+  floor DIAG inside the mark effect tests that variable's *absence*. A record that precedes
+  its mark makes `BC: floor admitted` permanently unreachable, and step 6 of task 12 would
+  then read an instrumentation bug as an inconclusive result.
 
 - [ ] **Step 4: Confirm the knight file is untouched**
 
@@ -1119,7 +1232,42 @@ the world writes into the same `debug.log`, interleaved. Counting `BC: moment` l
 "between two `BC: size` lines" attributes one battle's moments to another. Do not do it,
 and do not report a number derived that way.
 
-What the run **can** falsify is the floor, which is the failure Section 6 exists to fix:
+That constraint is why task 9 put the floor's evidence inside a **single line's own
+meaning** instead of inside a count:
+
+```bash
+cd /d/ck3/tools && python ck3.py probe "BC: floor admitted"
+```
+
+`BC: floor admitted` is written only when, at the instant the event's effect began, the
+commander already carried `bc_chronicle_recent` **and** `bc_battle_moments` did not exist.
+`is_valid` had already passed `bc_chronicle_ready_commander_trigger`, and a live cooldown
+flag makes that trigger's first arm false, so the floor arm is the only thing that could
+have admitted the event. **One such line anywhere in the log proves the floor works.** It
+does not matter which battle wrote it, who wrote it, or what surrounds it, and that is the
+entire reason the marker is shaped this way rather than as a count.
+
+**Read it one-directionally:**
+
+| result | conclusion |
+|---|---|
+| at least one `BC: floor admitted` | **the floor works.** Done — no further floor testing this run |
+| none, and `BC: chronicle mark commander` is present | **inconclusive, not a failure.** The tested state may never have arisen. Go to the retry below |
+| none, and `BC: chronicle mark commander` is absent too | not a floor result at all — the task-10 swap did not land. Step 5 already caught this |
+
+**The retry, if it came back empty.** The state the marker needs is a commander starting a
+battle while a cooldown from an *earlier* battle is still running. Nothing about that
+requires log attribution, so you can go make it happen directly: fight a second battle
+within a few in-game days of the first, with the same commander, and re-run the probe.
+Two battles back to back with one leader is the whole recipe. If a long run with several
+such back-to-back pairs still yields nothing, treat it as a failure and look at the two
+likely causes — the `OR` in `bc_chronicle_ready_commander_trigger` written as two `AND`
+rows, or `bc_battle_moments` surviving combat end, which makes the floor arm permanently
+false from the second battle onward. For the second cause the thing to check is
+`bc_clear_scratch_effect` and its two call sites in `bc_chronicles.0091` and `.0092` — not
+`bc_cleanup_effect`, which strips modifiers and does not touch scratch.
+
+For context only, these two should both be non-empty and neither is a floor result:
 
 ```bash
 cd /d/ck3/tools
@@ -1127,24 +1275,11 @@ python ck3.py probe "BC: size 1"
 python ck3.py probe "BC: moment"
 ```
 
-Expected: both exit 0. Size-1 battles happened, and moments happened.
-
-The properly falsifiable version needs one battle in isolation, and the only battle you
-control is your own:
-
-- Fight **one** small battle with no other war running that you can see, having cleared
-  the logs immediately before.
-- Afterwards, confirm at least one `BC: moment` line exists.
-
-If a small battle that fired a phase event produced no moment at all, the floor arm is
-broken — most likely the `OR` in `bc_chronicle_ready_commander_trigger` was written as
-two `AND` rows, or `bc_battle_moments` is not being cleared at combat end so the floor
-arm is permanently false from the second battle onward.
-
 **The 40/20/10 durations themselves are not verified by this run, and this plan does not
 claim they are.** A script value's result cannot be logged. What is verified is that the
-value is *reached* (step 5's marker) and that the floor prevents silence. Tuning the three
-numbers is a later question and needs a purpose-built DIAG, not this log.
+value is *reached* (step 5's marker) and that the floor can override it (this step's
+marker). Whether 40 days is the right number for a large battle is untested and untestable
+from this log; it needs a purpose-built DIAG.
 
 - [ ] **Step 7: Error sweep**
 
@@ -1153,7 +1288,7 @@ cd /d/ck3/tools && python ck3.py probe "bc_"
 ```
 
 Apply plan 1's three-row pass condition unchanged. Row 3 — "a line beginning `BC: `" —
-now legitimately covers this plan's eight new markers.
+now legitimately covers this plan's nine new markers.
 
 **Watch specifically for a missing-variable read naming `bc_battle_size` or
 `bc_battle_moments`.** Those are the two variables this plan added readers for, and both
@@ -1173,7 +1308,11 @@ Write into `README.md`:
   `ordered`/`down`;
 - the pre-existing late-pop-up modifier hazard from this plan's preamble;
 - that `bc_mark_chronicle_effect` and `bc_chronicle_ready_trigger` are now knight-only,
-  and why.
+  and why;
+- whether `BC: floor admitted` appeared, **and if it did not, that the floor is untested
+  rather than broken.** Write the distinction down. It is the one result in this run that
+  a later reader is likely to misremember as a failure, because every other empty probe in
+  this plan is one.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1200,15 +1339,20 @@ git commit -m "docs: record the measured battle-size boundary"
 - `common/modifiers/bc_battle_modifiers.txt` defines four modifiers and
   `bc_cleanup_effect` strips all ten. Task 11 step 1's diff is empty.
 - No file under `common/combat_phase_events/` or `events/` names a family-2 modifier.
-- `bc_commander_phase_events.txt` holds 7 `bc_chronicle_ready_commander_trigger` and 7
-  `bc_mark_chronicle_commander_effect`, and 0 of the shared variants.
-- `bc_knight_phase_events.txt` holds 4 and 4 of the **shared** variants and 0 of the
-  commander variants.
+- `bc_commander_phase_events.txt` holds 7 `bc_chronicle_ready_commander_trigger = yes` and
+  7 `bc_mark_chronicle_commander_effect = yes`, and 0 of the shared variants **including in
+  its header comment**, which task 10 step 2 rewrites along with the code.
+- `bc_knight_phase_events.txt` holds 4 and 4 `= yes` call sites of the **shared** variants
+  and 0 of the commander variants. Its header comment still names the shared variants,
+  correctly, so an unfiltered count there is 5 and 5 — count with ` = yes`.
 - `validate --strict`, `index`, `conflicts` and `deploy` all exit 0.
 - A cleared-log run returns at least two distinct `BC: size` markers, at least two
   distinct `BC: verb` markers, and `BC: chronicle mark commander`.
-- An isolated small battle in that run produced at least one `BC: moment` — the floor.
-  **Not** "no battle produced zero", which cannot be established from an interleaved log.
+- The floor is **either** proven by at least one `BC: floor admitted` line, **or** recorded
+  in the README as untested with the back-to-back-battle retry noted for a later run.
+  Both outcomes close this plan; only a run that never produced
+  `BC: chronicle mark commander` at all leaves it open. **Not** "an isolated battle
+  produced a moment" — no battle is isolated in an interleaved log.
 - The error sweep returns nothing outside plan 1's three whitelist rows, and in
   particular no missing-variable read naming `bc_battle_size` or `bc_battle_moments`.
 
@@ -1216,7 +1360,7 @@ git commit -m "docs: record the measured battle-size boundary"
 
 | thing | plan |
 |---|---|
-| family 3, the wounds | 6 — gated on this plan's size buckets |
+| family 3, the wounds | 6 — **gated on plan 1, not on this plan.** Plan 6 hangs the wound off `bc_record_effective_tier_effect`'s decisive arm and reads `var:bc_battle_size`, both of which plan 1 ships. It can run before this plan, after it, or instead of it |
 | B, the reputation traits | 3 — gated on Q1 and Q4 |
 | C, the named foe | 4 — `bc_battle_foe` is written by plan 1 and read by nobody until then |
 | D, the eve and the aftermath | 5 |

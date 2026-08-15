@@ -441,9 +441,21 @@ In `bc_l_english.yml`, after the bond section. **The three strings below are a
 DRAFT and were NOT what shipped.** They grade on who hears about the moment, and
 that axis is unavailable: `bc_frag_banner_falls_open` already settles the same
 question for open ground, in text that renders earlier in the same run, so every
-arm either restated it or contradicted it. The shipped strings grade on how often
-a fight of that size throws up a moment of the kind just described. Copy the
-shipped section comment and strings from `bc_l_english.yml`, not this block.
+arm either restated it or contradicted it.
+
+A second draft graded on how often a fight of that size throws up such a moment.
+That axis is unavailable too, and worse: `bc_chronicle_flag_days_value`
+(`bc_script_values.txt:110-128`) already grades recurrence off the same variable
+at 10 / 20 / 40 days, so prose promising another moment the same afternoon
+contradicts a shipped mechanic by an order of magnitude. It also fails the
+shared-clause test — four of the ten moments are states or one-offs and cannot
+recur at all.
+
+The shipped strings grade on how many men are standing in the battle without
+being used, and say nothing about the moment itself. Copy the shipped section
+comment and strings from `bc_l_english.yml`, not this block; the shipped
+`bc_scale_clause` header carries the three-row test a replacement axis has to
+pass.
 
 ```
 
@@ -494,7 +506,9 @@ For contrast, the loc-key check *does* fire: renaming `localization_key = bc_fra
 
 - [ ] **Step 4b: Fix the file header's opening line**
 
-Adding this class falsifies the first paragraph of `bc_flavour.txt`, which reads "THE ARMS ONLY COMPARE FLAGS". Rewrite it to say the arms compare a recorded classification, name the three writers (`bc_context_effects.txt` for the ground and the bond, the size ladder in `bc_ledger_effects.txt` for the scale), and add a second paragraph saying most comparisons are against a flag and `bc_scale_clause` is the exception. Do not leave the old line standing — it is the first thing a reader of this file sees.
+Adding this class falsifies the first paragraph of `bc_flavour.txt`, which reads "THE ARMS ONLY COMPARE FLAGS". Rewrite it to say the arms compare a recorded classification, name the three writers **as effects, not as the files holding them** — `bc_write_ground_effect` and `bc_write_bond_effect` in `bc_context_effects.txt`, and the size ladder inside `bc_battle_open_effect` in `bc_ledger_effects.txt` — and add a second paragraph saying most comparisons are against a flag and `bc_scale_clause` is the exception. Do not leave the old line standing — it is the first thing a reader of this file sees.
+
+An earlier revision of this step named only the two files. That is what shipped first and was then corrected: a reader sent to `bc_context_effects.txt` still has to find which of its effects classified, and the size ladder is not a file at all. The shipped header is the one to copy.
 
 - [ ] **Step 5: Commit**
 

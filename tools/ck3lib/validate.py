@@ -15,6 +15,7 @@ comments land on a line of that file that carries content.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -110,9 +111,14 @@ _CITE_EXT_ALT = "|".join(sorted(ext.lstrip(".") for ext in CITE_EXTS))
 # The STEM is shared for the same reason the extension is. When the two stems
 # differed, `bc_missing-2.txt:1` matched the broad pattern, failed the narrow
 # one, and was dropped as unresolvable - so a `bc_` file that does not exist
-# escaped the error, purely because of a hyphen.
+# escaped the error, purely because of a hyphen. `(?i:...)` closes the same
+# escape in the other direction: CITE_EXTS is lowercase and the target side
+# lowercases `suffix`, so without it `BC_T.TXT:1` failed the narrow pattern and
+# was dropped for its case alone. The prefix test in `_check_citations` is
+# case-folded to match, or a mis-cased `bc_` name would be resolvable and then
+# silently skipped for not looking like a mod file.
 _CITE_STEM = r"[A-Za-z0-9_.-]+"
-RESOLVABLE_CITE_RE = re.compile(r"\b(" + _CITE_STEM + r"\.(?:" + _CITE_EXT_ALT + "))" + CITE_TAIL)
+RESOLVABLE_CITE_RE = re.compile(r"\b(" + _CITE_STEM + r"\.(?i:" + _CITE_EXT_ALT + "))" + CITE_TAIL)
 ANY_CITE_RE = re.compile(r"\b(" + _CITE_STEM + r"\.[A-Za-z0-9]{1,8})" + CITE_TAIL)
 # `(?<![\w.])`: without it `bc_frag_x:0 "text"` in a loc file matches as `:0`.
 # Only ever applied to comment lines, where a key/value pair cannot appear.
@@ -316,44 +322,53 @@ def _citation_files(
 
     EVERY FILE WITH A CITABLE EXTENSION, WHEREVER IT SITS. This deliberately does
     not use `iter_files`: that walks SCAN_DIRS, and anything outside them - a
-    root-level README.md, a `tests/` directory `_check_structure` explicitly
-    allows - would be invisible as a citer AND as a target, the second of which
-    turns a citation into a present file into a false "this mod does not contain
-    it". descriptor.mod falls out anyway because `.mod` is not in CITE_EXTS,
-    which is fine: nine lines, and nothing in the mod cites a line of it.
+    root-level README.md, or a `tests/` directory `_check_structure` explicitly
+    allows - would be invisible as a citer AND as a target. The target half is
+    the worse one: a citation into a file that IS present then reports the false
+    "this mod does not contain it", though only for a `bc_`-prefixed name, since
+    that is the only kind `_check_citations` claims to know about. descriptor.mod
+    falls out anyway because `.mod` is not in CITE_EXTS, which is fine: nine
+    lines, and nothing in the mod cites a line of it.
     """
     texts: dict[str, list[str]] = {}
-    owners: dict[str, str] = {}
     ambiguous: set[str] = set()
     citers: list[tuple[str, list[str]]] = []
     # WALK THE WHOLE MOD, NOT SCAN_DIRS. Three rounds running found a file the
-    # citation check could not see, each time in a new dimension - a shadowed
-    # basename, then an extension SCRIPT_EXTS omits, then any `.md` below a
-    # SCAN_DIR - and each time the file was invisible in BOTH directions, which
-    # means a citation INTO it also reports the false "this mod does not contain
-    # it". `tests/` was the next one queued up: `_check_structure` allows it at
-    # root and SCAN_DIRS does not list it. Rather than enumerate the exceptions
-    # a fourth time, the extension is now the only filter. `.git` is skipped
-    # because it is not part of the mod.
-    for path in sorted(mod_root.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in CITE_EXTS:
-            continue
-        if ".git" in path.relative_to(mod_root).parts:
-            continue
-        relpath = path.relative_to(mod_root).as_posix()
-        name = path.name
-        # splitlines(), not a newline split: the latter leaves a phantom empty
-        # last element on any file ending in a newline, which is every file, and
-        # a citation one past the last real line would then be reported as
-        # landing on a blank line rather than as running off the end.
-        lines = read_text(path).splitlines()
-        citers.append((relpath, lines))
-        if name in owners:
-            if owners[name] != relpath:
-                ambiguous.add(name)
-            continue
-        owners[name] = relpath
-        texts[name] = lines
+    # citation check could not see, each time in a different dimension: fc6792f
+    # a root-level file, ec8eced a basename shadowed by another file's, d904308
+    # any `.md` at all, because the walk fell back to SCRIPT_EXTS and CITE_EXTS
+    # minus SCRIPT_EXTS is exactly `{".md"}`. Each time the file was invisible in
+    # BOTH directions. `tests/` was the next one queued up: `_check_structure`
+    # allows it at root and SCAN_DIRS does not list it. Rather than enumerate the
+    # exceptions a fourth time, the extension is now the only filter.
+    #
+    # os.walk RATHER THAN rglob SO `.git` CAN BE PRUNED. rglob yields every git
+    # object and then discards it per-path; on this mod that was 1074 of 1117
+    # entries, and it grows with the object count, not with the mod. Pruning
+    # dirnames in place stops the descent instead.
+    for dirpath, dirnames, filenames in os.walk(mod_root):
+        # Sorted as well as pruned: the walk order decides which file of a
+        # colliding pair becomes the target, and which issues come out first.
+        dirnames[:] = sorted(name for name in dirnames if name != ".git")
+        for filename in sorted(filenames):
+            path = Path(dirpath) / filename
+            if path.suffix.lower() not in CITE_EXTS:
+                continue
+            relpath = path.relative_to(mod_root).as_posix()
+            # splitlines(), not a newline split: the latter leaves a phantom
+            # empty last element on any file ending in a newline, which is every
+            # file, and a citation one past the last real line would then be
+            # reported as landing on a blank line rather than as off the end.
+            lines = read_text(path).splitlines()
+            citers.append((relpath, lines))
+            # No path is walked twice, so a repeated basename is always a second
+            # FILE. An earlier version compared the stored path here because it
+            # concatenated two candidate lists that could overlap; that guard
+            # would now be dead, and dead code implies a case that can occur.
+            if filename in texts:
+                ambiguous.add(filename)
+                continue
+            texts[filename] = lines
     return texts, ambiguous, citers
 
 
@@ -468,7 +483,7 @@ def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
                     current = None
                     continue
                 if not resolvable or target not in texts:
-                    if resolvable and target.startswith(MOD_KEY_PREFIX):
+                    if resolvable and target.lower().startswith(MOD_KEY_PREFIX):
                         issues.append(
                             Issue(ERROR, relpath, line_no, f"cites `{target}`, which this mod does not contain")
                         )

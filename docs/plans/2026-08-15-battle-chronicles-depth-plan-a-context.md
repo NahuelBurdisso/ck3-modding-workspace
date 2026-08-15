@@ -76,7 +76,7 @@ run from `D:/ck3`. **Its baseline is `0 errors, 2 warnings`** — both warnings 
 Run from `D:/ck3`:
 
 ```bash
-python tools/ck3.py validate --strict battle_chronicles
+cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
 ```
 
 Expected: `0 errors, 2 warnings`. If it is not, stop and find out why before continuing — every later step in this plan compares against this number.
@@ -158,7 +158,7 @@ In `validate_mod`, immediately **before** the `if strict:` block, add:
 The mod has no `common/customizable_localization/` directory yet, so the new code must find nothing.
 
 ```bash
-python tools/ck3.py validate --strict battle_chronicles
+cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
 ```
 
 Expected: `0 errors, 2 warnings` — identical to step 1.
@@ -169,7 +169,7 @@ Create the directory and a deliberately broken definition:
 
 ```bash
 cd /d/ck3 && mkdir -p mods/battle_chronicles/common/customizable_localization
-printf '\xef\xbb\xbfbc_probe_check = {\n\ttype = character\n\ttext = {\n\t\tlocalization_key = bc_this_key_does_not_exist\n\t}\n}\n' > mods/battle_chronicles/common/customizable_localization/zz_probe.txt
+cd /d/ck3 && printf '\xef\xbb\xbfbc_probe_check = {\n\ttype = character\n\ttext = {\n\t\tlocalization_key = bc_this_key_does_not_exist\n\t}\n}\n' > mods/battle_chronicles/common/customizable_localization/zz_probe.txt
 python tools/ck3.py validate --strict battle_chronicles
 ```
 
@@ -253,7 +253,7 @@ The `bc_` filter is load-bearing and is **not** a shortcut. `validate_mod` itera
 - [ ] **Step 3: Confirm the baseline is unchanged**
 
 ```bash
-python tools/ck3.py validate --strict battle_chronicles
+cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
 ```
 
 Expected: `0 errors, 2 warnings`. The mod's loc contains no `Custom(` calls yet.
@@ -280,7 +280,7 @@ ERROR localization/english/bc_l_english.yml:276: `Custom('bc_no_such_fragment')`
 Delete the appended line with the `Edit` tool — do not truncate the file with a shell redirect, and do not use `sed -i`, which strips the BOM on some Windows Python/git-bash combinations and would silently make CK3 ignore the whole file.
 
 ```bash
-python tools/ck3.py validate --strict battle_chronicles
+cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
 ```
 
 Expected: `0 errors, 2 warnings`. If you see `missing UTF-8 BOM; CK3 will ignore the entire file`, restore the file with `git checkout -- localization/english/bc_l_english.yml` from the mod repo and redo the removal with `Edit`.
@@ -396,8 +396,8 @@ bc_ground_is_winter_trigger = {
 - [ ] **Step 2: Add the BOM**
 
 ```bash
-python -c "import pathlib; p=pathlib.Path('mods/battle_chronicles/common/scripted_triggers/bc_ground_triggers.txt'); b=p.read_bytes(); p.write_bytes(b'\xef\xbb\xbf'+b) if not b.startswith(b'\xef\xbb\xbf') else None"
-python -c "import pathlib; print(pathlib.Path('mods/battle_chronicles/common/scripted_triggers/bc_ground_triggers.txt').read_bytes()[:3])"
+cd /d/ck3 && python -c "import pathlib; p=pathlib.Path('mods/battle_chronicles/common/scripted_triggers/bc_ground_triggers.txt'); b=p.read_bytes(); p.write_bytes(b'\xef\xbb\xbf'+b) if not b.startswith(b'\xef\xbb\xbf') else None"
+cd /d/ck3 && python -c "import pathlib; print(pathlib.Path('mods/battle_chronicles/common/scripted_triggers/bc_ground_triggers.txt').read_bytes()[:3])"
 ```
 
 Expected second line: `b'\xef\xbb\xbf'`.
@@ -627,7 +627,7 @@ Then in `validate_mod`, after `_check_structure(mod_root, issues)`, add:
 - [ ] **Step 3: Confirm the baseline is unchanged**
 
 ```bash
-python tools/ck3.py validate --strict battle_chronicles
+cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
 ```
 
 Expected: `0 errors, 2 warnings`. Task 3's file is complete and AGOT's 23 bases match it exactly.
@@ -676,17 +676,18 @@ These are the arms that catch AGOT changing under the mod, and no edit to the mo
 cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
 ```
 
-Expected: **exactly 3 errors** —
+Expected: **exactly 4 errors** —
 
 ```
+terrain `marshland` is in no ground band
 `agot_is_glacier_terrain` is not a base terrain helper
-band uses `agot_is_marshland_terrain`, which AGOT no longer defines
 AGOT ships `agot_is_glacier_terrain`, which is in no ground band
+band uses `agot_is_marshland_terrain`, which AGOT no longer defines
 ```
 
-The first is the mod-side arm firing on the same break from the other direction — `bc_ground_triggers.txt` still names `glacier` and the literal no longer does.
+**Two of those four are mod-side**, and that is the point of doing the break this way — one edit reaches all four arms. `BC_GROUND_BASES` feeds both halves of the function, so adding `marshland` to it makes the mod-side "in no ground band" loop fire too (the trigger file does not name `marshland`), and deleting `glacier` from it makes the mod-side "not a base" loop fire (the trigger file still names `glacier`). Do not read the two mod-side lines as noise; if either is missing, the corresponding loop is broken.
 
-**If instead you see `SKIPPED the AGOT-side check`,** the playset does not resolve on this machine and only the first line appears. That is the loud skip working; record it and move on.
+**If instead you see `SKIPPED the AGOT-side check`,** the playset does not resolve on this machine. You then get **2 errors and 3 warnings** — the two mod-side lines and the skip warning, with the two AGOT-side lines absent. That is the loud skip working; record it and move on.
 
 Revert **with `Edit`**, restoring `"glacier"` and deleting `"marshland"`. Do not `git checkout -- tools/ck3lib/validate.py` — steps 1 and 2 of this task are not committed yet and that would discard them.
 
@@ -815,8 +816,8 @@ bc_write_ground_effect = {
 - [ ] **Step 2: Add the BOM**
 
 ```bash
-python -c "import pathlib; p=pathlib.Path('mods/battle_chronicles/common/scripted_effects/bc_context_effects.txt'); b=p.read_bytes(); p.write_bytes(b'\xef\xbb\xbf'+b) if not b.startswith(b'\xef\xbb\xbf') else None"
-python -c "import pathlib; print(pathlib.Path('mods/battle_chronicles/common/scripted_effects/bc_context_effects.txt').read_bytes()[:3])"
+cd /d/ck3 && python -c "import pathlib; p=pathlib.Path('mods/battle_chronicles/common/scripted_effects/bc_context_effects.txt'); b=p.read_bytes(); p.write_bytes(b'\xef\xbb\xbf'+b) if not b.startswith(b'\xef\xbb\xbf') else None"
+cd /d/ck3 && python -c "import pathlib; print(pathlib.Path('mods/battle_chronicles/common/scripted_effects/bc_context_effects.txt').read_bytes()[:3])"
 ```
 
 Expected: `b'\xef\xbb\xbf'`.
@@ -841,7 +842,11 @@ bc_battle_open_effect = {
 	# that survives those hops. It carries no meaning of its own - it is an
 	# address, not a fact - so it is exempt from the "no saved scope carries
 	# meaning" rule in the spec, and a stale one is harmless because it is
-	# rewritten at the top of every phase event before anything reads it.
+	# rewritten in every phase event, before anything reads it. NOT literally at
+	# the top of every effect block: the seven commander events call this effect
+	# at the top, but the three knight events call it nested inside their
+	# `scope:combat_side.side_commander ?=` block (bc_knight_phase_events.txt:101,
+	# :169, :232). Upstream of every read is what matters, not the line number.
 	save_scope_as = bc_chronicle_subject
 
 	scope:combat_side.enemy_side.side_commander ?= {
@@ -1053,7 +1058,7 @@ Expected: a trigger entry with scope `character` taking a character target. **Do
 
 `is_close_family_of` and not the wider `is_close_or_extended_family_of`, which the dump also lists: the wider one reaches cousins, uncles, aunts, nephews and nieces, and `kin` sits directly **above** `countryman` in an ordered ladder. Widening `kin` starves the band below it, and a second cousin across the field is a countryman, not a brother. This is the spec's choice; do not quietly upgrade it.
 
-The other two comparisons in the ladder use the bare-field form — `culture = scope:X.culture`, `faith = scope:X.faith` — rather than a named trigger. That form is what vanilla itself uses; see `common/scripted_triggers/00_councillor_triggers.txt:404-405`, which compares `culture` and `faith` against a scoped character's field in exactly this shape. Confirm it before writing if you want, with `python tools/ck3.py find 00_councillor_triggers`, but do not swap it for `has_same_culture_as` / `has_same_faith_as` on instinct: those are separate triggers with their own semantics, and a wrong guess here is a silent no-match, not an error.
+The other two comparisons in the ladder use the bare-field form — `culture = scope:X.culture`, `faith = scope:X.faith` — rather than a named trigger. That form is what vanilla itself uses; see **vanilla's** `common/scripted_triggers/00_councillor_triggers.txt:402-407` (`same_faith_or_culture_as_councillor_trigger`), which compares `culture` and `faith` against a scoped character's field in exactly this shape. **The vanilla file, not AGOT's** — AGOT overrides the whole file and wins load order, and its own `:402-407` is a different trigger body. Confirm with `python tools/ck3.py find same_faith_or_culture_as_councillor_trigger`, which resolves script keys rather than filenames. Do not swap the form for `has_same_culture_as` / `has_same_faith_as` on instinct: those are separate triggers with their own semantics, and a wrong guess here is a silent no-match, not an error.
 
 - [ ] **Step 3: Call the bond writer**
 
@@ -1123,10 +1128,11 @@ A non-empty `leaked` list means a scratch variable outlives its battle and the n
 `bc_facing_nemesis_trigger` gains its first caller outside a weight block, and its header (`bc_scripted_triggers.txt:227-243`) makes two statements that are now only true of the *other* call sites. Neither is wrong about the trigger's body; both are wrong as blanket statements. Append a fourth paragraph rather than rewriting the first two — the original reasoning still explains why the body looks the way it does:
 
 ```
-# SINCE bc_write_bond_effect, ONE CALLER IS NOT A WEIGHT BLOCK. It calls this
-# from a `limit` inside bc_battle_open_effect - still a trigger context, so the
-# safety argument above holds unchanged, but two things above are now local to
-# the weight call sites and not to this trigger:
+# SINCE bc_write_bond_effect, ONE CALLER IS NOT A WEIGHT BLOCK. That effect - in
+# bc_context_effects.txt, called from bc_battle_open_effect - asks this in the
+# `limit` of its first `if`. Still a trigger context, so the safety argument
+# above holds unchanged, but two things above are now local to the weight call
+# sites and not to this trigger:
 #   - "TRIGGER contexts only - weight multipliers and is_valid blocks" now also
 #     means the limit of an if in an effect.
 #   - "IT MISSES THE FIRST ROLL OF EVERY BATTLE" is true of weights and FALSE
@@ -1269,8 +1275,8 @@ bc_banner_falls_ground = {
 - [ ] **Step 2: Add the BOM**
 
 ```bash
-python -c "import pathlib; p=pathlib.Path('mods/battle_chronicles/common/customizable_localization/bc_flavour.txt'); b=p.read_bytes(); p.write_bytes(b'\xef\xbb\xbf'+b) if not b.startswith(b'\xef\xbb\xbf') else None"
-python -c "import pathlib; print(pathlib.Path('mods/battle_chronicles/common/customizable_localization/bc_flavour.txt').read_bytes()[:3])"
+cd /d/ck3 && python -c "import pathlib; p=pathlib.Path('mods/battle_chronicles/common/customizable_localization/bc_flavour.txt'); b=p.read_bytes(); p.write_bytes(b'\xef\xbb\xbf'+b) if not b.startswith(b'\xef\xbb\xbf') else None"
+cd /d/ck3 && python -c "import pathlib; print(pathlib.Path('mods/battle_chronicles/common/customizable_localization/bc_flavour.txt').read_bytes()[:3])"
 ```
 
 Expected: `b'\xef\xbb\xbf'`.
@@ -1346,7 +1352,7 @@ Expected: `0 errors, 2 warnings`.
 **If the restore fails, the fragments are gone and step 1 has to be redone.** Check the move landed before running anything else:
 
 ```bash
-ls -l mods/battle_chronicles/common/customizable_localization/bc_flavour.txt
+cd /d/ck3 && ls -l mods/battle_chronicles/common/customizable_localization/bc_flavour.txt
 ```
 
 - [ ] **Step 7: Record what the run must show**
@@ -1489,7 +1495,29 @@ bc_ground_held = {
 }
 ```
 
-- [ ] **Step 3: Register it in `bc_cleanup_effect` — this is the one rule**
+- [ ] **Step 3: Correct the header claim this modifier breaks**
+
+`bc_battle_modifiers.txt:8-10` reads:
+
+```
+# NO CALL SITE NAMES ONE. They are selected by bc_apply_verb_effect from the
+# (KIND, SWING) an event already passes to the seam. If you find yourself adding
+# `bc_bloodied` to an event, the KIND table is wrong, not the event.
+```
+
+It is already false — the eve's options a and b name `bc_bloodied` and `bc_shieldwall` today, which is what `bc_eve_events.txt:31-37` documents — and tasks 9 and 10 make it falser. Replace those three lines with:
+
+```
+# ONE EVENT NAMES THESE DIRECTLY AND IT IS THE ONLY ONE. Everywhere else they
+# are selected by bc_apply_verb_effect from the (KIND, SWING) an event already
+# passes to the seam. The exception is bc_chronicles.0011, the eve, whose four
+# option effects name a modifier because nothing has happened yet - there is no
+# moment to route through. See bc_eve_events.txt:31-37, which carries the
+# reasoning. If you find yourself naming one from any OTHER event, the KIND
+# table is wrong, not the event.
+```
+
+- [ ] **Step 4: Register it in `bc_cleanup_effect` — this is the one rule**
 
 `bc_battle_modifiers.txt:28` states it in the imperative: *"EVERY ONE OF THESE MUST APPEAR IN bc_cleanup_effect."* In `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt`, the family-2 block currently ends:
 
@@ -1510,7 +1538,7 @@ Change it to:
 
 **Not** `bc_clear_faltering_effect`, which runs mid-battle from `bc_rally_effect` — the comment five lines above the family-2 block (`bc_scripted_effects.txt`, immediately before `remove_character_modifier = bc_bloodied`) says why, and it applies to this modifier exactly as it does to the other four.
 
-- [ ] **Step 4: Add the loc**
+- [ ] **Step 5: Add the loc**
 
 In `bc_l_english.yml`, after `bc_pursuit_desc`:
 
@@ -1519,7 +1547,7 @@ In `bc_l_english.yml`, after `bc_pursuit_desc`:
  bc_ground_held_desc:0 "They chose the ground and they have not stepped off it. Moving them is a day's work; moving them forward is not happening."
 ```
 
-- [ ] **Step 5: Verify the modifier resolves and is localized**
+- [ ] **Step 6: Verify the modifier resolves and is localized**
 
 `validate` cannot see either of these — `LOC_EXPECTED` (`validate.py:37`) covers only traits, decisions and character interactions, and nothing checks a modifier tag at all. So check both by hand:
 
@@ -1531,7 +1559,7 @@ Separated with `;`, not `&&`, deliberately: `find` exits non-zero when it finds 
 
 Expected: exactly one definition, in `common/modifiers/bc_battle_modifiers.txt` in this mod, and exactly one loc entry, in this mod. Two of either means a collision with another mod and one of them silently wins. **Zero of either is the failure this step exists to catch** — do not read an empty result as "nothing to report".
 
-- [ ] **Step 6: Verify the cleanup list covers every family-2 modifier**
+- [ ] **Step 7: Verify the cleanup list covers every family-2 modifier**
 
 The one rule, checked mechanically rather than by eye:
 
@@ -1557,7 +1585,7 @@ unremoved []
 
 A non-empty `unremoved` list means a modifier survives combat end for its full 20 days and bleeds into the next battle of the war.
 
-- [ ] **Step 7: Validate**
+- [ ] **Step 8: Validate**
 
 ```bash
 cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
@@ -1565,7 +1593,7 @@ cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
 
 Expected: `0 errors, 2 warnings`.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add common/modifiers/bc_battle_modifiers.txt common/scripted_effects/bc_scripted_effects.txt localization/english/bc_l_english.yml && git commit -m "$(cat <<'EOF'
@@ -1587,7 +1615,7 @@ EOF
 
 **Two deliberate departures from the spec, recorded here so a later reader does not "fix" them back:**
 
-1. **The eve's foe chain drops `countryman`.** The bond ladder in task 6 has five values; the eve names four (nemesis, kin, heathen, stranger). Sharing a culture with the man across the field is not worth a paragraph on the eve of a battle, and dropping the arm lets the faith arm reach foes who *do* share a culture — which is the more interesting case. The scratch variable still records `countryman`; only this event declines to say it.
+1. **The eve's foe chain reorders the bond ladder.** It carries all five values, but runs nemesis → kin → **heathen → countryman** → stranger, where `bc_write_bond_effect` runs nemesis → kin → **countryman → heathen** → stranger. Lifting heathen above countryman lets the faith line reach foes who *do* share a culture, which is the more interesting sentence and which the ladder's order makes unreachable. The two orders disagree on purpose: the ladder writes a fact that other systems read, the chain picks a line nobody reads back. Note that this makes the chain's `heathen` a *wider* class than the scratch variable's — do not use one to predict the other.
 2. **The ground paragraph names four bands, not six.** `jungle` and `open` collapse into the catch-all. `jungle` is vanishingly rare on the AGOT map outside Sothoryos and the Summer Isles, and the catch-all has to cover an unresolved province anyway, so a band that reads as "the field is what it is" is the honest text for both. The prose fragments (task 7, Plan B) keep all six; this is an eve-only simplification.
 
 **Files:**
@@ -1597,9 +1625,12 @@ EOF
 
 - [ ] **Step 1: Widen the foe paragraph and add the ground paragraph**
 
-The event's `desc` currently reads:
+The event's `desc`, **and the three comment lines directly above it at `bc_eve_events.txt:50-52`**, currently read:
 
 ```
+	# first_valid, not a bare desc. The nemesis branch is the read-back plan 4
+	# promises and the eve is the cheapest place in the mod to deliver it - one
+	# desc branch, no new event, no new state.
 	desc = {
 		desc = bc_chronicles.0011.desc_intro
 		first_valid = {
@@ -1612,7 +1643,7 @@ The event's `desc` currently reads:
 	}
 ```
 
-Replace it with three assembled paragraphs:
+Replace **all of it, comment included**, with three assembled paragraphs. The old comment is not preserved: it claims "one desc branch, no new event, no new state", and after this step there are two `first_valid` chains, seven branches, and one new scope (`bc_eve_ground`, task 8). The new comment below says what is true instead.
 
 ```
 	# THREE PARAGRAPHS, ASSEMBLED: what is happening, who is across the field,
@@ -1625,11 +1656,18 @@ Replace it with three assembled paragraphs:
 	# pop-up renders when the player gets round to it, which can be after the
 	# combat ended and bc_clear_scratch_effect ran.
 	#
-	# THE FOE CHAIN IS ORDERED AND THE ORDER IS THE SAME ONE §2 USES - nemesis,
-	# kin, heathen, stranger. It is deliberately SHORTER than the bond ladder:
-	# `countryman` is dropped because "a man of your own people" is not worth a
-	# paragraph on the eve of a battle, and dropping it lets the faith arm reach
-	# the foes who share a culture, which is where it is most interesting.
+	# THE FOE CHAIN CARRIES THE SAME FIVE VALUES AS THE BOND LADDER BUT IN A
+	# DIFFERENT ORDER - nemesis, kin, heathen, countryman, stranger, where the
+	# ladder in bc_write_bond_effect runs nemesis, kin, countryman, heathen,
+	# stranger. Heathen is lifted above countryman ON PURPOSE: a man of your own
+	# people who prays to something else is the more interesting sentence, and
+	# under the ladder's order he never gets one. The two orders disagree and
+	# that is the intent - the ladder writes a fact, this chain picks a line.
+	#
+	# THE stranger ARM IS A TRUE FALLBACK AND HAS TO STAY REACHABLE ONLY BY
+	# STRANGERS. Its text says "a banner nobody here can name", which is a lie
+	# about a countryman. That is why the countryman arm is here and not dropped:
+	# without it the largest match-up class on the map falls through to it.
 	desc = {
 		desc = bc_chronicles.0011.desc_intro
 		first_valid = {
@@ -1656,6 +1694,16 @@ Replace it with three assembled paragraphs:
 					}
 				}
 				desc = bc_chronicles.0011.desc_heathen
+			}
+			triggered_desc = {
+				trigger = {
+					exists = scope:bc_eve_foe
+					trigger_if = {
+						limit = { exists = scope:bc_eve_foe }
+						scope:bc_eve_foe = { culture = root.culture }
+					}
+				}
+				desc = bc_chronicles.0011.desc_countryman
 			}
 			desc = bc_chronicles.0011.desc_stranger
 		}
@@ -1764,9 +1812,9 @@ The event currently has three options. Add two more, **after** the existing thre
 
 `bc_bloodied` and not a new modifier: going at a man you hate is the same trade the existing option a already makes, and family 2 gains one modifier in this plan, not two.
 
-- [ ] **Step 3: Correct the two comments this change falsifies**
+- [ ] **Step 3: Correct the file header's option count**
 
-Both are load-bearing claims that are now wrong. Comments in this mod are the record; a false one costs a future session a run.
+The other comment this change falsifies — the one above the `desc` — was already replaced in step 1. This is the remaining one, and it is a load-bearing claim. Comments in this mod are the record; a false one costs a future session a run.
 
 `bc_eve_events.txt:31-37` opens *"TWO OPTIONS APPLY A FAMILY-2 MODIFIER BY NAME, and these are the only call sites in the mod that do."* After step 2 it is four — `.0011.a`, `.b`, `.d`, `.e`. Change the first sentence to:
 
@@ -1777,16 +1825,6 @@ Both are load-bearing claims that are now wrong. Comments in this mod are the re
 
 leaving the rest of the paragraph as it stands — the reasoning is unchanged, only the count moved.
 
-`bc_eve_events.txt:50-52` reads *"first_valid, not a bare desc. The nemesis branch is the read-back plan 4 promises and the eve is the cheapest place in the mod to deliver it - one desc branch, no new event, no new state."* After step 1 there are two `first_valid` chains and seven branches, and the second chain does introduce new state (`scope:bc_eve_ground`, task 8). Replace it with:
-
-```
-	# THREE PARAGRAPHS AND TWO first_valid CHAINS: intro, then who, then where.
-	# The nemesis branch is the read-back plan 4 promises. The ground chain reads
-	# scope:bc_eve_ground, saved in bc_eve_offer_effect - a scope and not scratch
-	# because this pop-up renders whenever the player gets round to it, which can
-	# be after bc_clear_scratch_effect has run.
-```
-
 - [ ] **Step 4: Add the loc**
 
 Append to `bc_l_english.yml`, in the eve section:
@@ -1794,6 +1832,7 @@ Append to `bc_l_english.yml`, in the eve section:
 ```
  bc_chronicles.0011.desc_kin:0 "The banners across the field are ones he grew up under. Somebody over there taught him to ride."
  bc_chronicles.0011.desc_heathen:0 "They will pray before this, as he will, and not to the same thing."
+ bc_chronicles.0011.desc_countryman:0 "The men across the field speak as his do. Whatever is decided here, both sides will tell it in the same tongue."
  bc_chronicles.0011.desc_ground_rough:0 "The ground is broken between here and them. Whoever crosses it will arrive out of order."
  bc_chronicles.0011.desc_ground_forest:0 "The trees begin a hundred paces off and do not end. A line that goes in there stops being a line."
  bc_chronicles.0011.desc_ground_winter:0 "The cold has been in the men since before dawn. It will be in them all day."
@@ -1816,10 +1855,12 @@ Expected: `0 errors, 2 warnings`.
 `validate` proves the loc file parses; it does not prove an event's `desc` or `name` points at a key that exists, and a missing one renders as the raw key on screen.
 
 ```bash
-cd /d/ck3 && python tools/ck3.py index -q && for k in desc_kin desc_heathen desc_ground_rough desc_ground_forest desc_ground_winter desc_ground_desert desc_ground_open d e; do python tools/ck3.py loc "bc_chronicles.0011.$k"; done
+cd /d/ck3 && python tools/ck3.py index -q ; for k in desc_kin desc_heathen desc_countryman desc_ground_rough desc_ground_forest desc_ground_winter desc_ground_desert desc_ground_open d e; do python tools/ck3.py loc "bc_chronicles.0011.$k"; done
 ```
 
-Expected: nine results, each with **exactly one** definition, in this mod. A zero means a typo between the event and the loc file; a two means another mod owns the key and one of the two silently wins.
+`;` and not `&&`, for the reason task 9 gives: `loc` exits non-zero on a miss, and a miss is exactly what this loop is looking for.
+
+Expected: ten results, each with **exactly one** definition, in this mod. A zero means a typo between the event and the loc file; a two means another mod owns the key and one of the two silently wins.
 
 - [ ] **Step 7: Record what the run must show**
 
@@ -1842,11 +1883,9 @@ Append to `mods/battle_chronicles/README.md`, under its "Not yet verified in gam
   run must show it appear when option d is taken and be **gone** by the next
   battle of the same war. If it is still there, `bc_cleanup_effect` did not run
   or did not reach the new line.
-- **The foe-relative award.** `probe 'BC: award'` reports which of the two
-  currencies paid. A run with `BC: award no creed` dominating means most notable
-  wins carry no BC moment, not that the award is broken — read it against
-  `BC: bond` counts for the same session.
 ```
+
+The award gets its own entry in task 11, not here — it does not exist in the tree yet and the README must not describe code that is not committed.
 
 - [ ] **Step 8: Commit**
 
@@ -1870,7 +1909,7 @@ A battle currently leaves momentum, a memory, a counter tick, and sometimes a gr
 
 **Files:**
 - Modify: `mods/battle_chronicles/events/bc_aftermath_events.txt:189-216`
-- Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
+- Modify: `mods/battle_chronicles/README.md`
 
 - [ ] **Step 1: Add the award**
 
@@ -1988,10 +2027,25 @@ print(w.rindex('bc_clear_scratch_effect'), 'clear')
 
 Expected: the award index is the smaller number. If it is not, the block landed below `bc_clear_scratch_effect` and reads a variable that has already been removed — which would fire the `BC: award no creed` arm on every single notable win and look like a data problem rather than an ordering one.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Record what the run must show**
+
+Append to `mods/battle_chronicles/README.md`, under its "Not yet verified in game" list:
+
+```markdown
+- **The foe-relative award.** `probe 'BC: award'` reports which of the two
+  currencies paid. The three markers `piety` / `prestige` / `no creed` partition
+  the notable wins that reached the award; `nemesis` is a subset of the first
+  two. A run where `BC: award no creed` dominates means most notable wins carry
+  no BC moment — not that the award is broken. Separate the two causes by
+  crossing it against `BC: bond nofoe`, which counts only the leaderless-enemy
+  case. `BC: award piety` at zero while `BC: creed heathen` counts is the real
+  failure: the read is landing on the wrong character.
+```
+
+- [ ] **Step 5: Commit**
 
 ```bash
-cd /d/ck3/mods/battle_chronicles && git add events/bc_aftermath_events.txt && git commit -m "$(cat <<'EOF'
+cd /d/ck3/mods/battle_chronicles && git add events/bc_aftermath_events.txt README.md && git commit -m "$(cat <<'EOF'
 feat: a notable win pays out against who was beaten
 
 Piety for a foe of another faith, prestige otherwise, doubled against a
@@ -2028,6 +2082,13 @@ The four denominators are: how many moments fired, how many eves were offered, h
 **The award denominator is not `BC: win notable`.** That marker is logged at `events/bc_aftermath_events.txt:84`, outside both the `side_commander ?=` and the `is_alive = yes` gates; the award sits inside both. A notable win whose side commander does not resolve, or whose commander died winning, logs `BC: win notable` and none of the award markers. The gap between them is real and is not a bug. (Note the word order of that marker, too — there is no `BC: notable win`.)
 
 ---
+
+## Where this plan departs from the spec
+
+Task 10 records its own two departures in its preamble. Two more are global:
+
+- **`bc_ground_held` is a plan invention.** The spec designs the eve's contextual options but names no modifier for the ground option to apply. Family 2 gains exactly one member here, and it reuses two tags already proven in this file rather than introducing a third. If the spec is ever reconciled, this is an addition to it, not a contradiction of it.
+- **Task 4 runs after task 3, where spec §8 puts the partition check first.** The check reads `bc_ground_triggers.txt`, and its four deliberate-break steps revert with `git checkout --`, which needs that file committed. Task 3 commits it. Building the check first would mean either an early-return that never exercises, or reverts by hand. The reordering is forced and is not a judgement about which matters more.
 
 ## What Plan A does not do
 

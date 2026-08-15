@@ -392,10 +392,14 @@ Append to `bc_flavour.txt`:
 # bucket derivation (:97-105); the pointer to step 4's mechanical check; the
 # correction that a silent no-match IS distinguishable in the log even though it
 # is not on the toast, via the `BC: size` markers at :115, :120 and :124; the
-# monotonicity rule for the three strings; the axis itself and the record of why
-# the first axis was abandoned; the fallback's reachability by call site, which
-# is the same argument bc_bond_clause carries; and the fact that nothing calls
-# the clause yet.]
+# note that these arms compare for equality where the rest of the mod uses `>=`;
+# the monotonicity rule for the three strings; the axis itself, the record of
+# why the first two axes were abandoned and by what, and the four-row test a
+# replacement axis has to pass; the fact that the clause's subject is both hosts
+# and why phrasing it as the commander's own men contradicts two moments'
+# `is_valid`; the fallback's reachability by call site, which is the same
+# argument bc_bond_clause carries; and the fact that nothing calls the clause
+# yet.]
 bc_scale_clause = {
 	type = character
 
@@ -451,10 +455,17 @@ contradicts a shipped mechanic by an order of magnitude. It also fails the
 shared-clause test — four of the ten moments are states or one-offs and cannot
 recur at all.
 
-The shipped strings grade on how many men are standing in the battle without
-being used, and say nothing about the moment itself. Copy the shipped section
+A third draft kept that axis but phrased it as the commander's own companies
+standing idle, which contradicts `bc_flank_collapses` outright: that moment's
+`is_valid` requires `bc_side_is_outnumbered_trigger`
+(`bc_commander_phase_events.txt:221`), and it is the highest-firing commander
+moment in the mod.
+
+The shipped strings grade on how much of the battle — both hosts, because
+`bc_battle_size` counts `num_total_troops` on the combat — is standing about not
+yet fighting, and say nothing about the moment itself. Copy the shipped section
 comment and strings from `bc_l_english.yml`, not this block; the shipped
-`bc_scale_clause` header carries the three-row test a replacement axis has to
+`bc_scale_clause` header carries the four-row test a replacement axis has to
 pass.
 
 ```

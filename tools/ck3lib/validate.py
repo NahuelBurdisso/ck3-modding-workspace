@@ -73,28 +73,35 @@ CUSTOM_CALL_RE = re.compile(r"\.Custom2?\(\s*'([^']+)'")
 # comment edit shifts, and a shifted citation still points at a real line, so it
 # reads as fine.
 #
-# WHAT THIS CHECKS IS POSITION, NOT MEANING. It can tell that a citation lands on
-# a blank line or past the end of the file; it cannot tell that `:270` now names
-# an `exists` guard where it used to name the `>=` comparison the sentence is
-# about. That failure survives this check, and the mitigation for it is not
-# mechanical: cite a named paragraph or a definition rather than a line, so the
-# reference moves with the thing it names.
+# WHAT THIS CHECKS IS POSITION, NOT MEANING. The full list of what it will
+# report: a citation landing on a blank line, on a bare `#`, on the `}` that
+# closes a block (allowed as the END of a range, never as its start), past the
+# end of the file, below line 1, a range that runs backwards, and a `bc_`-named
+# target this mod does not contain. What it CANNOT report is the case that has
+# cost the most: `:270` now names an `exists` guard where it used to name the
+# `>=` comparison the sentence is about. Every number in that list is a real
+# line. The mitigation for that is not mechanical - cite a named paragraph or a
+# definition rather than a line, so the reference moves with the thing it names.
 #
 # TWO PATTERNS, AND THE BROAD ONE IS NOT AN ACCIDENT. The narrow pattern decides
 # what to RESOLVE; the broad one decides what CLEARS the running target. They
 # have to differ, because `effects.log:9770 (grudge), :9810 (nemesis)` is a real
-# line in this mod: the log file cannot be resolved, but if it did not clear the
-# target then `:9810` would resolve against whatever mod file was named further
-# up the paragraph. Matching only resolvable extensions in one pattern is what
-# made that bug possible in the first version of this check.
+# line in this mod (bc_rivalry_effects.txt, the `grudge` note): the log file
+# cannot be resolved, but if it did not clear the target then `:9810` would
+# resolve against whatever mod file was named earlier in the paragraph. Matching
+# only resolvable extensions in one pattern is what made that bug possible in
+# the first version of this check. Clearing is POSITIONAL, and the note in
+# `_check_citations` on the single ordered pass says why that matters.
 #
 # CITE_EXTS AND THE NARROW PATTERN ARE ONE DECLARATION ON PURPOSE. The set names
 # which files this check will open; the pattern names which citations it will try
 # to open one for. Written twice they drift, and the drift is invisible: a
 # citation whose extension is in the set but not the pattern silently stops being
 # checked, which is exactly the failure mode this whole check exists to end.
-# `.md` is in the set because README.md carries citations into the script files
-# and had two that had rotted.
+# `.md` is in the set so README.md gets the position check at all - it is the
+# largest body of prose here and it cites the scripts constantly. Note what that
+# does NOT buy: the two README citations round 9 caught had drifted onto real
+# lines, which is the case above that no check can see.
 CITE_EXTS = {".txt", ".yml", ".gui", ".info", ".md"}
 CITE_TAIL = r":(\d+)(?:-(\d+))?"
 _CITE_EXT_ALT = "|".join(sorted(ext.lstrip(".") for ext in CITE_EXTS))
@@ -288,8 +295,17 @@ def _check_ground_partition(cfg: Config, mod_root: Path, issues: list[Issue]) ->
         )
 
 
-def _citation_files(mod_root: Path) -> tuple[dict[str, list[str]], dict[str, str], set[str]]:
-    """Basename -> lines, basename -> relpath, and the basenames that collide.
+def _citation_files(
+    mod_root: Path,
+) -> tuple[dict[str, list[str]], set[str], list[tuple[str, list[str]]]]:
+    """Basename -> lines for TARGETS, the colliding basenames, and every CITER.
+
+    THE TARGET SIDE AND THE CITER SIDE ARE DIFFERENT COLLECTIONS ON PURPOSE. A
+    citation names a basename, so the target side has to be keyed by one and can
+    hold only one file per key. The citer side is a list of paths, so it holds
+    every file. Keying both by basename - which the first version did - meant the
+    second file to claim a shared basename was never scanned for its own outgoing
+    citations, silently, with nothing reported.
 
     ROOT-LEVEL FILES ARE INCLUDED BY HAND. `iter_files` walks SCAN_DIRS, which
     starts at `common/`, so it never yields anything sitting beside descriptor.mod.
@@ -302,6 +318,7 @@ def _citation_files(mod_root: Path) -> tuple[dict[str, list[str]], dict[str, str
     texts: dict[str, list[str]] = {}
     owners: dict[str, str] = {}
     ambiguous: set[str] = set()
+    citers: list[tuple[str, list[str]]] = []
     candidates = [(path.name, relpath, path) for relpath, path in iter_files(mod_root)]
     candidates += [
         (path.name, path.name, path)
@@ -311,17 +328,19 @@ def _citation_files(mod_root: Path) -> tuple[dict[str, list[str]], dict[str, str
     for name, relpath, path in candidates:
         if path.suffix.lower() not in CITE_EXTS:
             continue
+        # splitlines(), not a newline split: the latter leaves a phantom empty
+        # last element on any file ending in a newline, which is every file, and
+        # a citation one past the last real line would then be reported as
+        # landing on a blank line rather than as running off the end.
+        lines = read_text(path).splitlines()
+        citers.append((relpath, lines))
         if name in owners:
             if owners[name] != relpath:
                 ambiguous.add(name)
             continue
         owners[name] = relpath
-        # splitlines(), not a newline split: the latter leaves a phantom empty
-        # last element on any file ending in a newline, which is every file, and
-        # a citation one past the last real line would then be reported as
-        # landing on a blank line rather than as running off the end.
-        texts[name] = read_text(path).splitlines()
-    return texts, owners, ambiguous
+        texts[name] = lines
+    return texts, ambiguous, citers
 
 
 def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
@@ -338,14 +357,16 @@ def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
     exists to produce; treating it as "some file I cannot see" would hide it.
 
     A basename two files in the mod share cannot be resolved either way without
-    guessing, so it is reported once and its citations are left unchecked.
+    guessing, so a citation naming one is reported once and left unchecked. Both
+    files are still scanned for their OWN citations - see the note on the two
+    collections in `_citation_files`.
 
     NOT CHECKED, and none of these are oversights this can close: meaning, per
     the module note on RESOLVABLE_CITE_RE; any target outside CITE_EXTS, which
     is why a `.log` or `.py` citation is skipped; and the D:/ck3 docs repo, which
     `validate` never sees because it takes one mod folder as its argument.
     """
-    texts, owners, ambiguous = _citation_files(mod_root)
+    texts, ambiguous, citers = _citation_files(mod_root)
     reported_ambiguous: set[str] = set()
 
     def resolve(citing: str, line_no: int, target: str, start: int, end: int | None) -> None:
@@ -355,8 +376,15 @@ def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
                 Issue(ERROR, citing, line_no, f"cites {target}:{start}-{end}, which runs backwards")
             )
             return
-        for number, is_range_end in [(start, False)] + ([(end, True)] if end else []):
-            if number < 1 or number > len(lines):
+        # `if end is not None`, not `if end`: a range ending in `-0` is reversed
+        # rather than absent, and the truthiness spelling dropped it silently.
+        for number, is_range_end in [(start, False)] + ([(end, True)] if end is not None else []):
+            if number < 1:
+                issues.append(
+                    Issue(ERROR, citing, line_no, f"cites {target}:{number}, and there is no line {number}")
+                )
+                continue
+            if number > len(lines):
                 issues.append(
                     Issue(ERROR, citing, line_no, f"cites {target}:{number}, past the end of that file ({len(lines)} lines)")
                 )
@@ -369,7 +397,7 @@ def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
                     Issue(ERROR, citing, line_no, f"cites {target}:{number}, which is `{lines[number - 1].strip()}`")
                 )
 
-    for name, relpath in sorted(owners.items()):
+    for relpath, lines in citers:
         current: str | None = None
         # IN MARKDOWN EVERY LINE IS PROSE. Restricting to `#` lines the way the
         # script files need would reduce README.md to heading text, i.e. to
@@ -377,7 +405,7 @@ def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
         # blank line ends a paragraph there, which is the same rule by a
         # different marker.
         prose_everywhere = relpath.lower().endswith(".md")
-        for line_no, line in enumerate(texts[name], 1):
+        for line_no, line in enumerate(lines, 1):
             stripped = line.strip()
             # A bare `#` ends a paragraph in this house style, and a running
             # target must not survive one: a `:456` three paragraphs below the
@@ -389,9 +417,28 @@ def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
             elif not stripped.startswith("#") or stripped == "#":
                 current = None
                 continue
-            spans: list[tuple[int, int]] = []
-            for match in ANY_CITE_RE.finditer(line):
-                spans.append(match.span())
+            # ONE PASS IN DOCUMENT ORDER, and two passes is a bug rather than a
+            # tidier spelling. A bare `:N` belongs to whatever file was named
+            # BEFORE it on the line, so `00_court_poet_tasks.txt:94-98 ... :47
+            # ... bc_commander_phase_events.txt:65` must leave `:47` attached to
+            # the vanilla file - i.e. unresolvable - not to the mod file named
+            # after it. Collecting the full citations first and then sweeping
+            # the bare ones against the survivor attaches every bare citation on
+            # the line to the LAST full one, which reports correct citations as
+            # broken and lets broken ones through. That was live on
+            # README.md:615 the day this was written.
+            full = list(ANY_CITE_RE.finditer(line))
+            spans = [match.span() for match in full]
+            bare = [
+                match
+                for match in BARE_CITE_RE.finditer(line)
+                if not any(lo <= match.start() < hi for lo, hi in spans)
+            ]
+            for match in sorted(full + bare, key=lambda m: m.start()):
+                if match.re is BARE_CITE_RE:
+                    if current is not None:
+                        resolve(relpath, line_no, current, int(match.group(1)), int(match.group(2)) if match.group(2) else None)
+                    continue
                 target = match.group(1)
                 resolvable = RESOLVABLE_CITE_RE.fullmatch(match.group(0)) is not None
                 if target in ambiguous:
@@ -411,12 +458,6 @@ def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
                     continue
                 current = target
                 resolve(relpath, line_no, current, int(match.group(2)), int(match.group(3)) if match.group(3) else None)
-            if current is None:
-                continue
-            for match in BARE_CITE_RE.finditer(line):
-                if any(lo <= match.start() < hi for lo, hi in spans):
-                    continue
-                resolve(relpath, line_no, current, int(match.group(1)), int(match.group(2)) if match.group(2) else None)
 
 
 def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issue]:

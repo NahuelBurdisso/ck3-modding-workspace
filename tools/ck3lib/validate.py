@@ -53,6 +53,10 @@ CUSTOM_LOC_DIR = "common/customizable_localization/"
 # generalise this (e.g. read it from the descriptor or a workspace config).
 # Used by both the localization_key arm check and the Custom() call check so
 # the two agree on what "owned by this mod" means.
+# NOT A TOTAL CHECK: a typo that damages the prefix itself (`bcfrag_x` for
+# `bc_frag_x`) reads as a foreign key and is skipped silently. Inherent to
+# prefix namespacing; the alternative is resolving every arm against the whole
+# playset, which is ~770k loc keys across 48 sources per run.
 MOD_KEY_PREFIX = "bc_"
 # `[^\s#]+` and not `\S+`: `localization_key = bc_x# note` is a legal comment
 # with no space before it, and `\S+` would capture `bc_x# note`'s first token

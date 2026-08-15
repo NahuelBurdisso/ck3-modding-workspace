@@ -4,20 +4,31 @@ WHY THIS FILE EXISTS. The sweep was a throwaway shell one-liner retyped from
 memory in every review round, and every retyping was wrong in a new way: one
 was vacuous because a citation matches itself, one was case-blind in prose and
 case-sensitive in fact, one read a blockquoted fence delimiter as prose, one
-counted escaped backticks. 8a71ce1 turned it into a file so the mistakes stop
-being invisible. That only helps if the behaviour is pinned, because the file
-is small enough to look obviously correct while being wrong - which is exactly
-what happened to each one-liner.
+counted escaped backticks. f74e420 turned it into a file, and 8a71ce1
+corrected that file, so the mistakes stop being invisible. That only helps if
+the behaviour is pinned, because the file is small enough to look obviously
+correct while being wrong - which is exactly what happened to each one-liner,
+and then happened to the file: 8a71ce1's message says it recorded the
+unterminated-fence limit and it recorded an invented mismatched-marker one
+instead.
 
 Run it with `python tools/tests/test_sweep_backticks.py`. Stdlib unittest, no
 pytest, for the reason test_citations.py gives in its own header.
 
-THE DOCUMENTED LIMITS ARE TESTED AS LIMITS, not as bugs. A span broken across
-three or more lines and two unbalanced spans sharing one line both escape this
-detector on purpose; if someone later makes them report, these tests fail and
-the KNOWN LIMITS block in sweep_backticks.py has to be updated with them. That
-is the intent - a limit nobody has written down is indistinguishable from a
-defect nobody has noticed.
+THE DOCUMENTED LIMITS ARE TESTED AS LIMITS, not as bugs. Every bullet of the
+KNOWN LIMITS block in sweep_backticks.py has a test here, including the
+unterminated fence, which is the only one whose failure mode is to report
+nothing at all. If someone later makes one of them report, its test fails and
+the block has to be updated with the change. That is the intent - a limit
+nobody has written down is indistinguishable from a defect nobody has noticed,
+and a limit written down that the code does not actually have is worse than
+either, because it sends the reader looking for the wrong hazard.
+
+WHAT PINS WHAT IS STATED PER TEST, NOT IN AGGREGATE. "Every test is killed by
+at least one mutant" is true of this suite and it is weak: it is a property of
+the SUITE, and it says nothing about whether a given test pins the behaviour
+its name claims. Where a test is weaker than its name suggests, its own
+docstring says so.
 """
 
 from __future__ import annotations
@@ -38,9 +49,11 @@ import sweep_backticks as S  # noqa: E402
 # report. Twelve fixture lines here did exactly that. The escape is the same
 # character at run time, so nothing under test changes, and it is preferred over
 # excluding this file by name because a carve-out is the shape the rule exists
-# to prevent. BALANCED FIXTURES ARE LEFT LITERAL - they never reported, and
-# `\x60{3}` for a fence delimiter is unreadable.
+# to prevent. BALANCED FIXTURES ARE LEFT LITERAL - they never reported, and a
+# fence delimiter written out as three escapes is unreadable, so it gets a name
+# instead.
 ODD_LINE = "an \x60 unbalanced line\n"
+FENCE = "\x60" * 3 + "\n"
 
 
 class SweepTestCase(unittest.TestCase):
@@ -93,10 +106,17 @@ class TestTheSignature(SweepTestCase):
 
 
 class TestDocumentedLimits(SweepTestCase):
-    """The two misses that sweep_backticks.py's KNOWN LIMITS block admits to.
+    """One test per bullet of sweep_backticks.py's KNOWN LIMITS block.
 
     These assert the CURRENT behaviour so that changing it is a deliberate act
     with a failing test attached, not a silent widening nobody records.
+
+    An earlier version of this docstring said the block admitted to TWO misses.
+    It admitted to more than that, and the bullet the miscount dropped was the
+    unterminated fence - the only one of them whose failure mode is to report
+    nothing at all. A test class that undercounts the limits it covers is
+    hiding a defect behind the word "limit", which is the accusation the whole
+    of this file exists to answer.
     """
 
     def test_the_middle_of_a_span_broken_twice_is_not_reported(self) -> None:
@@ -112,6 +132,27 @@ class TestDocumentedLimits(SweepTestCase):
         self.write("a.md", "close` and open `x\n")
         self.assertClean()
 
+    def test_an_unterminated_fence_swallows_the_rest(self) -> None:
+        # THE WORST OF THE FOUR, and the one no test covered until this one.
+        # `fenced` is a single boolean with no stack, so an opener that is
+        # never closed leaves the flag set to the end of the file and the sweep
+        # reports NOTHING below it. The silent partner is the same file with
+        # the fence closed, without which this passes against a sweep that
+        # reports nothing at all.
+        self.write("open.md", FENCE + ODD_LINE)
+        self.write("shut.md", "```\n```\n" + ODD_LINE)
+        self.assertEqual(self.hits(), [("shut.md", 3)])
+
+    def test_a_backslash_before_a_backtick_is_read_as_an_escape(self) -> None:
+        # The fourth bullet, and the only limit in the FALSE-POSITIVE
+        # direction. The fixture below ends a code span with a literal
+        # backslash, which is not an escape, so the line is genuinely balanced
+        # and the sweep is wrong to report it. Nothing in the tree trips it; it
+        # is pinned so that a later attempt to be cleverer about escapes has to
+        # face it.
+        self.write("a.md", "A span ending in a backslash: \x60x\\\x60 and done.\n")
+        self.assertEqual(self.hits(), [("a.md", 1)])
+
 
 class TestFences(SweepTestCase):
     """Fenced blocks are skipped, including fences inside a blockquote.
@@ -120,12 +161,20 @@ class TestFences(SweepTestCase):
     the defect put fenced BODY lines into the report. It does not. A fence
     delimiter is three backticks, so an unrecognised delimiter is odd and
     reports ITSELF; the body only reports if the body is itself unbalanced.
-    Both halves are pinned below because the first is what actually happened
-    and the second is what the message claimed.
+    Both halves are pinned below - the second by a fixture whose body IS
+    unbalanced, because with the blockquoted body the reputation plan actually
+    has, which carries no backtick, the assertion cannot tell "the body is
+    exempt" from "the body had nothing to say".
+
+    The class also pins what is NOT a limit. 8a71ce1 shipped a KNOWN LIMITS
+    bullet claiming a fence opened with one marker and closed with the other is
+    not paired, and that the rest of the file is then swallowed. FENCE_RE
+    matches either marker and the toggle is marker-agnostic, so that is false
+    and it stood for two commits in place of the real hazard.
     """
 
     def test_an_unbalanced_line_inside_a_fence_is_skipped(self) -> None:
-        self.write("a.md", "```\n" + ODD_LINE + "```\n")
+        self.write("a.md", FENCE + ODD_LINE + FENCE)
         self.assertClean()
 
     def test_a_blockquoted_fence_is_recognised_and_reports_nothing(self) -> None:
@@ -142,19 +191,63 @@ class TestFences(SweepTestCase):
         self.addCleanup(setattr, S, "FENCE_RE", real)
         self.assertEqual(self.hits(), [("a.md", 1), ("a.md", 3)])
 
+    def test_an_unrecognised_delimiter_does_not_exempt_an_odd_body(self) -> None:
+        # THE OTHER HALF, and the one f74e420's message actually claimed. The
+        # fixture above cannot show it: its body carries no backtick, so
+        # "the body did not report" and "the body is exempt" look identical.
+        # Give the body something to say and it says it, at line 2.
+        self.write("a.md", "> ```bash\n> " + ODD_LINE + "> ```\n")
+        real = S.FENCE_RE
+        S.FENCE_RE = __import__("re").compile(r"^\s*(?:\x60{3}|~{3})")
+        self.addCleanup(setattr, S, "FENCE_RE", real)
+        self.assertEqual(self.hits(), [("a.md", 1), ("a.md", 2), ("a.md", 3)])
+
+    def test_a_fence_closed_by_the_other_marker_is_still_a_pair(self) -> None:
+        # THE REFUTATION OF 8a71ce1'S THIRD BULLET. Opened with backticks,
+        # closed with tildes, and the odd line after the close still reports -
+        # so the pair closed and the rest of the file was not swallowed. The
+        # matched-pair partner is written beside it because a sweep that never
+        # entered the fenced state at all would also report line 4 of the
+        # first file, and the fenced ODD_LINE inside each proves it did.
+        self.write("mixed.md", FENCE + ODD_LINE + "~~~\n" + ODD_LINE)
+        self.write("same.md", FENCE + ODD_LINE + FENCE + ODD_LINE)
+        self.assertEqual(self.hits(), [("mixed.md", 4), ("same.md", 4)])
+
     def test_a_tilde_fence_is_recognised(self) -> None:
         self.write("a.md", "~~~\n" + ODD_LINE + "~~~\n")
+        self.assertClean()
+
+    def test_an_indented_fence_is_recognised(self) -> None:
+        # `^\s*` in FENCE_RE. A fence nested under a list item is indented, and
+        # a delimiter read as prose is odd and reports itself - the same defect
+        # the blockquote form had.
+        self.write("a.md", "  " + FENCE + ODD_LINE + "  " + FENCE)
+        self.assertClean()
+
+    def test_a_fence_inside_two_blockquote_markers_is_recognised(self) -> None:
+        # `(?:>\s*)*` repeats. With `?` in its place one marker is allowed and
+        # two are not, which is the shape a quoted reply carries.
+        self.write("a.md", "> > ```bash\n> > x\n> > ```\n")
         self.assertClean()
 
 
 class TestEscapedBackticks(SweepTestCase):
     """Stripping removes BOTH failure modes; it does not trade one for the other.
 
-    8a0d33e's prose and sweep_backticks.py's own first header both got this
-    backwards. Counted raw, an escaped backtick flips a balanced line to odd -
-    noise - and flips an unbalanced line to even, which is a MISS. The second
-    test here is the one that matters: without stripping it goes green, and a
-    real wrapped marker goes unreported.
+    Counted raw, an escaped backtick flips a balanced line to odd - noise - and
+    flips an unbalanced line to even, which is a MISS. The second test here is
+    the one that matters, because it is the miss: delete the strip and THE
+    SWEEP goes green on a file with a real wrapped marker in it, so the test
+    goes RED. Both tests here go red under that mutation, which is the point of
+    them; an earlier draft of this docstring, and 2bc0257's message, said the
+    test goes green, which would make it the vacuous kind this file exists to
+    rule out.
+
+    f74e420's header did get the direction backwards - "the stripping trades
+    the common noise for the rare miss". 8a0d33e's prose did NOT: it named both
+    failure modes correctly and only implied a trade with the word "but", which
+    is the distinction 6145832 drew and which an earlier draft here flattened
+    back out.
     """
 
     def test_a_balanced_line_carrying_an_escape_is_not_reported(self) -> None:
@@ -189,9 +282,57 @@ class TestWalkCoverage(SweepTestCase):
         self.write("b.TXT", ODD_LINE)
         self.assertEqual(self.hits(), [("A.MD", 1), ("b.TXT", 1)])
 
+    def test_every_listed_extension_is_actually_scanned(self) -> None:
+        # NOT `assertEqual(S.EXTS, {...})`, which restates the declaration and
+        # pins nothing about the walk. One fixture per listed extension, each
+        # of which must report. Until this test existed only `.txt` and `.md`
+        # were covered, so dropping `.yml`, `.gui`, `.info`, `.mod` or `.py`
+        # from EXTS was a silent narrowing - which flatly contradicts
+        # bc_flavour.txt's claim that the sweep checks every commentable file.
+        for i, ext in enumerate(sorted(S.EXTS)):
+            self.write(f"f{i}{ext}", ODD_LINE)
+        self.assertEqual(
+            self.hits(),
+            [(f"f{i}{ext}", 1) for i, ext in enumerate(sorted(S.EXTS))],
+        )
+
+    def test_a_bom_is_not_reported_as_part_of_the_line(self) -> None:
+        # Every mod script file carries a UTF-8 BOM, so `utf-8-sig` is not
+        # decoration. THE ASSERTION IS ON THE REPORTED TEXT, not on the line
+        # number, because a BOM shifts neither the numbering nor the backtick
+        # count - read as plain `utf-8` it survives into line 1 as U+FEFF,
+        # which `str.strip()` does not remove, and the sweep then prints a line
+        # that does not match what a grep for it would find.
+        (self.root / "bom.txt").write_bytes(b"\xef\xbb\xbf" + ODD_LINE.encode("utf-8"))
+        self.assertEqual(
+            S.sweep(self.root), [("bom.txt", 1, ODD_LINE.strip())]
+        )
+
     def test_a_file_that_is_not_utf8_is_skipped_rather_than_crashing(self) -> None:
         (self.root / "bad.txt").write_bytes(b"\xff\xfe an \x60 unbalanced line\n")
         self.assertClean()
+
+    def test_an_entry_that_is_not_a_file_is_skipped(self) -> None:
+        # os.walk puts anything that is not a directory into `filenames`,
+        # including a broken symlink and a name deleted between the scandir and
+        # the read. `read_text` on one raises FileNotFoundError, which the
+        # sweep does not catch, so the `is_file()` guard is what stands between
+        # that and a crash. Injected rather than symlinked for the reason
+        # test_citations.py gives: creating a symlink on Windows needs a
+        # privilege this account does not have, and a test that skips on the
+        # only platform anyone runs it on pins nothing.
+        self.write("real.md", ODD_LINE)
+        real_walk = S.os.walk
+
+        def walk_with_a_ghost(top, *args, **kwargs):
+            for dirpath, dirnames, filenames in real_walk(top, *args, **kwargs):
+                if Path(dirpath) == self.root:
+                    filenames = filenames + ["ghost.md"]
+                yield dirpath, dirnames, filenames
+
+        S.os.walk = walk_with_a_ghost
+        self.addCleanup(setattr, S.os, "walk", real_walk)
+        self.assertEqual(self.hits(), [("real.md", 1)])
 
     def test_the_walk_order_is_sorted_and_parents_lead(self) -> None:
         # ASSERTS THE ORDER, NOT MERELY THAT IT REPEATS. Comparing several runs
@@ -219,26 +360,123 @@ class TestAgainstTheRealTree(unittest.TestCase):
     NOT AN ASSERTION THAT THE TREE IS CLEAN - it is not, and it is not meant to
     be. The tree carries legitimate multi-line quotations of script, command
     lines, paths and tool output, which is why sweep_backticks.py is not a
-    `validate` check. What is pinned is that the sweep RUNS over the real
-    checkout and returns well-formed results, which every tmpdir test above
-    would pass without.
+    `validate` check.
+
+    EVERY ASSERTION HERE IS POSITIVE OR PAIRED WITH ONE. An earlier version of
+    this class held only shape checks over the hits and one `assertNotIn`, and
+    it passed against a sweep that returned an empty list on this checkout and
+    against one that had stopped reading Python at all - a pure negative is
+    satisfied by any narrowing, including narrowing to nothing.
     """
 
-    def test_the_sweep_runs_over_the_repo_and_returns_well_formed_hits(self) -> None:
-        repo = Path(__file__).resolve().parents[2]
-        hits = S.sweep(repo)
-        for rel, lineno, line in hits:
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.repo = Path(__file__).resolve().parents[2]
+        cls.hits = S.sweep(cls.repo)
+
+    def test_the_sweep_reports_something_over_the_real_checkout(self) -> None:
+        # THE SILENT PARTNER FOR EVERY OTHER TEST IN THIS CLASS. The tree is
+        # not clean, so a sweep that finds nothing here has broken, and no
+        # tmpdir test above would notice: they all build the tree they read.
+        # No count is asserted - the number drifts with every commit, and this
+        # file's own rule is that a drifting count is not a fact.
+        self.assertTrue(self.hits, "the sweep found nothing in a tree that is not clean")
+
+    def test_the_hits_are_well_formed(self) -> None:
+        for rel, lineno, line in self.hits:
             self.assertFalse(Path(rel).is_absolute(), rel)
             self.assertGreaterEqual(lineno, 1, rel)
-            self.assertIsInstance(line, str)
+            self.assertEqual(line, line.strip(), rel)
+            self.assertEqual(
+                (self.repo / rel).read_text(encoding="utf-8-sig").splitlines()[
+                    lineno - 1
+                ].strip(),
+                line,
+                f"{rel}:{lineno} does not hold the text reported for it",
+            )
+
+    def test_the_sweep_reads_python_and_markdown_alike(self) -> None:
+        # Both extensions are in EXTS and both carry comment prose the rule
+        # covers. Asserting that the sweep OPENED them, not that they are
+        # clean: a narrowing of EXTS is invisible to a report that happens to
+        # be empty for the narrowed type anyway.
+        opened = set()
+        real_read = Path.read_text
+
+        def read_text_recording(self_, *args, **kwargs):
+            opened.add(self_.suffix.lower())
+            return real_read(self_, *args, **kwargs)
+
+        Path.read_text = read_text_recording
+        self.addCleanup(setattr, Path, "read_text", real_read)
+        S.sweep(self.repo)
+        self.assertLessEqual({".py", ".md", ".txt"}, opened)
 
     def test_the_sweep_does_not_report_its_own_source(self) -> None:
         # sweep_backticks.py spells its backticks as escapes so that it does not
         # name itself on every run. Excluding it by name would be a carve-out of
         # the kind the rule exists to prevent, so this pins the escaping instead.
-        repo = Path(__file__).resolve().parents[2]
-        reported = {rel for rel, _, _ in S.sweep(repo)}
+        # Paired with the test above, which is what stops a narrowed EXTS from
+        # satisfying this one by never reading the file.
+        reported = {rel for rel, _, _ in self.hits}
         self.assertNotIn("tools/sweep_backticks.py", reported)
+        self.assertNotIn("tools/tests/test_sweep_backticks.py", reported)
+        self.assertNotIn("tools/tests/mutate_sweep_backticks.py", reported)
+
+
+class TestTheCommandLine(SweepTestCase):
+    """`main()`, which nothing pinned until now.
+
+    It matters more than its size suggests. The summary line it prints - whose
+    wording is `--- unbalanced backtick lines:` followed by a count - IS the
+    acceptance baseline this project quotes at itself between rounds, so a
+    change to it invalidates every recorded baseline silently. That prefix is
+    kept on one line here for the reason the whole rule exists: a grep target
+    broken over a wrap is not a grep target.
+    """
+
+    def run_main(self, argv: list[str]) -> str:
+        import io
+        import contextlib
+
+        real_argv = sys.argv
+        sys.argv = ["sweep_backticks.py"] + argv
+        self.addCleanup(setattr, sys, "argv", real_argv)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self.assertEqual(S.main(), 0)
+        return buf.getvalue()
+
+    def test_the_summary_line_wording_and_count(self) -> None:
+        self.write("a.md", ODD_LINE)
+        self.write("b.md", ODD_LINE)
+        out = self.run_main([str(self.root)])
+        self.assertIn("--- unbalanced backtick lines: 2", out)
+
+    def test_each_hit_prints_as_path_colon_line_colon_text(self) -> None:
+        self.write("sub/a.md", ODD_LINE)
+        out = self.run_main([str(self.root)])
+        self.assertIn("sub/a.md:1: " + ODD_LINE.strip(), out)
+
+    def test_a_long_line_is_truncated_in_the_report(self) -> None:
+        # The report is meant to be read, so a 4000-character quotation must
+        # not push the next hit off the screen. 110 characters, and the cut is
+        # on the STRIPPED text.
+        self.write("a.md", "x" * 400 + " \x60 open\n")
+        out = self.run_main([str(self.root)])
+        body = out.splitlines()[0].split(": ", 1)[1]
+        self.assertEqual(len(body), 110)
+
+    def test_with_no_argument_it_sweeps_the_working_directory(self) -> None:
+        import os as real_os
+
+        self.write("a.md", ODD_LINE)
+        here = real_os.getcwd()
+        real_os.chdir(self.root)
+        self.addCleanup(real_os.chdir, here)
+        out = self.run_main([])
+        self.assertIn("a.md:1: ", out)
+        self.assertIn("--- unbalanced backtick lines: 1", out)
 
 
 if __name__ == "__main__":

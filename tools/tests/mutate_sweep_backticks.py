@@ -5,8 +5,8 @@ actually fails when the behaviour it names is broken - is worth nothing if the
 harness itself is retyped from memory each time it is wanted. That is the exact
 history of the sweep this harness points at: it was a `grep` one-liner, it was
 retyped in every review round, and every retyping was wrong in a new way.
-8a71ce1 made the sweep a file for that reason; this is the same move one level
-up.
+f74e420 made the sweep a file for that reason and 8a71ce1 corrected it; this is
+the same move one level up.
 
 WHAT IT PROVES. Rounds 15 and 16 both found tests in test_citations.py that
 passed against a build with the checked behaviour deleted. A test that cannot
@@ -14,6 +14,16 @@ fail is not a test, and reading one does not tell you which kind it is. Each
 entry below breaks one line of sweep_backticks.py and the run records which
 tests go red. A SURVIVING MUTANT NAMES A VACUOUS TEST, or a behaviour nothing
 pins at all.
+
+WHAT IT DOES NOT PROVE, and what its first version was read as proving: that
+every test pins the behaviour ITS NAME CLAIMS. "Every test is killed by at
+least one mutant" is a property of the SUITE. Round 18 held that property while
+five behaviours of the sweep had no mutant here at all - the fence exit, the
+`is_file()` guard, BOM handling, five of the seven extensions, and the whole of
+`main()` - and while two tests were weaker than their names. THE LIST BELOW IS
+THE CLAIM. It is only as good as its coverage of the file it points at, so a
+behaviour added to sweep_backticks.py without an entry here is unpinned no
+matter what this run prints.
 
 NOT PART OF THE ACCEPTANCE SET. It edits a tracked file in place, so it is run
 deliberately and never as part of a batch. It restores the file in a `finally`,
@@ -119,6 +129,64 @@ MUTANTS = [
         "                    hits.append((rel, lineno, line.strip()))",
         "                    hits.append((rel, 1, line.strip()))",
     ),
+    (
+        "report: keep the leading whitespace",
+        "                    hits.append((rel, lineno, line.strip()))",
+        "                    hits.append((rel, lineno, line))",
+    ),
+    # The nine below close the gaps round 18 found: behaviours of the sweep
+    # that no test and no mutant touched, so that "every test is killed" was
+    # true of the suite while five separate behaviours were unpinned.
+    (
+        "fence: enter but never leave the fenced state",
+        "                    fenced = not fenced",
+        "                    fenced = True",
+    ),
+    (
+        "fence: require the delimiter at column zero",
+        r'FENCE_RE = re.compile(r"^\s*(?:>\s*)*(?:\x60{3}|~{3})")',
+        r'FENCE_RE = re.compile(r"^(?:>\s*)*(?:\x60{3}|~{3})")',
+    ),
+    (
+        "fence: allow at most one blockquote marker",
+        r'FENCE_RE = re.compile(r"^\s*(?:>\s*)*(?:\x60{3}|~{3})")',
+        r'FENCE_RE = re.compile(r"^\s*(?:>\s*)?(?:\x60{3}|~{3})")',
+    ),
+    (
+        "walk: drop the is_file guard",
+        "if path.suffix.lower() not in EXTS or not path.is_file():",
+        "if path.suffix.lower() not in EXTS:",
+    ),
+    (
+        "decode: stop stripping the BOM",
+        'lines = path.read_text(encoding="utf-8-sig").splitlines()',
+        'lines = path.read_text(encoding="utf-8").splitlines()',
+    ),
+    (
+        "walk: stop reading Python",
+        '".md", ".mod", ".py"}',
+        '".md", ".mod"}',
+    ),
+    (
+        "walk: prune the three directories the real tree keeps its prose in",
+        'PRUNE = {".git", "__pycache__"}',
+        'PRUNE = {".git", "__pycache__", "docs", "mods", "tools"}',
+    ),
+    (
+        "main: reword the summary line",
+        'print(f"--- unbalanced backtick lines: {len(hits)}")',
+        'print(f"--- total: {len(hits)}")',
+    ),
+    (
+        "main: stop truncating a long quotation",
+        'print(f"{rel}:{lineno}: {line[:110]}")',
+        'print(f"{rel}:{lineno}: {line}")',
+    ),
+    (
+        "main: ignore the path argument",
+        'root = (Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")).resolve()',
+        'root = Path(".").resolve()',
+    ),
 ]
 
 FAIL_RE = re.compile(r"^(test_\w+) \(.*\) \.\.\. (?:FAIL|ERROR)", re.M)
@@ -159,6 +227,13 @@ def main() -> int:
             TARGET.write_bytes(original)
         if passed:
             print(f"SURVIVED  {name}")
+            survivors.append(name)
+        elif not red:
+            # A NON-ZERO EXIT IS NOT A KILL BY ITSELF. A mutant that stops the
+            # suite importing also exits non-zero, and counting it teaches the
+            # harness to accept a mutation no test ever saw. Round 18 found
+            # this reading only the code, before it had cost anything.
+            print(f"CRASHED   {name} - the suite failed without naming a test")
             survivors.append(name)
         else:
             print(f"killed    {name}")

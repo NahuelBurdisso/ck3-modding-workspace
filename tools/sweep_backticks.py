@@ -17,22 +17,44 @@ KNOWN LIMITS. The first two are also written down in that same paragraph:
     backtick at all, so it is caught at its two ends and not in its middle;
   - two independent unbalanced spans on one line sum to even and hide each
     other;
-  - a fence whose opener and closer use different markers is not recognised as
-    a pair, and the state machine then treats the rest of the file as fenced,
-    which is a silent MISS of everything below. No such fence exists today;
+  - AN UNTERMINATED FENCE SWALLOWS THE REST OF ITS FILE, in silence, and it is
+    the worst of the four: the sweep does not report less confidently below an
+    unclosed opener, it reports nothing at all. The state machine is one
+    boolean with no stack, so it cannot tell an unclosed fence from a very long
+    one. Pinned by `test_an_unterminated_fence_swallows_the_rest` in
+    tools/tests/test_sweep_backticks.py;
   - a backslash immediately before a real backtick is read as an escape and
     stripped, which flips a balanced line to odd. That is a false positive, the
-    harmless direction, and no line in the tree does it.
+    harmless direction. Lines of the docs tree DO do it - in the rivalry plan
+    and in the before-and-after plan, quoting comments that themselves contain
+    backticks - and none of them flips: the ones that report are odd before the
+    strip as well. An earlier draft of this bullet said no line in the tree did
+    it, which one grep disproves.
+
+WHAT IS NOT A LIMIT: A MISMATCHED FENCE PAIR. Until this paragraph was written
+the third bullet above claimed that a block opened with three backticks and
+closed with three tildes was not recognised as a pair, and that the rest of the
+file was then swallowed. That is false, and it hid the real hazard behind an
+invented one for two commits. `FENCE_RE` matches either marker and the toggle
+is marker-agnostic, so a mismatched pair closes exactly like a matched one -
+`test_a_fence_closed_by_the_other_marker_is_still_a_pair` is the proof.
+8a71ce1's own message says it recorded the unterminated-fence limit; it did
+not, it recorded this instead, which is the failure this file exists to make
+harder.
 
 EXTENSIONS ARE MATCHED CASE-INSENSITIVELY, because the rule the sweep enforces
 is casing-blind and a `README.MD` would otherwise be skipped in silence.
 
 AN UNREADABLE FILE IS NOT SKIPPED. Only `UnicodeDecodeError` is caught, so a
-file this process cannot open raises out of the sweep. `validate.py` takes the
-same stance for the same reason - its
-`test_an_unopenable_entry_is_skipped_rather_than_crashing` records it - and a
-sweep that quietly drops what it could not read is the exact defect this tool
-exists to catch, one level up.
+file this process cannot open raises out of the sweep, and a sweep that quietly
+drops what it could not read is the exact defect this tool exists to catch, one
+level up. `validate.py` takes the same stance for the same reason, but BE
+PRECISE ABOUT WHERE THAT IS WRITTEN: it is a comment inside
+`test_an_unopenable_entry_is_skipped_rather_than_crashing`, which says in as
+many words that it does NOT cover an unreadable file. Reading that name as a
+pin is a mistake this docstring made until it was corrected. What is pinned
+either side is the `is_file()` guard, which is a different case - an entry that
+os.walk offered and that is not a file.
 
 THIS FILE SPELLS ITS OWN BACKTICKS AS `\\x60`. A detector that matches on a
 character will contain that character, and writing it literally made the sweep

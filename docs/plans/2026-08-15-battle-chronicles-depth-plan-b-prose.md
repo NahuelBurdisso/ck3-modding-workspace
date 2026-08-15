@@ -90,7 +90,7 @@ If the user has no such run, **stop here.** This plan is blocked on a run, not o
 |---|---|---|
 | a band | clause present, matches band | **proceed to task 2.** |
 | a band | clause present, wrong band | **stop.** The arms read the variable off a character other than the one holding it. Re-derive the anchor before writing anything; the fault is in Plan A task 5, not here. |
-| a band | no clause at all | **stop.** Either `Custom()` does not render in a toast desc or the anchor is not addressable from loc. Retry the spike once with `bc_commander` (`bc_commander_phase_events.txt:65`). If that renders, the anchor is wrong and fixable; if it does not, the mechanism is dead and this plan is cancelled — the fallback design is `first_valid` in an event `desc`, which is proven, but toasts have no `desc` block and the ten moments would have to become events. |
+| a band | no clause at all | **stop.** Either `Custom()` does not render in a toast desc or the anchor is not addressable from loc. Retry the spike once with `bc_commander` (`bc_commander_phase_events.txt:65`). If that renders, the anchor is wrong and fixable; if it does not, the mechanism is dead but **this plan is not cancelled**. A `send_interface_toast` does take a `desc = { ... }` block with `triggered_desc` arms inside it — vanilla does exactly that at `events/dlc/ach/ach_coronation_events.txt:3316-3324`, and `first_valid` inside a toast `title` at `common/scripted_effects/01_ep1_court_event_effects.txt:14-22`. The fallback is therefore the eve's own proven mechanism, written inline in the ten descs instead of in a shared definition: the same prose, the same triggers, but repeated per moment rather than shared, and with no `random_valid` — so the core class would be lost and the other three would survive. Expensive, local, and not a cancellation. Re-plan before writing it. |
 | `BC: ground missing` | no clause | **stop, but this is not a spike failure.** `combat.location` did not resolve at a phase event. Fix `bc_write_ground_effect` and get another run. |
 | nothing at all | — | the build the user ran did not contain Plan A. Confirm the mod deployed. |
 
@@ -101,7 +101,7 @@ heading per run, in chronological order, with `## Not yet verified in game`
 always **last** (`README.md:558`). Follow it: insert a new
 
 ```
-## Spike gate run, 2026-08-15 (Plan B task 1)
+## Spike gate run, <date of the run> (Plan B task 1)
 ```
 
 section immediately **above** `## Not yet verified in game`, naming which row of
@@ -233,7 +233,7 @@ In `bc_l_english.yml`, after the last moment toast desc (`bc_shieldbrother_forge
  bc_frag_bond_nemesis:0 " The man commanding here knows whose banner that is across the field, and has known all morning."
  bc_frag_bond_kin:0 " The man commanding here has eaten at a table with men on the other side."
  bc_frag_bond_countryman:0 " Both sides are shouting in the same tongue."
- bc_frag_bond_heathen:0 " Whatever the other side was praying to at dawn, the man commanding here does not."
+ bc_frag_bond_heathen:0 " Whatever the other side was praying to at dawn, the man commanding here was not."
  bc_frag_bond_stranger:0 " Nobody across the field is anybody to the man commanding here."
  bc_frag_bond_any:0 ""
 ```
@@ -567,7 +567,7 @@ bc_<moment>_ground = {
 3. **Rewrite the toast desc** to open with the core call and follow with the ground call.
 4. **Validate** — expect `0 errors, 2 warnings` — then run the arm-shape check from task 2 step 5 and confirm the new `_ground` entry reads `arms 7 unguarded at [6]` and the new `_core` entry reads `arms 3 unguarded at [0, 1, 2]`.
 5. **Commit**, one moment per commit. Every one of these ten tasks touches the
-   same two files and no others, so the stage line is the same every time:
+   same two files and no others, so the stage line is the same every time — except task 14, which also stages `README.md`:
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add common/customizable_localization/bc_flavour.txt localization/english/bc_l_english.yml && git commit -m "<subject>"
@@ -579,7 +579,7 @@ cd /d/ck3/mods/battle_chronicles && git add common/customizable_localization/bc_
 |---|---|
 | `_core arms 3 unguarded at [0, 1, 2]` | correct |
 | `_core` unguarded at anything else | a trigger got copied into a core arm, and a trigger in a `random_valid` class quietly biases the randomiser |
-| `_core arms 0` | all three arms were written on one line each — see the warning under task 5 step 1 |
+| `_core arms 0` | all three arms were written on one line each. Task 14 scores this as **passing** too, because `[] == list(range(0))`, and `arms 110` does not see it either — see the warning under task 5 step 1 |
 | `_core arms 2` or `arms 1` | *some* arms were collapsed to one line. This one is nastier: the whole-file check in task 14 scores it as **passing**, and task 14's `arms 110` key count does not see it either, because that count scans `localization_key = X` regardless of line shape. The per-task `arms 3` is the only thing that catches a partial collapse. |
 | `_ground arms 2 unguarded at [1]` | the template's `# ... identical arms for open, rough, forest, jungle, winter ...` placeholder line was left in place and the five middle arms were never written. Task 14 scores this as passing too — a two-arm keyed class with its fallback last is well-formed. Only `arms 7` here, and `arms 110` at the end, catch it. |
 
@@ -733,7 +733,7 @@ Follow the five steps. Both definitions are new.
  bc_frag_horse_killed_core1:0 "The horse goes down screaming. He comes up off the ground on foot, and is seen to come up."
  bc_frag_horse_killed_core2:0 "The animal folds under him. He is on his feet before anyone can reach him."
  bc_frag_horse_killed_core3:0 "He loses the horse and does not lose the ground, which the men nearest him notice."
- bc_frag_horse_killed_desert:0 " He comes up out of the sand with half of it on him."
+ bc_frag_horse_killed_desert:0 " He is out of the sand with half of it still on him."
  bc_frag_horse_killed_open:0 " On open ground a man on foot is visible from everywhere, and he knows it."
  bc_frag_horse_killed_rough:0 " On this ground the horse was becoming a liability anyway."
  bc_frag_horse_killed_forest:0 " Among the trees he is no worse off on foot than he was mounted."
@@ -809,7 +809,7 @@ Follow the five steps. Both definitions are new.
 - [ ] **Step 2: Add the ten keys.** The core arms are deliberately rewritten to say nothing specific about terrain; the ground class now says it, and says it truthfully:
 
 ```
- bc_frag_ground_favours_us_core1:0 "They have to come to us, and they have to come across all of it."
+ bc_frag_ground_favours_us_core1:0 "They have to come to him, and they have to come across all of it."
  bc_frag_ground_favours_us_core2:0 "Whatever they intended, the field has made the decision for them."
  bc_frag_ground_favours_us_core3:0 "He picked this place, and it is turning out to be worth having picked."
  bc_frag_ground_favours_us_desert:0 " They will cross open sand to reach him, in the heat, carrying their own water."
@@ -817,7 +817,7 @@ Follow the five steps. Both definitions are new.
  bc_frag_ground_favours_us_rough:0 " The slope, the rocks, the one narrow way up. Every part of it is his."
  bc_frag_ground_favours_us_forest:0 " The treeline is behind him and the open ground is in front of them."
  bc_frag_ground_favours_us_jungle:0 " He holds the one path through, and there is no other."
- bc_frag_ground_favours_us_winter:0 " They will come uphill through snow, and arrive out of breath."
+ bc_frag_ground_favours_us_winter:0 " They will cross the snow to reach him, and arrive out of breath."
  bc_frag_ground_favours_us_any:0 ""
 ```
 
@@ -827,9 +827,9 @@ Follow the five steps. Both definitions are new.
 
 ### Task 11: The Lines Bog Down
 
-- [ ] **Step 1: Append both definitions** — template, `<moment>` = `lines_bogged_down`.
-
 **Two of the six bands are reachable here too, and they are not the same two.** `bc_terrain_bogs_us_down_trigger` (`bc_scripted_triggers.txt:76-86`) is `OR = { agot_is_wetlands_terrain agot_is_jungle_terrain agot_is_mountains_terrain agot_is_the_bog_terrain agot_is_taiga_bog_terrain }` — bands **rough** (wetlands, mountains, the_bog, taiga_bog) and **jungle**. The `_forest` arm below is dead: forest terrain does not bog anyone down under this trigger. Write all six for the same reason as task 10.
+
+- [ ] **Step 1: Append both definitions** — template, `<moment>` = `lines_bogged_down`.
 
 - [ ] **Step 2: Add the ten keys.** As with task 10, the core sentence currently names mud; the rewritten arms let the ground class decide what the men are standing in:
 
@@ -852,7 +852,7 @@ Follow the five steps. Both definitions are new.
 
 ### Task 12: The Knight Holds the Breach
 
-**The three knight moments read their scratch off `bc_chronicle_subject`, the commander — not off the knight.** No `bc_` variable is ever written onto a knight, and the fragments must not be written as though the knight held them. The knight's name still comes from `scope:bc_knight`, which the event saves; the ground and bond come from the commander who was on that side. Both are true of the same battle, so the prose is consistent — but do not "fix" a fragment by pointing it at `bc_knight`.
+**The three knight moments read their scratch off `bc_chronicle_subject`, the commander — not off the knight.** No `bc_` variable is ever written onto a knight, and the fragments must not be written as though the knight held them. `scope:bc_knight` stays where it is and is not needed here: it is the toast's `left_icon` (`bc_knight_phase_events.txt:109`, `:177`, `:293`) and nothing else — no fragment renders the knight's name. The ground and bond come from the commander who was on that side. Both are true of the same battle, so the prose is consistent — but do not "fix" a fragment by pointing it at `bc_knight`, and see task 2 on why the shared bond clause names the role instead of saying "he".
 
 - [ ] **Step 1: Append both definitions** — template, `<moment>` = `knight_holds_the_breach`.
 
@@ -904,7 +904,7 @@ The last one. Its ground fragments are about two men rather than one, which is t
 
 - [ ] **Step 1: Append both definitions** — template, `<moment>` = `shieldbrother_forged`.
 
-- [ ] **Step 2: Add the ten keys:**
+- [ ] **Step 2: Add the ten keys**, directly under `bc_shieldbrother_forged_toast_desc` and therefore **above** the two shared-fragment sections that tasks 2 and 3 appended after it. Key order in a yml is irrelevant to the engine; this only keeps the file reading the way the File structure section describes.
 
 ```
  bc_frag_shieldbrother_forged_core1:0 "They came through the same press back to back. Neither will speak of it well, and neither will forget it."
@@ -1052,8 +1052,10 @@ cd /d/ck3/mods/battle_chronicles && git add common/customizable_localization/bc_
 feat: ground-aware prose for The Shieldbrother Forged, and close the set
 
 Twenty-two definitions and 110 keys, against ten fixed sentences before.
-Cost is additive and coverage is multiplicative: each moment now has
-three openings times seven grounds times six bonds times four scales.
+Cost is additive and coverage is multiplicative: a moment now has three
+openings times up to seven grounds times six bonds times four scales.
+Two of the ten reach only three grounds, because their own is_valid
+gates the terrain they can fire on.
 
 The two whole-file checks in this commit's task are the ones nothing in
 the toolchain does - that every keyed class ends in its fallback and
@@ -1081,6 +1083,6 @@ Two deliberate divergences, recorded so that a later reader does not treat them 
 
 ## The one thing this plan cannot check
 
-**Whether the prose is any good.** Every check here is structural: keys resolve, fallbacks are last, arms are counted. None of them can tell that `bc_frag_rally_the_line_jungle` reads awkwardly after `core2`, because each moment has 3 × 7 = 21 core-plus-ground readings, 210 across the ten, and no way to see any of them without playing.
+**Whether the prose is any good.** Every check here is structural: keys resolve, fallbacks are last, arms are counted. None of them can tell that `bc_frag_rally_the_line_jungle` reads awkwardly after `core2`, because eight moments have 3 × 7 = 21 core-plus-ground readings and the two gated ones have 3 × 3 = 9, which is 186 across the ten, and no way to see any of them without playing.
 
 The mitigation is the shape, not a check: every fragment is a **complete clause that stands alone**, and the classes are concatenated in a fixed order — what happened, where, against whom, at what scale. A reading assembled from four independently sensible clauses in a fixed order is at worst flat. It cannot be ungrammatical, which is the failure that would actually matter.

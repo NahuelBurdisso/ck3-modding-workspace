@@ -162,10 +162,16 @@ def _check_descriptor(mod_root: Path, cfg: Config, issues: list[Issue]) -> dict:
 
 
 def _check_structure(mod_root: Path, issues: list[Issue]) -> None:
+    # THE GIT ENTRIES ARE NAMED ONE AT A TIME ON PURPOSE. A `.git*` glob would
+    # also pass a stray `.gitkeep` or a leftover `.git.orig`, and the point of
+    # the warning is that the mod root is small enough to enumerate. The cost is
+    # that a git file nobody anticipated warns until it is added here, which
+    # `.gitattributes` did.
     allowed = set(SCAN_DIRS) | {
         "descriptor.mod",
         "thumbnail.png",
         ".git",
+        ".gitattributes",
         ".gitignore",
         ".vscode",
         "README.md",

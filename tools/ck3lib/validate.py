@@ -67,11 +67,11 @@ CUSTOM_CALL_RE = re.compile(r"\.Custom2?\(\s*'([^']+)'")
 
 # Comments in this workspace cite each other by `file.txt:123` and `file.txt:1-9`,
 # and continue with a bare `:456` once the file has been named in the same
-# comment block. Nothing enforced them until now, and four consecutive review
-# rounds on Battle Chronicles lost their headline finding to a citation that was
-# correct when written and silently wrong after an unrelated comment ABOVE it
-# grew: every line below a comment edit shifts, and a shifted citation still
-# points at a real line, so it reads as fine.
+# comment paragraph. Nothing enforced them until now, and review rounds on Battle
+# Chronicles repeatedly lost time to a citation that was correct when written and
+# silently wrong after an unrelated comment ABOVE it grew: every line below a
+# comment edit shifts, and a shifted citation still points at a real line, so it
+# reads as fine.
 #
 # WHAT THIS CHECKS IS POSITION, NOT MEANING. It can tell that a citation lands on
 # a blank line or past the end of the file; it cannot tell that `:270` now names
@@ -79,10 +79,30 @@ CUSTOM_CALL_RE = re.compile(r"\.Custom2?\(\s*'([^']+)'")
 # about. That failure survives this check, and the mitigation for it is not
 # mechanical: cite a named paragraph or a definition rather than a line, so the
 # reference moves with the thing it names.
-FULL_CITE_RE = re.compile(r"\b([A-Za-z0-9_]+\.(?:txt|yml|gui|info)):(\d+)(?:-(\d+))?")
+#
+# TWO PATTERNS, AND THE BROAD ONE IS NOT AN ACCIDENT. The narrow pattern decides
+# what to RESOLVE; the broad one decides what CLEARS the running target. They
+# have to differ, because `effects.log:9770 (grudge), :9810 (nemesis)` is a real
+# line in this mod: the log file cannot be resolved, but if it did not clear the
+# target then `:9810` would resolve against whatever mod file was named further
+# up the paragraph. Matching only resolvable extensions in one pattern is what
+# made that bug possible in the first version of this check.
+#
+# CITE_EXTS AND THE NARROW PATTERN ARE ONE DECLARATION ON PURPOSE. The set names
+# which files this check will open; the pattern names which citations it will try
+# to open one for. Written twice they drift, and the drift is invisible: a
+# citation whose extension is in the set but not the pattern silently stops being
+# checked, which is exactly the failure mode this whole check exists to end.
+# `.md` is in the set because README.md carries citations into the script files
+# and had two that had rotted.
+CITE_EXTS = {".txt", ".yml", ".gui", ".info", ".md"}
+CITE_TAIL = r":(\d+)(?:-(\d+))?"
+_CITE_EXT_ALT = "|".join(sorted(ext.lstrip(".") for ext in CITE_EXTS))
+RESOLVABLE_CITE_RE = re.compile(r"\b([A-Za-z0-9_]+\.(?:" + _CITE_EXT_ALT + "))" + CITE_TAIL)
+ANY_CITE_RE = re.compile(r"\b([A-Za-z0-9_.-]+\.[A-Za-z0-9]{1,8})" + CITE_TAIL)
 # `(?<![\w.])`: without it `bc_frag_x:0 "text"` in a loc file matches as `:0`.
 # Only ever applied to comment lines, where a key/value pair cannot appear.
-BARE_CITE_RE = re.compile(r"(?<![\w.]):(\d+)(?:-(\d+))?\b")
+BARE_CITE_RE = re.compile(r"(?<![\w.])" + CITE_TAIL + r"\b")
 
 
 @dataclass(frozen=True)
@@ -268,39 +288,77 @@ def _check_ground_partition(cfg: Config, mod_root: Path, issues: list[Issue]) ->
         )
 
 
-def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
-    """Every `file.txt:N` in a comment must land on a line that carries content.
+def _citation_files(mod_root: Path) -> tuple[dict[str, list[str]], dict[str, str], set[str]]:
+    """Basename -> lines, basename -> relpath, and the basenames that collide.
 
-    ONLY THE MOD'S OWN FILES ARE RESOLVED. A citation into vanilla, AGOT or a
-    game log names a file this checker cannot see, and skipping it is correct -
-    but it must also stop a following bare `:N` from resolving against whatever
-    mod file was named before it, so an unresolvable name CLEARS the current
-    target rather than leaving it standing.
-
-    A basename that two mod files share is ambiguous and reported once, because
-    resolving it either way would be a guess.
+    ROOT-LEVEL FILES ARE INCLUDED BY HAND. `iter_files` walks SCAN_DIRS, which
+    starts at `common/`, so it never yields anything sitting beside descriptor.mod.
+    README.md is the one that matters: it is the largest body of prose in a
+    Battle-Chronicles-shaped mod and it cites the scripts constantly, so leaving
+    it out would leave the citations most likely to rot unchecked. descriptor.mod
+    is skipped because `.mod` is not in CITE_EXTS, which is fine - it is nine
+    lines long and nothing in the mod cites a line of it.
     """
     texts: dict[str, list[str]] = {}
     owners: dict[str, str] = {}
     ambiguous: set[str] = set()
-    for relpath, path in iter_files(mod_root):
-        if path.suffix.lower() not in (".txt", ".yml", ".gui", ".info"):
+    candidates = [(path.name, relpath, path) for relpath, path in iter_files(mod_root)]
+    candidates += [
+        (path.name, path.name, path)
+        for path in sorted(mod_root.glob("*"))
+        if path.is_file() and path.suffix.lower() in CITE_EXTS
+    ]
+    for name, relpath, path in candidates:
+        if path.suffix.lower() not in CITE_EXTS:
             continue
-        name = path.name
         if name in owners:
-            ambiguous.add(name)
+            if owners[name] != relpath:
+                ambiguous.add(name)
             continue
         owners[name] = relpath
-        texts[name] = read_text(path).split("\n")
+        # splitlines(), not a newline split: the latter leaves a phantom empty
+        # last element on any file ending in a newline, which is every file, and
+        # a citation one past the last real line would then be reported as
+        # landing on a blank line rather than as running off the end.
+        texts[name] = read_text(path).splitlines()
+    return texts, owners, ambiguous
 
+
+def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
+    """Every `file.txt:N` in a comment must land on a line that carries content.
+
+    ONLY FILES THIS MOD OWNS CAN BE RESOLVED. A citation into vanilla, AGOT or a
+    game log names a file the checker cannot see, and skipping it is correct -
+    but it must also stop a following bare `:N` from resolving against whatever
+    mod file was named before it, which is why the clearing decision uses
+    ANY_CITE_RE and the resolving decision uses RESOLVABLE_CITE_RE.
+
+    A NAME THAT LOOKS LIKE THIS MOD'S AND RESOLVES TO NOTHING IS AN ERROR, not a
+    skip. Renaming or mistyping a script is exactly the visible event this check
+    exists to produce; treating it as "some file I cannot see" would hide it.
+
+    A basename two files in the mod share cannot be resolved either way without
+    guessing, so it is reported once and its citations are left unchecked.
+
+    NOT CHECKED, and none of these are oversights this can close: meaning, per
+    the module note on RESOLVABLE_CITE_RE; any target outside CITE_EXTS, which
+    is why a `.log` or `.py` citation is skipped; and the D:/ck3 docs repo, which
+    `validate` never sees because it takes one mod folder as its argument.
+    """
+    texts, owners, ambiguous = _citation_files(mod_root)
     reported_ambiguous: set[str] = set()
 
-    def resolve(citing: str, line_no: int, target: str, numbers: list[tuple[int, bool]]) -> None:
+    def resolve(citing: str, line_no: int, target: str, start: int, end: int | None) -> None:
         lines = texts[target]
-        for number, is_range_end in numbers:
+        if end is not None and end < start:
+            issues.append(
+                Issue(ERROR, citing, line_no, f"cites {target}:{start}-{end}, which runs backwards")
+            )
+            return
+        for number, is_range_end in [(start, False)] + ([(end, True)] if end else []):
             if number < 1 or number > len(lines):
                 issues.append(
-                    Issue(ERROR, citing, line_no, f"cites {target}:{number}, which is past the end of that file ({len(lines)} lines)")
+                    Issue(ERROR, citing, line_no, f"cites {target}:{number}, past the end of that file ({len(lines)} lines)")
                 )
                 continue
             body = lines[number - 1].strip()
@@ -308,42 +366,57 @@ def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
             # spans. A citation that STARTS there names nothing.
             if body in ("", "#") or (body == "}" and not is_range_end):
                 issues.append(
-                    Issue(ERROR, citing, line_no, f"cites {target}:{number}, which is `{lines[number - 1]}`")
+                    Issue(ERROR, citing, line_no, f"cites {target}:{number}, which is `{lines[number - 1].strip()}`")
                 )
 
-    for relpath, path in iter_files(mod_root):
-        if path.name not in texts or owners[path.name] != relpath:
-            continue
+    for name, relpath in sorted(owners.items()):
         current: str | None = None
-        for line_no, line in enumerate(texts[path.name], 1):
-            stripped = line.lstrip()
-            if not stripped.startswith("#"):
-                current = None
-                continue
-            consumed = 0
-            for match in FULL_CITE_RE.finditer(line):
-                name = match.group(1)
-                consumed = match.end()
-                if name in ambiguous:
-                    if name not in reported_ambiguous:
-                        reported_ambiguous.add(name)
-                        issues.append(Issue(WARN, relpath, line_no, f"cites `{name}`, which two files in this mod are named"))
+        # IN MARKDOWN EVERY LINE IS PROSE. Restricting to `#` lines the way the
+        # script files need would reduce README.md to heading text, i.e. to
+        # nothing, and the README is the file whose citations rot fastest. A
+        # blank line ends a paragraph there, which is the same rule by a
+        # different marker.
+        prose_everywhere = relpath.lower().endswith(".md")
+        for line_no, line in enumerate(texts[name], 1):
+            stripped = line.strip()
+            # A bare `#` ends a paragraph in this house style, and a running
+            # target must not survive one: a `:456` three paragraphs below the
+            # file that was named would otherwise resolve against it.
+            if prose_everywhere:
+                if not stripped:
                     current = None
                     continue
-                current = name if name in texts else None
-                if current is None:
+            elif not stripped.startswith("#") or stripped == "#":
+                current = None
+                continue
+            spans: list[tuple[int, int]] = []
+            for match in ANY_CITE_RE.finditer(line):
+                spans.append(match.span())
+                target = match.group(1)
+                resolvable = RESOLVABLE_CITE_RE.fullmatch(match.group(0)) is not None
+                if target in ambiguous:
+                    if target not in reported_ambiguous:
+                        reported_ambiguous.add(target)
+                        issues.append(
+                            Issue(WARN, relpath, line_no, f"cites `{target}`, a basename more than one file in this mod has")
+                        )
+                    current = None
                     continue
-                numbers = [(int(match.group(2)), False)]
-                if match.group(3):
-                    numbers.append((int(match.group(3)), True))
-                resolve(relpath, line_no, current, numbers)
+                if not resolvable or target not in texts:
+                    if resolvable and target.startswith(MOD_KEY_PREFIX):
+                        issues.append(
+                            Issue(ERROR, relpath, line_no, f"cites `{target}`, which this mod does not contain")
+                        )
+                    current = None
+                    continue
+                current = target
+                resolve(relpath, line_no, current, int(match.group(2)), int(match.group(3)) if match.group(3) else None)
             if current is None:
                 continue
-            for match in BARE_CITE_RE.finditer(line, consumed):
-                numbers = [(int(match.group(1)), False)]
-                if match.group(2):
-                    numbers.append((int(match.group(2)), True))
-                resolve(relpath, line_no, current, numbers)
+            for match in BARE_CITE_RE.finditer(line):
+                if any(lo <= match.start() < hi for lo, hi in spans):
+                    continue
+                resolve(relpath, line_no, current, int(match.group(1)), int(match.group(2)) if match.group(2) else None)
 
 
 def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issue]:

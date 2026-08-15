@@ -150,7 +150,7 @@ it guards, which is the pair most likely to drift.
 
 **Files:** none — this task only reads and decides.
 
-- [ ] **Step 1: Find Q1's counts**
+- [x] **Step 1: Find Q1's counts**
 
 ```bash
 cd /d/ck3 && grep -n "Q1" docs/specs/2026-08-13-battle-chronicles-expansion-design.md
@@ -162,7 +162,7 @@ already hold 0, 1, 2, or 3+ commander traits.
 **If the counts are not there, stop.** Plan 1 task 16 was not completed. Go run plan 1
 task 15 — do not proceed on the assumption that the gate is fine.
 
-- [ ] **Step 2: Decide**
+- [x] **Step 2: Decide**
 
 | what Q1 shows | decision |
 |---|---|
@@ -170,7 +170,7 @@ task 15 — do not proceed on the assumption that the gate is fine.
 | most hold 3 or more, but a meaningful minority hold fewer | **ship, and record the reach honestly** in the README: B will only ever touch that minority. Do not raise the cap to compensate — the cap exists so a commander does not collect the set |
 | almost every commander already holds 3+ | **the gate is dead.** Do not ship B as written |
 
-- [ ] **Step 3: If the gate is dead, choose the replacement before writing any code**
+- [x] **Step 3: If the gate is dead, choose the replacement before writing any code**
 
 Two options, and this plan does **not** pick for you because Q1's shape decides it:
 
@@ -185,7 +185,7 @@ Two options, and this plan does **not** pick for you because Q1's shape decides 
 than the ceiling**, which is what "almost every commander already holds 3+ at their first
 notable battle" means. Record which was chosen and why in the README before task 3.
 
-- [ ] **Step 4: Record the decision**
+- [x] **Step 4: Record the decision**
 
 ```bash
 cd /d/ck3
@@ -201,7 +201,7 @@ A workspace commit, not a mod commit — nothing in the mod changed yet.
 
 **Files:** none.
 
-- [ ] **Step 1: Find Q4's verdict**
+- [x] **Step 1: Find Q4's verdict**
 
 ```bash
 cd /d/ck3 && grep -n "Q4" docs/specs/2026-08-13-battle-chronicles-expansion-design.md
@@ -210,7 +210,7 @@ cd /d/ck3 && grep -n "Q4" docs/specs/2026-08-13-battle-chronicles-expansion-desi
 Q4 asked whether a `send_interface_toast` **body** executes for a character nobody is
 playing. The mod's README contradicted itself on this.
 
-- [ ] **Step 2: Apply it — to comments only**
+- [x] **Step 2: Apply it — to comments only**
 
 | Q4 verdict | what changes in plan 3 |
 |---|---|
@@ -234,7 +234,7 @@ executing there would apply the trait to the *liege*.
 **Files:**
 - Create: `mods/battle_chronicles/common/scripted_effects/bc_reputation_effects.txt`
 
-- [ ] **Step 1: Confirm the markers do not exist**
+- [x] **Step 1: Confirm the markers do not exist**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "BC: style"
@@ -242,7 +242,7 @@ cd /d/ck3/tools && python ck3.py probe "BC: style"
 
 Expected: **exit 1**. This is the failing test.
 
-- [ ] **Step 2: Write the file header and the bookkeeper**
+- [x] **Step 2: Write the file header and the bookkeeper**
 
 ```
 # Battle Chronicles - the commander's reputation.
@@ -331,7 +331,7 @@ write `bc_style_last` — they are set together in both, always. That invariant 
 reason the create-or-increment shape is not needed here; **if you ever write
 `bc_style_last` without `bc_style_streak`, this breaks silently.**
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -350,7 +350,7 @@ battle never reads a missing bc_style_last."
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_reputation_effects.txt`
 
-- [ ] **Step 1: Write the ladder**
+- [x] **Step 1: Write the ladder**
 
 ```
 # --- the style award --------------------------------------------------------
@@ -455,7 +455,7 @@ bc_style_award_effect = {
 marker exists to report. It also catches a `bc_battle_style` holding a kind not in this
 table, which would mean the seam's KIND vocabulary and this ladder have drifted apart.
 
-- [ ] **Step 2: Write the award toast**
+- [x] **Step 2: Write the award toast**
 
 ```
 # One toast shape for every style award, so the six call sites cannot drift.
@@ -517,7 +517,7 @@ every `TRAIT =` argument in this file against a real key in the loc file. It can
 here, because until task 8 none of the keys exist and every row would read `loc=0`. Type
 the six names carefully and let task 8 confirm them.
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -547,7 +547,7 @@ and the bucket must be **derived**, because there is no scratch variable holding
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_reputation_effects.txt`
 
-- [ ] **Step 1: Understand why terrain is not symmetric with style**
+- [x] **Step 1: Understand why terrain is not symmetric with style**
 
 `bc_battle_style` is a variable the seam wrote during the battle. There is no
 `bc_battle_terrain` and there cannot be one cheaply: **`terrain` is a trigger, not
@@ -562,7 +562,7 @@ both `rough_terrain_expert`; stored as raw keys they are a mismatch, the streak 
 and `rough_terrain_expert` becomes near-unreachable. **The streak must be counted on the
 thing being awarded.**
 
-- [ ] **Step 2: Write the bucket resolver**
+- [x] **Step 2: Write the bucket resolver**
 
 **Read this trap first — it is one of the two things in task 5 to get right.** The obvious
 way to write a six-way ladder that reads a province and writes to a commander is this, and
@@ -794,7 +794,7 @@ cd /d/ck3/mods/battle_chronicles && grep -n "left_icon MUST be" -A 6 common/scri
 
 If plan 1 task 5 moved that comment into `bc_reward_effects.txt`, look there instead.
 
-- [ ] **Step 3: Write the terrain streak, using `bc_terrain_this`**
+- [x] **Step 3: Write the terrain streak, using `bc_terrain_this`**
 
 The bucket resolver writes a **fifth variable**, `bc_terrain_this`, so the streak
 comparison has something to compare against — exactly as `bc_battle_style` backs the style
@@ -825,7 +825,7 @@ bc_terrain_streak_effect = {
 }
 ```
 
-- [ ] **Step 4: Write the terrain award**
+- [x] **Step 4: Write the terrain award**
 
 ```
 # Six buckets, six traits. Called only when the streak has reached 2 and the
@@ -922,7 +922,7 @@ sed -n '17133,17212p' "D:/SteamLibrary/steamapps/workshop/content/1158310/296233
 
 Expected: **0**.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -942,7 +942,7 @@ so hills-then-mountains counts as a streak rather than breaking one."
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_reputation_effects.txt`
 
-- [ ] **Step 1: Understand the two phases, because collapsing them is the trap**
+- [x] **Step 1: Understand the two phases, because collapsing them is the trap**
 
 Bookkeeping and awarding are **separate passes**, not one.
 
@@ -953,7 +953,7 @@ Bookkeeping and awarding are **separate passes**, not one.
 - **Awarding is a chain** — style, then terrain, then nickname — and awards **at most one
   thing per battle**.
 
-- [ ] **Step 2: Understand the three defects that a plain `else_if` chain has here**
+- [x] **Step 2: Understand the three defects that a plain `else_if` chain has here**
 
 The obvious shape for "style, then terrain, then nickname, at most one" is a three-arm
 `if / else_if / else_if`. It is wrong three separate ways, and all three are invisible to
@@ -1002,7 +1002,7 @@ if the streak survived any of them the commander would re-enter the dead branch 
 subsequent notable battle, forever. Resetting on threshold rather than on award is what
 makes all four safe at once. **So the reset sits above the award, not inside it.**
 
-- [ ] **Step 3: Write the chain**
+- [x] **Step 3: Write the chain**
 
 ```
 # --- the chain --------------------------------------------------------------
@@ -1125,7 +1125,7 @@ bc_reputation_effect = {
 }
 ```
 
-- [ ] **Step 4: Read these three things before moving on**
+- [x] **Step 4: Read these three things before moving on**
 
 1. **Both `remove_variable` calls must be outside every branch**, as written. If
    `bc_terrain_this` lived inside the terrain block, a battle that took the style block
@@ -1153,7 +1153,7 @@ bc_reputation_effect = {
    would report it if that reasoning is ever broken by a later plan. Do not remove that
    marker.
 
-- [ ] **Step 5: Validate**
+- [x] **Step 5: Validate**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1162,7 +1162,7 @@ cd /d/ck3/tools && python ck3.py validate --strict
 Expected: exit 0.
 
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1184,7 +1184,7 @@ block-doors safe at once."
 **Files:**
 - Modify: `mods/battle_chronicles/events/bc_aftermath_events.txt`
 
-- [ ] **Step 1: Replace the nickname block in `bc_chronicles.0091` (the winner)**
+- [x] **Step 1: Replace the nickname block in `bc_chronicles.0091` (the winner)**
 
 The winner grader currently holds, inside `side_commander ?= { if = { limit = { is_alive = yes } } }`:
 
@@ -1211,7 +1211,7 @@ Replace the whole `if` block — **not** the counter call above it — with:
 nickname arm reads `var:bc_notable_battles >= 3`, so the counter must have already
 incremented for this battle.
 
-- [ ] **Step 2: Add the chain to `bc_chronicles.0092` (the loser)**
+- [x] **Step 2: Add the chain to `bc_chronicles.0092` (the loser)**
 
 The loser grader has **no** `side_commander ?=` block today — the counter and the nickname
 are winner-only, deliberately, and nothing else touched the commander. Add one, inside the
@@ -1232,7 +1232,7 @@ outcomes.
 **Do not add `bc_notable_battle_counter_effect` here.** That counter is wins only and the
 loser grader's header says so.
 
-- [ ] **Step 3: Confirm placement against the load-bearing body order**
+- [x] **Step 3: Confirm placement against the load-bearing body order**
 
 Plan 1's grader header states the order: cleanup outside the gate, grading inside it,
 scratch clearing outside and last. **The chain is grading.** It must sit inside the
@@ -1254,7 +1254,7 @@ dead** — every battle would grade a commander whose style had already been era
 phase-1 guard would swallow it silently, and no marker would fire. That silence is why
 this is checked by eye rather than left to the runtime pass.
 
-- [ ] **Step 4: Verify the call count**
+- [x] **Step 4: Verify the call count**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -c "bc_reputation_effect" events/bc_aftermath_events.txt
@@ -1262,7 +1262,14 @@ cd /d/ck3/mods/battle_chronicles && grep -c "bc_reputation_effect" events/bc_aft
 
 Expected: **2** — one per grader.
 
-- [ ] **Step 5: Validate, index, conflicts, deploy**
+> **RUN CORRECTION 2026-08-14 — anchor this count on call syntax.** As written it returns
+> **3**: the comment this task adds above the winner's call names `bc_reputation_effects.txt`
+> in prose, which the bare pattern matches. Use
+> `grep -c "bc_reputation_effect = {"` → **2**. Same house rule as this plan's other counts.
+> The `deploy` in step 5 also needs its mod slug (`deploy battle_chronicles`), or it exits 2
+> inside the `&&` chain.
+
+- [x] **Step 5: Validate, index, conflicts, deploy**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy
@@ -1270,7 +1277,7 @@ cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && pyt
 
 Expected: all exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1289,7 +1296,7 @@ than inferred from which event is running."
 **Files:**
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
 
-- [ ] **Step 1: Check the BOM and record the baseline key count**
+- [x] **Step 1: Check the BOM and record the baseline key count**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1302,7 +1309,7 @@ Expected: begins `M-oM-;M-?`. UTF-8 with BOM, one leading space per line.
 **Write the key count down.** Step 3 checks that it rose by exactly 14, which is not a
 check you can run without the number from before the edit.
 
-- [ ] **Step 2: Write the fourteen keys**
+- [x] **Step 2: Write the fourteen keys**
 
 Two titles and twelve descriptions — one description per trait, because
 `bc_style_award_toast_effect` and `bc_terrain_award_toast_effect` build the desc key by
@@ -1329,7 +1336,7 @@ substituting `$TRAIT$`. Six style, six terrain.
 one thing here that will not fail loudly if it is wrong — a bad scope reference in a loc
 string renders as broken text in game, not as a validation error.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1350,7 +1357,7 @@ An earlier draft of this step called the absence of a WARN "the real test of ste
 "the only check in the entire plan that catches it". Both statements were wrong: the check
 it named cannot fail.
 
-- [ ] **Step 4: Pair the twelve substituted keys against their call sites**
+- [x] **Step 4: Pair the twelve substituted keys against their call sites**
 
 This is the real test of task 4 step 2 and task 5, and it is only runnable now, because
 until this task the keys did not exist.
@@ -1379,7 +1386,7 @@ or the key here, and the loop cannot tell you which, only that the two do not ag
 version that harvested names out of the effect file and paired them with themselves would
 agree with itself no matter what either file says.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1393,7 +1400,7 @@ git commit -m "feat: localize the twelve reputation awards"
 
 **Files:** none — this task only reads.
 
-- [ ] **Step 1: Every trait B names actually exists**
+- [x] **Step 1: Every trait B names actually exists**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1416,7 +1423,7 @@ UTF-8 BOM, so its first line cannot match a `^`-anchored pattern — line 1 happ
 another AGOT file without checking what is on line 1 first; the terrain-helper file in
 task 6 is exactly the case where it bites.
 
-- [ ] **Step 2: No parameter is compared without `flag:`**
+- [x] **Step 2: No parameter is compared without `flag:`**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1440,7 +1447,7 @@ reports its own correct code as a failure — `flag:$OUTCOME$ = flag:win` contai
 no `flag:` on it and survives the filter. `[A-Z]` alone would miss a parameter named
 `$SOME_PARAM$`.
 
-- [ ] **Step 2b: Every toast call names a TYPE**
+- [x] **Step 2b: Every toast call names a TYPE**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1461,7 +1468,7 @@ plans 4 and 5 route bad news through the same effect. **An omitted parameter is 
 in CK3**: the literal text `type = $TYPE$` reaches `send_interface_toast` and `validate` sees
 balanced braces. Only this count catches it.
 
-- [ ] **Step 3: No missing-variable read**
+- [x] **Step 3: No missing-variable read**
 
 Read `bc_reputation_effects.txt` end to end and check every `limit` block containing a
 `var:` **comparison**. **Each one must be either nested inside an `exists` guard, or
@@ -1483,6 +1490,18 @@ There are **sixteen** such comparisons, and this is the full list. Tick each one
 
 2 + 3 + 6 + 5 = 16. If your read finds a seventeenth, it is new and it is unguarded.
 
+> **RUN CORRECTION 2026-08-14 — there are SEVENTEEN, and the seventeenth is not new.**
+> The terrain ladder has **6** arms, not 5: `winter` was added to this plan later than the
+> other five buckets and the row above was never updated with it. Correct arithmetic is
+> **2 + 3 + 6 + 6 = 17**. All seventeen are guarded exactly as the table says — the six
+> terrain arms by phase 2b's explicit `exists = var:bc_terrain_this` row. Verified with:
+> ```bash
+> grep -n "var:[a-z_]* [=<>]" common/scripted_effects/bc_reputation_effects.txt \
+>   | grep -v "^[0-9]*:#" | grep -v "exists = var" | grep -v "value = var"
+> ```
+> The `value = var` filter matters: `set_variable = { ... value = var:X }` is a WRITE, not
+> a comparison, and there are four of them.
+
 For the award ladders specifically: `var:bc_battle_style` is proven by phase 2a's outer
 `exists = var:bc_style_streak` — phase 1 writes `bc_style_streak` only when
 `bc_battle_style` existed, and never removes it — and `var:bc_terrain_this` by the explicit
@@ -1490,7 +1509,7 @@ For the award ladders specifically: `var:bc_battle_style` is proven by phase 2a'
 comment at the top of each ladder**, because it is the kind of invariant a later plan breaks
 by moving a call site.
 
-- [ ] **Step 4: The ledger variables are not cleared**
+- [x] **Step 4: The ledger variables are not cleared**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1502,7 +1521,7 @@ Expected: **no output**. These four are ledger, not scratch. If `bc_clear_scratc
 learned about any of them, every streak would reset at every combat end and B could never
 award anything.
 
-- [ ] **Step 5: Both scratch variables ARE dropped, and only inside the chain**
+- [x] **Step 5: Both scratch variables ARE dropped, and only inside the chain**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1525,7 +1544,7 @@ was also set in the chain, which would make it mean "an arm was entered" rather 
 award was made" and would let a style ladder that fell through on `has_trait` block terrain
 for nothing.
 
-- [ ] **Step 6: Full static pass**
+- [x] **Step 6: Full static pass**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy

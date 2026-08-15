@@ -29,6 +29,14 @@ importing - no test ever runs, none is named - reaches the CRASHED branch. Two
 mutants below are kept precisely because they raise: the early `return []` after
 a bad loc filename, and the ground guard.
 
+WHAT IS DELIBERATELY NOT MUTATED. `_scan_matches` reports the line of `m.start()`,
+and swapping that for `m.end()` is an EQUIVALENT MUTANT against the two patterns
+that reach it: neither LOC_ARM_RE nor CUSTOM_CALL_RE can match across a newline
+from the position it starts at, so both ends of a match always sit on the same
+line and no fixture can separate them. An entry for it would survive forever and
+say nothing. The arithmetic around it - the `+ 1`, and the prefix bound on the
+newline count - is mutated, because both are wrong in a way a fixture can see.
+
 Run it with `python tools/tests/mutate_validate.py`. Exit 0 means every mutant
 was killed.
 """
@@ -243,6 +251,16 @@ MUTANTS = [
         "    for name in sorted(set(BC_GROUND_BASES) - shipped):",
         "    for name in sorted(set()):",
     ),
+    (
+        "ground: scan the AGOT file for mentions, not definitions",
+        "    shipped = {n for n in TERRAIN_DEF_RE.findall(read_text(agot))} - BC_GROUND_NON_BASES",
+        "    shipped = {n for n in TERRAIN_HELPER_RE.findall(read_text(agot))} - BC_GROUND_NON_BASES",
+    ),
+    (
+        "ground: stop at the first source that ships the terrain file",
+        "        if candidate.is_file():\n            agot = candidate",
+        "        if candidate.is_file():\n            agot = candidate\n            break",
+    ),
     # --- the whole run ---------------------------------------------------
     (
         "run: report the folder that does exist and scan the one that does not",
@@ -336,6 +354,17 @@ MUTANTS = [
         "run: read a trailing comment as part of the arm key",
         'LOC_ARM_RE = re.compile(r"^\\s*localization_key\\s*=\\s*([^\\s#]+)", re.M)',
         'LOC_ARM_RE = re.compile(r"^\\s*localization_key\\s*=\\s*(\\S+)", re.M)',
+    ),
+    # --- the line number both resolvers report ---------------------------
+    (
+        "scan: report every match one line high",
+        'return [(text.count("\\n", 0, m.start()) + 1, m.group(1)) for m in pattern.finditer(text)]',
+        'return [(text.count("\\n", 0, m.start()), m.group(1)) for m in pattern.finditer(text)]',
+    ),
+    (
+        "scan: count the whole file instead of the prefix before the match",
+        'return [(text.count("\\n", 0, m.start()) + 1, m.group(1)) for m in pattern.finditer(text)]',
+        'return [(text.count("\\n") + 1, m.group(1)) for m in pattern.finditer(text)]',
     ),
     # --- the categories that expect localization -------------------------
     (

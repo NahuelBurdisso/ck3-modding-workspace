@@ -338,12 +338,13 @@ class TestGroundPartition(ValidateTestCase):
         with mock.patch.object(V, "playset_sources", return_value=sources or []):
             return self.run_check(V._check_ground_partition, self.cfg(), self.root)
 
-    def agot(self, names: list[str]) -> Source:
-        source_root = self.root / "agot_source"
+    def agot(self, names: list[str], at: str = "agot_source", body: str = "") -> Source:
+        source_root = self.root / at
         path = source_root / V.AGOT_TERRAIN_FILE
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
-            "".join(f"agot_is_{name}_terrain = {{\n}}\n" for name in names), encoding="utf-8"
+            "".join(f"agot_is_{name}_terrain = {{\n}}\n" for name in names) + body,
+            encoding="utf-8",
         )
         return Source(source_root)
 
@@ -404,6 +405,34 @@ class TestGroundPartition(ValidateTestCase):
         found = self.ground([source])
         for name in V.BC_GROUND_NON_BASES:
             self.assertNoneMatching(found, name)
+
+    def test_a_helper_agot_only_mentions_is_not_read_as_shipped(self) -> None:
+        # THE TWO SIDES USE TWO DIFFERENT PATTERNS AND MUST KEEP DOING SO. The
+        # mod side scans with TERRAIN_HELPER_RE, which matches a bare mention,
+        # because a ground band is nothing but mentions. The AGOT side scans
+        # with TERRAIN_DEF_RE, which matches only `agot_is_x_terrain = {` at
+        # column zero, because AGOT's terrain file also USES its helpers inside
+        # the bodies of other triggers. Point the AGOT side at the loose
+        # pattern and every such use reads as a terrain AGOT ships, which
+        # errors on a mod that is correct.
+        self.bands(V.BC_GROUND_BASES)
+        source = self.agot(
+            V.BC_GROUND_BASES,
+            body="agot_terrain_is_watery = {\n\tagot_is_saltmarsh_terrain = yes\n}\n",
+        )
+        self.assertEqual(self.ground([source]), [])
+
+    def test_the_last_source_shipping_the_file_is_the_one_read(self) -> None:
+        # THE LOOKUP HAS NO `break` ON PURPOSE. playset_sources yields in load
+        # order, so when two enabled sources both carry AGOT's terrain file the
+        # later one is what the game loads, and this check has to agree with
+        # the game. The earlier source here still defines a terrain that was
+        # since removed; stopping at the first hit reports a mod that matches
+        # the file actually loaded as wrong.
+        self.bands(V.BC_GROUND_BASES)
+        stale = self.agot(V.BC_GROUND_BASES + ["saltmarsh"], at="agot_old")
+        current = self.agot(V.BC_GROUND_BASES, at="agot_new")
+        self.assertEqual(self.ground([stale, current]), [])
 
 
 class TestValidateMod(ValidateTestCase):
@@ -574,6 +603,24 @@ class TestValidateMod(ValidateTestCase):
             "localization/english/a_l_english.yml", BOM + 'l_english:\n bc_present:0 "Here"\n'
         )
         self.assertNoneMatching(self.validate(), "localization_key")
+
+    def test_two_arms_are_each_reported_on_their_own_line(self) -> None:
+        # THE LINE NUMBER IS THE WHOLE POINT OF THE MESSAGE. _scan_matches
+        # derives it by counting newlines BEFORE the match and adding one, and
+        # neither half of that had a test: dropping the `+ 1` reports every
+        # issue one line high, and counting the whole file instead of the
+        # prefix reports every issue at the last line. Both leave the message
+        # text intact, so every other test here stays green over either. TWO
+        # ARMS, NOT ONE, because a single arm cannot tell a per-match count
+        # from a whole-file count.
+        self.write(
+            "common/customizable_localization/c.txt",
+            "bc_one = {\n\ttext = {\n\t\tlocalization_key = bc_absent_a\n\t}\n}\n"
+            "bc_two = {\n\ttext = {\n\t\tlocalization_key = bc_absent_b\n\t}\n}\n",
+        )
+        found = self.validate()
+        self.assertOneMatching(found, "c.txt:3: `localization_key = bc_absent_a`")
+        self.assertOneMatching(found, "c.txt:8: `localization_key = bc_absent_b`")
 
     def test_a_file_that_vanilla_also_ships_is_reported_as_an_override(self) -> None:
         # THE ONLY INFO-LEVEL LINE THE VALIDATOR EMITS, and nothing reached it:

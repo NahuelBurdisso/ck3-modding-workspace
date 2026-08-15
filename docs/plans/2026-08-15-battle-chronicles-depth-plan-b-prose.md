@@ -14,6 +14,37 @@
 
 ---
 
+## AMENDMENT 2026-08-15 — the gate is split, and its safe half is now open
+
+**Tasks 2, 3 and 4 are unblocked. Tasks 5-14 remain blocked on a run.** The line between them is
+not a judgement about confidence; it is a property of the diffs.
+
+**Why the split is safe.** Task 4 leaves every one of the ten literal sentences in place and
+*appends* two calls to each. If a `Custom()` call fails to render, the toast shows exactly what it
+shows today — the failure mode of tasks 2-4 is "no improvement", not "regression". Tasks 5-14 are
+the opposite: they replace each literal with four calls and nothing else, so the same failure
+produces an empty toast body. The gate exists for that second diff. It was never needed for the
+first.
+
+**What the gate asked, and how much of it static work has answered.** The premise was called
+"unproven by anything static". Two thirds of it now are, by vanilla precedent:
+
+| claim | status | proof |
+|---|---|---|
+| `Custom()` renders inside a `send_interface_toast` desc | **proven** | `common/court_positions/tasks/00_court_poet_tasks.txt:94-98` sends a toast whose `desc = court_poet_poetry_desc`; that key at `localization/english/court_positions_2_l_english.yml:150` is `"[court_poet_from_task.Custom('GeneratePoem_Outro_Rhyming')]"`, against a scope saved at `:47`. |
+| custom-loc arms may read `var:X = flag:y` off the scope handed to `Custom()`, where that scope is a `save_scope_as` and the variable a `set_variable` | **proven** | `common/customizable_localization/00_ai_value_custom_loc.txt:1-10` is `type = character`, `random_valid = yes`, arms `var:strongest_ai_value = flag:positive_boldness`. Its one call site is `[debater.Custom('StrongestAIValueNoun')]` (`event_localization/lifestyle/statecraft/diplomacy_majesty_events_l_english.yml:153`). `debater` is `save_scope_as`'d at `events/activities/debate_activity/debate_events.txt:1520`; `strongest_ai_value` is `set_variable`'d at `common/scripted_effects/00_ai_value_effects.txt:31`. |
+| the two **compose** — a var-reading definition called on a saved scope from inside a toast desc | **still unproven** | no vanilla site does both at once. This is the whole of what the run now settles. |
+
+`00_artifact_custom_loc.txt:17-18` additionally ships the `exists = var:X` / nested-read arm shape
+this plan mandates in rule 1, so that shape is precedent rather than invention.
+
+**Do not read this amendment as permission to start task 5.** The residual risk is small but its
+blast radius under tasks 5-14 is ten empty toasts, and the fix would be a rewrite of the same 110
+keys into the `triggered_desc` fallback shape. Under tasks 2-4 the residual risk costs nothing at
+all. Those are different bets and only one of them is worth taking without a run.
+
+---
+
 ## Read this before task 1
 
 **This plan is blocked until a human confirms one thing.** Plan A task 7 shipped a single fragment set on The Banner Falls precisely so that this plan is either unblocked or cancelled by one observation. Task 1 is that check. **Do not skip it because the code "looks right".** The premise it tests — that `[scope.Custom('key')]` renders inside a `send_interface_toast` desc with the arms reading the invoking character's variables — is unproven by anything static, and this plan writes about a hundred keys that all rest on it.

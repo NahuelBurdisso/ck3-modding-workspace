@@ -26,6 +26,8 @@ run from `D:/ck3`. **Its baseline is `0 errors, 2 warnings`** — both warnings 
 
 **No step in this plan requires launching CK3.** That is a hard constraint on this plan. Every step's expected output is either a `validate` result, a `git` result, or a `python -c` result. The one thing that genuinely needs a game run is task 7's spike, and task 7 only *writes* the spike — reading its result is Plan B's problem.
 
+**Every bare `python tools/ck3.py ...` in this plan runs from `D:/ck3`.** The shell is git-bash on Windows, so that is `cd /d/ck3`. Steps that need a different directory say so on the command line. If a `validate` invocation reports `mod folder does not exist`, you are in the wrong directory, not looking at a real failure.
+
 **Two git repos.** Docs live in `D:/ck3`. The mod lives in `D:/ck3/mods/battle_chronicles`, which is **its own repository**. `git status` from `D:/ck3` will not show mod changes. Every mod commit in this plan runs with `cd D:/ck3/mods/battle_chronicles` first; every tooling commit runs from `D:/ck3`.
 
 **Every script `.txt` in the mod carries a UTF-8 BOM** (`ef bb bf`). The `Write` tool does not add one. Every task that creates a new `.txt` under `mods/battle_chronicles` has an explicit BOM step, and it is not optional — CK3 does not read the file without it and `validate` will tell you so.
@@ -47,12 +49,16 @@ run from `D:/ck3`. **Its baseline is `0 errors, 2 warnings`** — both warnings 
 | `mods/battle_chronicles/common/scripted_effects/bc_context_effects.txt` | **create** | `bc_write_ground_effect`, `bc_write_bond_effect` |
 | `mods/battle_chronicles/common/scripted_effects/bc_ledger_effects.txt` | modify | anchor scope + three calls in `bc_battle_open_effect`; three removals in `bc_clear_scratch_effect` |
 | `mods/battle_chronicles/common/customizable_localization/bc_flavour.txt` | **create** | the spike fragment (Plan B fills this file out) |
+| `mods/battle_chronicles/common/modifiers/bc_battle_modifiers.txt` | modify | one new family-2 modifier, `bc_ground_held` |
+| `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt` | modify | register `bc_ground_held` in `bc_cleanup_effect` |
 | `mods/battle_chronicles/common/scripted_effects/bc_eve_effects.txt` | modify | save `scope:bc_eve_ground` |
-| `mods/battle_chronicles/events/bc_eve_events.txt` | modify | ground paragraph + two contextual options |
+| `mods/battle_chronicles/events/bc_eve_events.txt` | modify | foe + ground paragraphs, two contextual options |
 | `mods/battle_chronicles/events/bc_aftermath_events.txt` | modify | the foe-relative award in `.0091` |
-| `mods/battle_chronicles/localization/english/bc_l_english.yml` | modify | fragment keys, eve paragraphs, option text, award reason |
+| `mods/battle_chronicles/localization/english/bc_l_english.yml` | modify | fragment keys, eve paragraphs, option text, modifier name |
 
 `bc_ground_triggers.txt` is a **new file rather than an append to `bc_scripted_triggers.txt`** for one concrete reason: task 4's validator check counts every `agot_is_*_terrain` mention in the file it reads. A file that contains only the six band triggers makes that check a two-line regex instead of a brace parser. Keep it that way — do not add unrelated triggers to it.
+
+**A naming rule, and it starts here.** `validate.py:174-178` records a key in `def_categories` only the **first** time it sees it, so a customizable-localization definition whose key collides with an earlier-scanned script key would be omitted from task 2's `custom_loc_defs` and every `Custom()` call to it would error falsely — on top of the duplicate-definition warning. `common/customizable_localization` sorts after `common/combat_phase_events` under `iter_files`, so the phase event would win the race. **Every custom-loc definition in this mod ends in a class suffix** — `_core`, `_ground`, `_bond`, `_scale` — which no phase event, effect or trigger key uses. `bc_banner_falls_ground` versus the phase event `bc_banner_falls` is the first instance. Plan B writes about a hundred more; the rule is what keeps them from colliding.
 
 ---
 
@@ -160,7 +166,7 @@ Expected: `0 errors, 2 warnings` — identical to step 1.
 Create the directory and a deliberately broken definition:
 
 ```bash
-mkdir -p mods/battle_chronicles/common/customizable_localization
+cd /d/ck3 && mkdir -p mods/battle_chronicles/common/customizable_localization
 printf '\xef\xbb\xbfbc_probe_check = {\n\ttype = character\n\ttext = {\n\t\tlocalization_key = bc_this_key_does_not_exist\n\t}\n}\n' > mods/battle_chronicles/common/customizable_localization/zz_probe.txt
 python tools/ck3.py validate --strict battle_chronicles
 ```
@@ -176,7 +182,7 @@ If it does not appear, the check is not wired up — most likely the `if relpath
 - [ ] **Step 8: Remove the probe and confirm the baseline returns**
 
 ```bash
-rm mods/battle_chronicles/common/customizable_localization/zz_probe.txt
+cd /d/ck3 && rm mods/battle_chronicles/common/customizable_localization/zz_probe.txt
 python tools/ck3.py validate --strict battle_chronicles
 ```
 
@@ -255,7 +261,7 @@ Expected: `0 errors, 2 warnings`. The mod's loc contains no `Custom(` calls yet.
 Append a broken call to the loc file — temporarily:
 
 ```bash
-printf ' bc_probe_broken_call:0 "[ROOT.Char.Custom('"'"'bc_no_such_fragment'"'"')]"\n' >> mods/battle_chronicles/localization/english/bc_l_english.yml
+cd /d/ck3 && printf ' bc_probe_broken_call:0 "[ROOT.Char.Custom('"'"'bc_no_such_fragment'"'"')]"\n' >> mods/battle_chronicles/localization/english/bc_l_english.yml
 python tools/ck3.py validate --strict battle_chronicles
 ```
 
@@ -456,30 +462,39 @@ with
 
 - [ ] **Step 5: Verify the extraction lost nothing**
 
-The refactor is only safe if the terrain names moved intact. Compare the two sides mechanically:
+The refactor is only safe if **two** orderings survived: the terrain names inside the six bands, and the six `flag:` values the effect writes. Both matter and they fail differently — a transposed terrain name moves one province, a transposed flag value re-bands every province in two whole categories and silently changes which commander trait `bc_reputation_effect` awards.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && python -c "
 import re, subprocess
-old = subprocess.run(['git','show','HEAD:common/scripted_effects/bc_reputation_effects.txt'],capture_output=True,text=True).stdout
+old = subprocess.run(['git','show','HEAD:common/scripted_effects/bc_reputation_effects.txt'],
+                     capture_output=True, encoding='utf-8').stdout
+cur = open('common/scripted_effects/bc_reputation_effects.txt',encoding='utf-8-sig').read()
 new = open('common/scripted_triggers/bc_ground_triggers.txt',encoding='utf-8-sig').read()
-body = old[old.index('bc_terrain_bucket_effect'):]
-body = body[:body.index('bc_terrain_streak_effect')]
-a = re.findall(r'agot_is_(\w+)_terrain', body)
+
+def bucket(text):
+    b = text[text.index('bc_terrain_bucket_effect = {'):]
+    return b[:b.index('bc_terrain_streak_effect')]
+
+a = re.findall(r'agot_is_(\w+)_terrain', bucket(old))
 b = re.findall(r'agot_is_(\w+)_terrain', new)
-print('old', len(a), 'new', len(b))
-print('identical order:', a == b)
+print('terrain names  old', len(a), 'new', len(b), '| identical order:', a == b)
+
+fo = re.findall(r'bc_terrain_this value = flag:(\w+)', bucket(old))
+fn = re.findall(r'bc_terrain_this value = flag:(\w+)', bucket(cur))
+tn = re.findall(r'limit = \{ bc_ground_is_(\w+)_trigger = yes \}', bucket(cur))
+print('flag order     ', fo == fn, '| trigger order matches flags:', tn == fn)
 "
 ```
 
 Expected:
 
 ```
-old 23 new 23
-identical order: True
+terrain names  old 23 new 23 | identical order: True
+flag order      True | trigger order matches flags: True
 ```
 
-Order matters here because the bands are an ordered if/else_if chain: same names in same order means same band assignment for every province.
+The third comparison is the one that catches a transposition: it asserts that the `n`th `limit` in the rewritten ladder calls the trigger named after the `n`th flag it writes.
 
 - [ ] **Step 6: Validate**
 
@@ -507,12 +522,12 @@ EOF
 
 ### Task 4: validator — the ground partition stays complete
 
-Task 3's partition is only safe while it stays exhaustive. AGOT adds terrains. A helper that falls out of the six bands makes every province on it fall to an `else` and lose its band, silently.
+Task 3's partition is only safe while it stays exhaustive, and it can stop being exhaustive from **two directions**: the mod can drop a band, or AGOT can add a terrain. Either way, every province on the orphaned helper falls to an `else` and loses its band, silently. The check therefore has two halves.
 
 **Files:**
 - Modify: `tools/ck3lib/validate.py`
 
-- [ ] **Step 1: Add the expected helper list and the check**
+- [ ] **Step 1: Add the expected helper list and the mod-side check**
 
 In `tools/ck3lib/validate.py`, after `_scan_matches` (added in task 1 step 3), add:
 
@@ -522,8 +537,8 @@ In `tools/ck3lib/validate.py`, after `_scan_matches` (added in task 1 step 3), a
 # The 23 AGOT base terrain helpers, in band order. Held as an explicit list and
 # not globbed: the `agot_is_*_terrain` glob matches 26 names, because AGOT also
 # ships agot_is_majorroad_terrain, agot_is_minorroad_terrain and
-# agot_is_location_valid_vanilla_terrain, which are not bases and must not be
-# banded.
+# agot_is_location_valid_vanilla_terrain, which are cross-cutting or
+# character-scoped and must not be banded.
 BC_GROUND_BASES = [
     "drylands", "desert", "desert_mountains", "oasis", "canyon",
     "farmlands", "plains", "steppe", "floodplains", "urban",
@@ -532,33 +547,79 @@ BC_GROUND_BASES = [
     "jungle", "cloudforest",
     "frozen_flats", "glacier",
 ]
+BC_GROUND_NON_BASES = {"majorroad", "minorroad", "location_valid_vanilla"}
 BC_GROUND_FILE = "common/scripted_triggers/bc_ground_triggers.txt"
+AGOT_TERRAIN_FILE = "common/scripted_triggers/00_agot_terrain_type_triggers.txt"
 TERRAIN_HELPER_RE = re.compile(r"agot_is_(\w+)_terrain")
+TERRAIN_DEF_RE = re.compile(r"^agot_is_(\w+)_terrain\s*=\s*\{", re.M)
 
 
-def _check_ground_partition(mod_root: Path, issues: list[Issue]) -> None:
-    """Mod-specific: the six ground bands must cover every AGOT base once."""
+def _check_ground_partition(cfg: Config, mod_root: Path, issues: list[Issue]) -> None:
+    """Mod-specific: the six ground bands must cover every AGOT base exactly once."""
     path = mod_root / BC_GROUND_FILE
     if not path.is_file():
         return
+
     found = TERRAIN_HELPER_RE.findall(read_text(path))
-    missing = [name for name in BC_GROUND_BASES if name not in found]
-    extra = [name for name in found if name not in BC_GROUND_BASES]
-    dupes = sorted({name for name in found if found.count(name) > 1})
-    for name in missing:
-        issues.append(Issue(ERROR, BC_GROUND_FILE, None, f"terrain `{name}` is in no ground band"))
-    for name in extra:
-        issues.append(Issue(ERROR, BC_GROUND_FILE, None, f"`agot_is_{name}_terrain` is not a base terrain helper"))
-    for name in dupes:
+    for name in BC_GROUND_BASES:
+        if name not in found:
+            issues.append(Issue(ERROR, BC_GROUND_FILE, None, f"terrain `{name}` is in no ground band"))
+    for name in found:
+        if name not in BC_GROUND_BASES:
+            issues.append(
+                Issue(ERROR, BC_GROUND_FILE, None, f"`agot_is_{name}_terrain` is not a base terrain helper")
+            )
+    for name in sorted({n for n in found if found.count(n) > 1}):
         issues.append(Issue(ERROR, BC_GROUND_FILE, None, f"terrain `{name}` is in more than one ground band"))
+
+    # THE OTHER HALF: has AGOT grown a terrain the bands do not know about?
+    # BC_GROUND_BASES above is a frozen literal and can only ever catch drift on
+    # the mod's side. Resolved through the playset the way `ck3.py api` and
+    # `ck3.py find` do, last source wins.
+    #
+    # IT SKIPS LOUDLY, NEVER SILENTLY. A validate run on a machine with no
+    # playset configured must say that the cross-check did not happen, because a
+    # silent skip is indistinguishable from a pass and this check exists
+    # precisely for the case nobody is looking.
+    agot: Path | None = None
+    for source in playset_sources(cfg):
+        candidate = source.root / AGOT_TERRAIN_FILE
+        if candidate.is_file():
+            agot = candidate
+    if agot is None:
+        issues.append(
+            Issue(WARN, BC_GROUND_FILE, None, f"SKIPPED the AGOT-side check: no enabled source provides {AGOT_TERRAIN_FILE}")
+        )
+        return
+    shipped = {n for n in TERRAIN_DEF_RE.findall(read_text(agot))} - BC_GROUND_NON_BASES
+    for name in sorted(shipped - set(BC_GROUND_BASES)):
+        issues.append(
+            Issue(ERROR, BC_GROUND_FILE, None, f"AGOT ships `agot_is_{name}_terrain`, which is in no ground band")
+        )
+    for name in sorted(set(BC_GROUND_BASES) - shipped):
+        issues.append(
+            Issue(ERROR, BC_GROUND_FILE, None, f"band uses `agot_is_{name}_terrain`, which AGOT no longer defines")
+        )
 ```
 
-- [ ] **Step 2: Call it**
+- [ ] **Step 2: Add the import and call it**
 
-In `validate_mod`, after `_check_structure(mod_root, issues)`, add:
+At the top of the file, the import currently reads:
 
 ```python
-    _check_ground_partition(mod_root, issues)
+from .sources import SCAN_DIRS, iter_files
+```
+
+Change it to:
+
+```python
+from .sources import SCAN_DIRS, iter_files, playset_sources
+```
+
+Then in `validate_mod`, after `_check_structure(mod_root, issues)`, add:
+
+```python
+    _check_ground_partition(cfg, mod_root, issues)
 ```
 
 - [ ] **Step 3: Confirm the baseline is unchanged**
@@ -567,25 +628,43 @@ In `validate_mod`, after `_check_structure(mod_root, issues)`, add:
 python tools/ck3.py validate --strict battle_chronicles
 ```
 
-Expected: `0 errors, 2 warnings`. The file task 3 wrote is complete, so the check finds nothing.
+Expected: `0 errors, 2 warnings`. Task 3's file is complete and AGOT's 23 bases match it exactly.
 
-- [ ] **Step 4: Prove all three arms fire**
+**If you instead see `3 warnings` with `SKIPPED the AGOT-side check`,** the playset is not resolving on this machine. That is a real result, not a failure of this task — record it and continue; the mod-side half still works. Do not "fix" it by removing the warning.
 
-Break the file three ways in turn with `Edit`, running `validate` after each and reverting with `git checkout` from the mod repo between them:
+- [ ] **Step 4: Prove the "no band" arm fires**
 
-| break | expected new ERROR |
-|---|---|
-| delete the `agot_is_glacier_terrain = yes` line | `` terrain `glacier` is in no ground band `` |
-| change `agot_is_taiga_terrain` to `agot_is_majorroad_terrain` | two errors: `` terrain `taiga` is in no ground band `` and `` `agot_is_majorroad_terrain` is not a base terrain helper `` |
-| add `agot_is_hills_terrain = yes` to `bc_ground_is_open_trigger` | `` terrain `hills` is in more than one ground band `` |
+With `Edit`, delete the `agot_is_glacier_terrain = yes` line from `bc_ground_is_winter_trigger`, then:
 
-Revert after each:
+```bash
+cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
+```
+
+Expected: **2 errors** — `` terrain `glacier` is in no ground band `` and `` AGOT ships `agot_is_glacier_terrain`, which is in no ground band ``. Both halves catching the same break is the point: the second is the one that would still fire if `BC_GROUND_BASES` had also been edited.
+
+Revert:
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git checkout -- common/scripted_triggers/bc_ground_triggers.txt
 ```
 
-- [ ] **Step 5: Confirm the baseline returns**
+- [ ] **Step 5: Prove the "not a base" arm fires**
+
+With `Edit`, change `agot_is_taiga_terrain` to `agot_is_majorroad_terrain` in `bc_ground_is_forest_trigger`, then validate.
+
+Expected: **3 errors** — `` terrain `taiga` is in no ground band ``, `` `agot_is_majorroad_terrain` is not a base terrain helper ``, and `` AGOT ships `agot_is_taiga_terrain`, which is in no ground band ``.
+
+Revert as in step 4.
+
+- [ ] **Step 6: Prove the "more than one band" arm fires**
+
+With `Edit`, add `agot_is_hills_terrain = yes` to `bc_ground_is_open_trigger`'s `OR`, then validate.
+
+Expected: **1 error** — `` terrain `hills` is in more than one ground band ``.
+
+Revert as in step 4.
+
+- [ ] **Step 7: Confirm the baseline returns**
 
 ```bash
 cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
@@ -593,15 +672,17 @@ cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
 
 Expected: `0 errors, 2 warnings`.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 cd /d/ck3 && git add tools/ck3lib/validate.py && git commit -m "$(cat <<'EOF'
 tools: check the Battle Chronicles ground partition stays complete
 
 A terrain helper that falls out of the six bands loses its band silently,
-on every province that carries it. The 23 bases are an explicit list
-because the agot_is_*_terrain glob also matches three non-base helpers.
+on every province that carries it. Two halves: the 23 bases as an
+explicit list, because the agot_is_*_terrain glob also matches three
+non-base helpers, and a cross-check against whatever AGOT the playset
+actually resolves to, which skips loudly when there is no playset.
 EOF
 )"
 ```
@@ -849,16 +930,20 @@ bc_write_bond_effect = {
 	if = {
 		limit = { exists = var:bc_battle_foe }
 
+		# bc_facing_nemesis_trigger, NOT a hand-rolled comparison.
+		# bc_scripted_triggers.txt:244-255 already nests both reads behind their
+		# own `exists` in a trigger_if AND carries the `is_alive = yes` row. A
+		# hand-rolled `limit = { exists = var:bc_nemesis  var:bc_battle_foe =
+		# var:bc_nemesis }` would read var:bc_nemesis as a SIBLING of its own
+		# exists, which is the rule at the top of this file, and would drop the
+		# liveness row on top of it.
 		if = {
-			limit = {
-				exists = var:bc_nemesis
-				var:bc_battle_foe = var:bc_nemesis
-			}
+			limit = { bc_facing_nemesis_trigger = yes }
 			set_variable = { name = bc_battle_bond value = flag:nemesis }
 			debug_log = "BC: bond nemesis"
 		}
 		else_if = {
-			limit = { var:bc_battle_foe = { is_close_or_extended_family_of = scope:bc_chronicle_subject } }
+			limit = { var:bc_battle_foe = { is_close_family_of = scope:bc_chronicle_subject } }
 			set_variable = { name = bc_battle_bond value = flag:kin }
 			debug_log = "BC: bond kin"
 		}
@@ -899,13 +984,15 @@ bc_write_bond_effect = {
 }
 ```
 
-- [ ] **Step 2: Confirm `is_close_or_extended_family_of` exists in the playset**
+- [ ] **Step 2: Confirm `is_close_family_of` exists in the playset**
 
 ```bash
-cd /d/ck3 && python tools/ck3.py api is_close_or_extended_family_of
+cd /d/ck3 && python tools/ck3.py api is_close_family_of
 ```
 
-Expected: a trigger entry with scope `character` taking a character target. If it is absent, substitute the nearest available relative trigger the `api` dump does list — `is_close_family_of` is the fallback — and update the comment to name the one used. **Do not guess a name that the dump does not contain**; a nonexistent trigger inside a `limit` is not caught by `validate`.
+Expected: a trigger entry with scope `character` taking a character target. **Do not substitute a name the dump does not contain** — a nonexistent trigger inside a `limit` is not caught by `validate`.
+
+`is_close_family_of` and not the wider `is_close_or_extended_family_of`, which the dump also lists: the wider one reaches cousins, uncles, aunts, nephews and nieces, and `kin` sits directly **above** `countryman` in an ordered ladder. Widening `kin` starves the band below it, and a second cousin across the field is a countryman, not a brother. This is the spec's choice; do not quietly upgrade it.
 
 - [ ] **Step 3: Call the bond writer**
 
@@ -917,10 +1004,11 @@ In `bc_battle_open_effect`, directly after the `bc_write_ground_effect = yes` li
 	# AFTER the foe block at the top of this effect - it reads var:bc_battle_foe,
 	# which that block writes or removes. AFTER the dead-nemesis housekeeping
 	# would be better still, but the housekeeping sits below and moving it is a
-	# larger change than this needs: the nemesis arm reads var:bc_nemesis behind
-	# an `exists` and a dangling reference simply fails to match, falling through
-	# to the next arm. The consequence is one phase event of a dead man's grudge
-	# reading as `stranger` rather than `nemesis`, which is the correct answer.
+	# larger change than this needs: bc_facing_nemesis_trigger carries its own
+	# `is_alive = yes` row, so a dangling reference fails to match and falls
+	# through to the next arm. The consequence is one phase event of a dead man's
+	# grudge reading as `countryman` or `stranger` rather than `nemesis`, which is
+	# the correct answer anyway.
 	bc_write_bond_effect = yes
 ```
 
@@ -1121,22 +1209,24 @@ In `mods/battle_chronicles/localization/english/bc_l_english.yml`, replace line 
 with:
 
 ```
- bc_banner_falls_toast_desc:0 "The standard goes down in the press, and the men nearest it look for it and do not find it. [bc_commander.Custom('bc_banner_falls_ground')]"
+ bc_banner_falls_toast_desc:0 "The standard goes down in the press, and the men nearest it look for it and do not find it.[bc_chronicle_subject.Custom('bc_banner_falls_ground')]"
 
 # SPIKE. One fragment set, on one moment, to prove the shape renders before
-# ninety-nine more are written. Each begins with a space because it is appended
-# to a sentence, and each is one clause - the fragment adds a place to a thing
-# that already happened, it does not restate the thing.
- bc_frag_banner_falls_desert:0 "The dust takes it before the sand does."
- bc_frag_banner_falls_open:0 "There is nothing else on that field to look at, and so they all see it go."
- bc_frag_banner_falls_rough:0 "It goes down the slope with the man who carried it."
- bc_frag_banner_falls_forest:0 "The branches have it before the ground does, and it hangs there where no one can reach it."
- bc_frag_banner_falls_jungle:0 "The green closes over it in a moment, as though it had never been raised."
- bc_frag_banner_falls_winter:0 "It lies in the snow, and the snow begins at once to cover it."
+# ninety-nine more are written. Each BEGINS WITH A SPACE because it is appended
+# to a finished sentence - the anchor above deliberately has no space before the
+# tag, so that the empty fallback leaves no trailing space. Each is one clause:
+# the fragment adds a place to a thing that already happened, it does not
+# restate the thing.
+ bc_frag_banner_falls_desert:0 " The dust takes it before the sand does."
+ bc_frag_banner_falls_open:0 " There is nothing else on that field to look at, and so they all see it go."
+ bc_frag_banner_falls_rough:0 " It goes down the slope with the man who carried it."
+ bc_frag_banner_falls_forest:0 " The branches have it before the ground does, and it hangs there where no one can reach it."
+ bc_frag_banner_falls_jungle:0 " The green closes over it in a moment, as though it had never been raised."
+ bc_frag_banner_falls_winter:0 " It lies in the snow, and the snow begins at once to cover it."
  bc_frag_banner_falls_any:0 ""
 ```
 
-`bc_commander` is chosen and not invented: `bc_commander_phase_events.txt:65` saves it in the same `effect` block, one line above the toast. **Do not use `ROOT`** — the moment's desc is rendered from a toast whose root is the phase event's root, which is the knight for `type = knight` events, and using a saved scope keeps one form working for both families when Plan B extends this.
+**`bc_chronicle_subject` is the anchor, and the choice is the whole point of the spike.** It is the only scope common to all ten moment call sites — task 5 creates it in `bc_battle_open_effect`, which every phase event calls at the top of its `effect` block. `bc_commander` would render identically here (`bc_commander_phase_events.txt:65` saves it one line above this toast, on the same character) and would prove nothing, because the three `type = knight` events save `bc_knight` instead (`bc_knight_phase_events.txt:80`, `:151`, `:223`) and Plan B's hundred keys all hang off the commander-agnostic anchor. Spiking the wrong scope is a spike that costs a run and answers a question nobody asked. **Do not use `ROOT`** for the same reason: it is the knight in half the families.
 
 `bc_frag_banner_falls_any` is deliberately **empty**. The fallback should add nothing rather than say something vague; the base sentence already stands on its own.
 
@@ -1150,19 +1240,27 @@ Expected: `0 errors, 2 warnings`. Both new checks are now exercised by real cont
 
 - [ ] **Step 6: Prove the call site would have been caught**
 
+Move the definition out of the mod root — **not** `git stash`, which cannot take an untracked path and would either fail or pop an unrelated stash into the tree:
+
 ```bash
-cd /d/ck3/mods/battle_chronicles && git stash push common/customizable_localization/bc_flavour.txt && cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
+cd /d/ck3 && mv mods/battle_chronicles/common/customizable_localization/bc_flavour.txt /tmp/bc_flavour.txt && python tools/ck3.py validate --strict battle_chronicles
 ```
 
-Expected: **1 error** — `` `Custom('bc_banner_falls_ground')` has no customizable_localization definition in this mod ``.
+Expected: **1 error** — `` `Custom('bc_banner_falls_ground')` has no customizable_localization definition in this mod ``. Task 1's check goes quiet with the definition gone (no arms to resolve) and nothing checks for unreferenced loc keys, so this is the only line that moves.
 
 Restore:
 
 ```bash
-cd /d/ck3/mods/battle_chronicles && git stash pop && cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
+cd /d/ck3 && mv /tmp/bc_flavour.txt mods/battle_chronicles/common/customizable_localization/bc_flavour.txt && python tools/ck3.py validate --strict battle_chronicles
 ```
 
 Expected: `0 errors, 2 warnings`.
+
+**If the restore fails, the fragments are gone and step 1 has to be redone.** Check the move landed before running anything else:
+
+```bash
+ls -l mods/battle_chronicles/common/customizable_localization/bc_flavour.txt
+```
 
 - [ ] **Step 7: Record what the run must show**
 
@@ -1170,7 +1268,7 @@ Append to `mods/battle_chronicles/README.md`, under its "Not yet verified in gam
 
 ```markdown
 - **The spike fragment.** `bc_banner_falls_ground`, invoked as
-  `[bc_commander.Custom('bc_banner_falls_ground')]` from
+  `[bc_chronicle_subject.Custom('bc_banner_falls_ground')]` from
   `bc_banner_falls_toast_desc`. The next run must show a Banner Falls toast
   whose sentence ends with a clause naming the ground, and `probe 'BC: ground'`
   must report a band for the same battle. Read them together:
@@ -1178,9 +1276,9 @@ Append to `mods/battle_chronicles/README.md`, under its "Not yet verified in gam
   | markers | toast | verdict |
   |---|---|---|
   | a band | clause present, matches band | shape proven — Plan B may proceed |
-  | a band | no clause at all | `Custom()` does not render here, or the scope is wrong. The design's one unproven premise is false; stop. |
-  | a band | clause present, wrong band | the arms read the variable off the wrong character. Check `bc_commander` vs `bc_chronicle_subject`. |
-  | `BC: ground missing` | no clause | not a spike failure — `combat.location` did not resolve. Fix the read site, run again. |
+  | a band | no clause at all | either `Custom()` does not render in a toast desc, or `scope:bc_chronicle_subject` is not addressable from loc. Both kill the design as written; before abandoning it, retry once with `bc_commander`, which is saved on the same character one line above the toast. If that renders, the anchor is the problem and not the mechanism. |
+  | a band | clause present, wrong band | the arms read the variable off the wrong character — the anchor resolves but not to the commander who holds the scratch. |
+  | `BC: ground missing` | no clause | not a spike failure — `combat.location` did not resolve at a phase event. Fix the read site in `bc_write_ground_effect` and run again. |
 ```
 
 - [ ] **Step 8: Commit**
@@ -1260,15 +1358,149 @@ EOF
 
 ---
 
-### Task 9: the eve says where it is and offers the ground
+### Task 9: the `bc_ground_held` modifier
 
-`bc_chronicles.0011` currently branches once (nemesis / stranger) and offers three fixed options. It gains a ground paragraph and one contextual option.
+Task 10's new eve option has to apply something, and the file's own header forbids it applying momentum: *"the battle has not started, the eve is about shape, not advantage."* So it applies a family-2 verb modifier, and family 2 has exactly one rule.
+
+**Files:**
+- Modify: `mods/battle_chronicles/common/modifiers/bc_battle_modifiers.txt`
+- Modify: `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt`
+- Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
+
+- [ ] **Step 1: Confirm it does not already exist**
+
+```bash
+cd /d/ck3 && python tools/ck3.py find bc_ground_held
+```
+
+Expected: no definition. If one exists, skip to step 3 and reconcile.
+
+- [ ] **Step 2: Add the modifier**
+
+Append to `mods/battle_chronicles/common/modifiers/bc_battle_modifiers.txt`, after `bc_pursuit`:
+
+```
+
+# Took the broken ground and would not come off it. He cannot be moved and he
+# cannot move: a man who has anchored himself to a hillside or a treeline is not
+# chasing anybody off it.
+#
+# BOTH TAGS ARE ALREADY IN USE IN THIS FILE - army_toughness_mult by
+# bc_shieldwall, army_pursuit_mult by bc_pursuit - so both are confirmed against
+# docs/api/1.19.0.6/modifiers.log by the same evidence the header cites. Nothing
+# in this workspace validates a modifier tag; reusing a proven one is the only
+# check available.
+#
+# NOT a second bc_shieldwall. Shieldwall trades damage for toughness and is
+# something the line does. This trades PURSUIT for toughness and is something
+# the ground does - which is why it is offered only where the ground is worth
+# holding.
+bc_ground_held = {
+	icon = martial_positive
+	army_toughness_mult = 0.15
+	army_pursuit_mult = -0.15
+}
+```
+
+- [ ] **Step 3: Register it in `bc_cleanup_effect` — this is the one rule**
+
+`bc_battle_modifiers.txt:28` states it in the imperative: *"EVERY ONE OF THESE MUST APPEAR IN bc_cleanup_effect."* In `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt`, the family-2 block currently ends:
+
+```
+	remove_character_modifier = bc_spent_horse
+	remove_character_modifier = bc_pursuit
+}
+```
+
+Change it to:
+
+```
+	remove_character_modifier = bc_spent_horse
+	remove_character_modifier = bc_pursuit
+	remove_character_modifier = bc_ground_held
+}
+```
+
+**Not** `bc_clear_faltering_effect`, which runs mid-battle from `bc_rally_effect` — the comment two lines above says why, and it applies to this modifier exactly as it does to the other four.
+
+- [ ] **Step 4: Add the loc**
+
+In `bc_l_english.yml`, after `bc_pursuit_desc`:
+
+```
+ bc_ground_held:0 "The Ground Is Ours"
+ bc_ground_held_desc:0 "They chose the ground and they have not stepped off it. Moving them is a day's work; moving them forward is not happening."
+```
+
+- [ ] **Step 5: Verify the modifier resolves and is localized**
+
+`validate` cannot see either of these — `LOC_EXPECTED` (`validate.py:37`) covers only traits, decisions and character interactions, and nothing checks a modifier tag at all. So check both by hand:
+
+```bash
+cd /d/ck3 && python tools/ck3.py index -q && python tools/ck3.py find bc_ground_held && python tools/ck3.py loc bc_ground_held
+```
+
+Expected: exactly one definition, in `common/modifiers/bc_battle_modifiers.txt` in this mod, and exactly one loc entry, in this mod. Two of either means a collision with another mod and one of them silently wins.
+
+- [ ] **Step 6: Verify the cleanup list covers every family-2 modifier**
+
+The one rule, checked mechanically rather than by eye:
+
+```bash
+cd /d/ck3/mods/battle_chronicles && python -c "
+import re
+mods = re.findall(r'^(bc_\w+) = \{', open('common/modifiers/bc_battle_modifiers.txt',encoding='utf-8-sig').read(), re.M)
+eff = open('common/scripted_effects/bc_scripted_effects.txt',encoding='utf-8-sig').read()
+body = eff[eff.index('bc_cleanup_effect = {'):]
+body = body[:body.index('\n}')]
+cleared = set(re.findall(r'remove_character_modifier = (bc_\w+)', body))
+print('family 2 ', mods)
+print('unremoved', [m for m in mods if m not in cleared])
+"
+```
+
+Expected:
+
+```
+family 2  ['bc_bloodied', 'bc_shieldwall', 'bc_spent_horse', 'bc_pursuit', 'bc_ground_held']
+unremoved []
+```
+
+A non-empty `unremoved` list means a modifier survives combat end for its full 20 days and bleeds into the next battle of the war.
+
+- [ ] **Step 7: Validate**
+
+```bash
+cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
+```
+
+Expected: `0 errors, 2 warnings`.
+
+- [ ] **Step 8: Commit**
+
+```bash
+cd /d/ck3/mods/battle_chronicles && git add common/modifiers/bc_battle_modifiers.txt common/scripted_effects/bc_scripted_effects.txt localization/english/bc_l_english.yml && git commit -m "$(cat <<'EOF'
+feat: add the bc_ground_held family-2 modifier
+
+Toughness for pursuit: a man anchored to a hillside cannot be moved and
+cannot chase. Registered in bc_cleanup_effect in the same commit, which
+is the one rule family 2 has, and which nothing in the toolchain can
+check for us.
+EOF
+)"
+```
+
+---
+
+### Task 10: the eve says where it is, who is across the field, and offers both
+
+`bc_chronicles.0011` currently branches once (nemesis / stranger) and offers three fixed options. It gains a widened foe paragraph, a new ground paragraph, and two contextual options.
 
 **Files:**
 - Modify: `mods/battle_chronicles/events/bc_eve_events.txt`
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
 
-- [ ] **Step 1: Add the ground paragraph to the desc**
+- [ ] **Step 1: Widen the foe paragraph and add the ground paragraph**
 
 The event's `desc` currently reads:
 
@@ -1285,23 +1517,50 @@ The event's `desc` currently reads:
 	}
 ```
 
-Add a third paragraph, appended after the foe paragraph:
+Replace it with three assembled paragraphs:
 
 ```
 	# THREE PARAGRAPHS, ASSEMBLED: what is happening, who is across the field,
 	# what the field is. `desc` blocks concatenate in order; `first_valid` picks
-	# exactly one of its children. The ground block is a `first_valid` with a
-	# trigger-less final child for the same reason the fragments have a fallback
-	# arm - an eve whose province did not resolve must still render a whole
-	# paragraph, not a gap.
+	# exactly one of its children. Each chain ends in a trigger-less child for
+	# the same reason the prose fragments have a fallback arm - an eve whose foe
+	# or province did not resolve must still render a whole paragraph, not a gap.
 	#
-	# IT READS scope:bc_eve_ground, NOT scratch. See bc_eve_effects.txt.
+	# BOTH NEW CHAINS READ SAVED SCOPES, NOT SCRATCH. See bc_eve_effects.txt: the
+	# pop-up renders when the player gets round to it, which can be after the
+	# combat ended and bc_clear_scratch_effect ran.
+	#
+	# THE FOE CHAIN IS ORDERED AND THE ORDER IS THE SAME ONE §2 USES - nemesis,
+	# kin, heathen, stranger. It is deliberately SHORTER than the bond ladder:
+	# `countryman` is dropped because "a man of your own people" is not worth a
+	# paragraph on the eve of a battle, and dropping it lets the faith arm reach
+	# the foes who share a culture, which is where it is most interesting.
 	desc = {
 		desc = bc_chronicles.0011.desc_intro
 		first_valid = {
 			triggered_desc = {
 				trigger = { bc_eve_facing_nemesis_trigger = yes }
 				desc = bc_chronicles.0011.desc_nemesis
+			}
+			triggered_desc = {
+				trigger = {
+					exists = scope:bc_eve_foe
+					trigger_if = {
+						limit = { exists = scope:bc_eve_foe }
+						scope:bc_eve_foe = { is_close_family_of = root }
+					}
+				}
+				desc = bc_chronicles.0011.desc_kin
+			}
+			triggered_desc = {
+				trigger = {
+					exists = scope:bc_eve_foe
+					trigger_if = {
+						limit = { exists = scope:bc_eve_foe }
+						NOT = { scope:bc_eve_foe = { faith = root.faith } }
+					}
+				}
+				desc = bc_chronicles.0011.desc_heathen
 			}
 			desc = bc_chronicles.0011.desc_stranger
 		}
@@ -1353,16 +1612,23 @@ Add a third paragraph, appended after the foe paragraph:
 
 Four named bands plus a catch-all, not six plus a fallback: `jungle` is vanishingly rare on the AGOT map outside Sothoryos and the Summer Isles, and `open` is the honest default for both open ground and an unresolved province.
 
-- [ ] **Step 2: Add the ground option**
+- [ ] **Step 2: Add the two contextual options**
 
-The event currently has three options. Add a fourth, **after** the existing three so the familiar ones keep their positions:
+The event currently has three options. Add two more, **after** the existing three so the familiar ones keep their positions:
 
 ```
-	# A FOURTH OPTION, GATED ON THE GROUND. It is not offered on open ground -
-	# there is nothing there to use - so on most fields this event is unchanged.
-	# `trigger` on an option HIDES it when false, which is the behaviour wanted:
-	# an option greyed out on every plain would advertise a mechanic the player
-	# cannot reach.
+	# TWO CONTEXTUAL OPTIONS. `trigger` on an event option HIDES it when false,
+	# which is the behaviour wanted: an option greyed out on every plain would
+	# advertise a mechanic the player cannot reach. On open ground against a
+	# stranger this event is exactly what it was before.
+	#
+	# NEITHER APPLIES MOMENTUM. The file header states the rule: the battle has
+	# not started, the eve is about shape, not advantage. Both go through
+	# bc_add_verb_effect, which is family 2.
+	#
+	# BOTH TRIGGERS READ SCOPES, so a late-answered eve still renders the same
+	# option set it was offered with. That is the whole reason bc_eve_ground is a
+	# scope and not scratch.
 	option = {
 		name = bc_chronicles.0011.d
 		trigger = {
@@ -1381,38 +1647,37 @@ The event currently has three options. Add a fourth, **after** the existing thre
 		bc_add_verb_effect = { MODIFIER = bc_ground_held }
 		debug_log = "BC: eve option ground"
 	}
+
+	# bc_eve_facing_nemesis_trigger already guards its own reads - it is the
+	# trigger the desc branch above uses - so this needs no wrapper of its own.
+	option = {
+		name = bc_chronicles.0011.e
+		trigger = { bc_eve_facing_nemesis_trigger = yes }
+		bc_add_verb_effect = { MODIFIER = bc_bloodied }
+		add_stress = 5
+		debug_log = "BC: eve option nemesis"
+	}
 ```
 
-- [ ] **Step 3: Confirm `bc_ground_held` exists, or add it**
+`bc_bloodied` and not a new modifier: going at a man you hate is the same trade the existing option a already makes, and family 2 gains one modifier in this plan, not two.
 
-```bash
-cd /d/ck3 && python tools/ck3.py find bc_shieldwall
-```
-
-Note the file and shape of the `bc_shieldwall` modifier, then confirm whether `bc_ground_held` exists:
-
-```bash
-cd /d/ck3 && python tools/ck3.py find bc_ground_held
-```
-
-If it does not exist, add it to the same file as `bc_shieldwall`, copying that modifier's shape exactly and changing only the key and its numbers. **Match the existing modifier's magnitude** — this option is a peer of `bc_shieldwall`, not a stronger one.
-
-- [ ] **Step 4: Add the loc**
+- [ ] **Step 3: Add the loc**
 
 Append to `bc_l_english.yml`, in the eve section:
 
 ```
+ bc_chronicles.0011.desc_kin:0 "The banners across the field are ones he grew up under. Somebody over there taught him to ride."
+ bc_chronicles.0011.desc_heathen:0 "They will pray before this, as he will, and not to the same thing."
  bc_chronicles.0011.desc_ground_rough:0 "The ground is broken between here and them. Whoever crosses it will arrive out of order."
  bc_chronicles.0011.desc_ground_forest:0 "The trees begin a hundred paces off and do not end. A line that goes in there stops being a line."
  bc_chronicles.0011.desc_ground_winter:0 "The cold has been in the men since before dawn. It will be in them all day."
  bc_chronicles.0011.desc_ground_desert:0 "There is no water between here and the horizon, and both armies know it."
  bc_chronicles.0011.desc_ground_open:0 "The field is what it is. Nothing on it will decide anything for you."
  bc_chronicles.0011.d:0 "Let the ground fight for us."
+ bc_chronicles.0011.e:0 "This time he does not ride away."
 ```
 
-Plus the modifier's own loc if step 3 created it, in whatever form `bc_shieldwall`'s takes.
-
-- [ ] **Step 5: Validate**
+- [ ] **Step 4: Validate**
 
 ```bash
 cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
@@ -1420,30 +1685,33 @@ cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles
 
 Expected: `0 errors, 2 warnings`.
 
-- [ ] **Step 6: Check for a loc key collision across the playset**
+- [ ] **Step 5: Check every new key resolves, and resolves only once**
+
+`validate` proves the loc file parses; it does not prove an event's `desc` or `name` points at a key that exists, and a missing one renders as the raw key on screen.
 
 ```bash
-cd /d/ck3 && python tools/ck3.py index -q && python tools/ck3.py loc bc_chronicles.0011.d
+cd /d/ck3 && python tools/ck3.py index -q && for k in desc_kin desc_heathen desc_ground_rough desc_ground_forest desc_ground_winter desc_ground_desert desc_ground_open d e; do python tools/ck3.py loc "bc_chronicles.0011.$k"; done
 ```
 
-Expected: exactly one definition, in this mod. A second would mean another mod owns the key and one of the two renders.
+Expected: nine results, each with **exactly one** definition, in this mod. A zero means a typo between the event and the loc file; a two means another mod owns the key and one of the two silently wins.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-cd /d/ck3/mods/battle_chronicles && git add events/bc_eve_events.txt localization/english/bc_l_english.yml common/modifiers/ && git commit -m "$(cat <<'EOF'
-feat: the eve names the ground and offers to use it
+cd /d/ck3/mods/battle_chronicles && git add events/bc_eve_events.txt localization/english/bc_l_english.yml && git commit -m "$(cat <<'EOF'
+feat: the eve names the foe and the ground, and offers to use both
 
-A third assembled paragraph naming one of four bands, and a fourth option
-that is hidden on open ground rather than greyed out there. Both read
-scope:bc_eve_ground, never scratch.
+The foe paragraph gains kin and faith arms; a third paragraph names one
+of four ground bands; two options appear only where they mean something.
+Everything reads saved scopes, never scratch, so a late-answered eve
+renders the same event it was offered as.
 EOF
 )"
 ```
 
 ---
 
-### Task 10: the aftermath pays out against the foe
+### Task 11: the aftermath pays out against the foe
 
 A battle currently leaves momentum, a memory, a counter tick, and sometimes a grudge or a nickname. The one thing missing is that *who you beat* changes what beating him is worth.
 
@@ -1462,11 +1730,26 @@ In `bc_chronicles.0091`, inside the `side_commander ?= { if = { limit = { is_ali
 						# spiral. Asymmetry here is deliberate and is not an
 						# oversight to be tidied up later.
 						#
-						# IT READS var:bc_battle_creed AND NOT var:bc_battle_bond.
-						# The bond is an ordered ladder, so a nemesis of another
-						# faith reads `nemesis` and the faith question is
-						# unanswerable from it. The creed is the orthogonal flag
-						# that exists for exactly this read.
+						# TWO FLAGS, READ INDEPENDENTLY. bc_battle_creed picks the
+						# CURRENCY; bc_battle_bond = nemesis doubles whichever
+						# currency the creed chose.
+						#
+						# THE CURRENCY QUESTION GOES TO THE CREED AND NOT THE
+						# BOND. The bond is an ordered ladder, so a different-
+						# faith foe who shares your culture is filed under
+						# `countryman` and the bond flag alone cannot answer it.
+						# The creed is the orthogonal flag that exists for
+						# exactly this read.
+						#
+						# THE NEMESIS TERM GOES TO THE BOND, because `nemesis`
+						# is the top rung of that ladder and the creed knows
+						# nothing about grudges. Two questions, two flags, and
+						# they are not interchangeable in either direction.
+						#
+						# NESTED, NOT SIBLING, on both reads. The bond read sits
+						# inside its own `if = { limit = { exists = ... } }` and
+						# not beside the creed's - they are different variables
+						# and `bond` is written on paths where `creed` is not.
 						#
 						# BEFORE bc_clear_scratch_effect, which removes both.
 						# That call is at the bottom of this event and outside
@@ -1481,6 +1764,20 @@ In `bc_chronicles.0091`, inside the `side_commander ?= { if = { limit = { is_ali
 							else = {
 								add_prestige = 50
 								debug_log = "BC: award prestige"
+							}
+							if = {
+								limit = { exists = var:bc_battle_bond }
+								if = {
+									limit = { var:bc_battle_bond = flag:nemesis }
+									if = {
+										limit = { var:bc_battle_creed = flag:heathen }
+										add_piety = 100
+									}
+									else = {
+										add_prestige = 50
+									}
+									debug_log = "BC: award nemesis"
+								}
 							}
 						}
 						else = {
@@ -1519,9 +1816,11 @@ Expected: the award index is the smaller number. If it is not, the block landed 
 cd /d/ck3/mods/battle_chronicles && git add events/bc_aftermath_events.txt && git commit -m "$(cat <<'EOF'
 feat: a notable win pays out against who was beaten
 
-Piety for a foe of another faith, prestige otherwise, on the winner only.
-Reads bc_battle_creed rather than bc_battle_bond because the bond ladder
-is ordered and swallows the faith question for a nemesis or a kinsman.
+Piety for a foe of another faith, prestige otherwise, doubled against a
+nemesis, on the winner only. The currency question goes to
+bc_battle_creed because the bond ladder is ordered and swallows the faith
+question; the nemesis question goes to bc_battle_bond because the creed
+knows nothing about grudges.
 EOF
 )"
 ```
@@ -1530,7 +1829,9 @@ EOF
 
 ## The markers this plan adds
 
-Eighteen permanent markers. **Three different denominators — do not compare counts across the groups.**
+**Twenty-three permanent markers.** The spec's §4 table lists the eighteen that instrument classification; this plan adds five more that instrument what is done with it — `BC: award piety`, `BC: award prestige`, `BC: award nemesis`, `BC: eve option ground`, `BC: eve option nemesis`. If the spec's table is ever reconciled against reality, it is the table that is out of date, not the code.
+
+**Four different denominators — do not compare counts across the groups.**
 
 | marker | denominator | what a zero means |
 |---|---|---|
@@ -1540,10 +1841,14 @@ Eighteen permanent markers. **Three different denominators — do not compare co
 | `BC: bond nemesis` / `kin` / `countryman` / `heathen` / `stranger` | moments | the five sum to the moment count. `stranger` includes the leaderless case |
 | `BC: bond nofoe` | moments | a subset of `bond stranger`'s firings, logged separately |
 | `BC: creed heathen` / `same` | moments minus `bond nofoe` | if the two do not sum to that, the separate-chain shape is wrong |
-| `BC: eve ground missing` | **eves offered**, not moments | non-zero against a counting `BC: eve offered` is the stale-scope hole |
-| `BC: award piety` / `prestige` / `no creed` | **notable wins graded**, not moments | the three sum to `BC: notable win` |
+| `BC: eve ground missing` | **eves offered** | non-zero against a counting `BC: eve offered` is the stale-scope hole |
+| `BC: eve option ground` / `eve option nemesis` | **eves answered** | how often the contextual options are even reachable, let alone taken |
+| `BC: award piety` / `prestige` / `no creed` | **notable wins graded** | the three sum to `BC: win notable` |
+| `BC: award nemesis` | notable wins graded | a subset of the piety/prestige firings, not a fourth alternative to them |
 
-The three denominators are, in order: how many moments fired, how many eves were offered, and how many notable wins were graded. In the 44-battle run these were 233, 2 and 36. Comparing a ground count against an eve count says nothing.
+The four denominators are: how many moments fired, how many eves were offered, how many eves were answered, and how many notable wins were graded. In the 44-battle run the first, second and fourth were 233, 2 and 36. Comparing a ground count against an eve count says nothing.
+
+`BC: win notable` is the existing marker at `events/bc_aftermath_events.txt:84` — note the word order; there is no `BC: notable win`.
 
 ---
 
@@ -1553,3 +1858,9 @@ The three denominators are, in order: how many moments fired, how many eves were
 - **New moment templates.** The spec designs them and defers them: adding call sites moves the realised moment rate, and the tier ladder's thresholds are calibrated against a measured mean that has already drifted once (4.2 → 5.3). New templates land after a run re-measures the rate with the context writes in place.
 - **Season, war type, and troop composition.** Designed as inputs, not read by anything in this plan. Ground, foe identity and creed are enough to prove the mechanism; the rest is more of the same shape once it is proven.
 - **Anything on the handoff's §3.1 list.** Those are awaiting a run, not awaiting code.
+
+## One thing this plan knowingly leaves ugly
+
+`_check_ground_partition` hardcodes a Battle-Chronicles path into `validate.py`, a module whose docstring says it performs *"static checks for a mod folder"* — any mod folder. It runs on every mod validated and early-returns when the file is absent, so it is harmless, but it is not general and it is not pretending to be. Tasks 1 and 2 are genuinely generic; this one is not.
+
+The alternative — a per-mod check plugin mechanism — is more machinery than one check justifies. If a second mod in this workspace ever needs its own check, that is the moment to build it, and this function is the thing to move.

@@ -34,14 +34,16 @@ Neither of the first two existed when the mod shipped its first custom loc. With
 
 1. **Every keyed arm is `exists` then a nested read, never a bare read.** `trigger_if` whose `limit` fails evaluates **true**, so the bare `exists` row is the row that actually rejects; and a read may not sit beside its own `exists`, because CK3 does not short-circuit and guarantees no evaluation order among siblings.
 2. **Every keyed class ends in a trigger-less fallback arm, last.** It is load-bearing, not decorative: it is what a render after `bc_clear_scratch_effect` resolves to, and what a battle whose `combat.location` did not resolve resolves to. Each fallback must read as complete prose on its own.
-3. **`bc_battle_ground` and `bc_battle_bond` are flags; `bc_battle_size` is a number.** Ground and bond arms compare `var:X = flag:y`. Scale arms compare `var:bc_battle_size = 3`. `bc_ledger_effects.txt:99-112` writes it with `value = 3` / `2` / `1` — a flag comparison against it would be a silent no-match that `validate` passes.
+3. **`bc_battle_ground` and `bc_battle_bond` are flags; `bc_battle_size` is a number.** Ground and bond arms compare `var:X = flag:y`. Scale arms compare `var:bc_battle_size = 3`. The size ladder inside `bc_battle_open_effect` (`bc_ledger_effects.txt`) writes it with `value = 3` / `2` / `1` — a flag comparison against it would be a silent no-match that `validate` passes.
 4. **Every fragment string begins with a leading space, inside the quotes.** The toast concatenates `Custom()` calls with no separator of its own. A fragment that does not start with a space runs into the previous sentence. The fallback arms — which are usually empty strings — are the exception and are written `""`.
 
 **The anchor is `bc_chronicle_subject`,** saved in `bc_battle_open_effect` (Plan A task 5). It is the only scope common to all ten call sites: the seven commander events save `bc_commander`, the three knight events save `bc_knight`, and neither reaches the other's toast.
 
-**Naming rule, from Plan A:** every custom-loc definition ends in a class suffix — `_core`, `_ground`, `_bond`, `_scale`. `validate.py` records a key in `def_categories` only the first time it sees it, and `common/combat_phase_events` is scanned before `common/customizable_localization`, so a definition named `bc_banner_falls` would collide with the phase event of that name and every call to it would error falsely. The suffix is what prevents that. Do not drop it on a definition that happens not to collide today.
+**Naming rule, from Plan A:** every custom-loc definition ends in a class suffix — `_core`, `_ground`, or, for the two shared classes, `_clause`. `validate.py` records a key in `def_categories` only the first time it sees it, and `common/combat_phase_events` is scanned before `common/customizable_localization`, so a definition named `bc_banner_falls` would collide with the phase event of that name and every call to it would error falsely. The suffix is what prevents that. Do not drop it on a definition that happens not to collide today.
 
-**`bc_flavour.txt` carries a UTF-8 BOM.** Plan A task 7 created it with one. Appending with `Edit` preserves it. If you ever rewrite the file whole with `Write`, restore the BOM and check it — `validate` does **not** BOM-check script files (`has_bom` is called only from `_check_loc_file`, `validate.py:116`).
+The shared classes are `bc_bond_clause` and `bc_scale_clause`, not `bc_bond` and `bc_scale`, for exactly this reason. Plan A stated the rule as `_bond` / `_scale` because at the time the classes were per-moment; they are shared, so the suffix moved to the front of the name and `_clause` carries the collision-proofing instead. Neither name collides in the playset today — `python tools/ck3.py find bc_bond_clause` returns nothing — but the suffix is what keeps that true when a future definition is added.
+
+**`bc_flavour.txt` carries a UTF-8 BOM.** Plan A task 7 created it with one. Appending with `Edit` preserves it. If you ever rewrite the file whole with `Write`, restore the BOM and check it — `validate` does **not** BOM-check script files (`has_bom` is called only from `_check_loc_file` in `tools/ck3lib/validate.py`, never on a script file).
 
 ---
 
@@ -50,10 +52,10 @@ Neither of the first two existed when the mod shipped its first custom loc. With
 | file | state | responsibility |
 |---|---|---|
 | `mods/battle_chronicles/common/customizable_localization/bc_flavour.txt` | modify | all 22 definitions. Created by Plan A task 7 with one of them. |
-| `mods/battle_chronicles/localization/english/bc_l_english.yml` | modify | 110 fragment keys, and the ten rewritten toast descs |
+| `mods/battle_chronicles/localization/english/bc_l_english.yml` | modify | 110 fragment keys — 103 written here, 7 already shipped by Plan A's spike — and the ten rewritten toast descs |
 | `mods/battle_chronicles/README.md` | modify | one "Not yet verified in game" entry, at the end |
 
-**One file for all 22 definitions, not one per moment.** They share a shape and a set of rules, and a reader checking "does every keyed class end in a fallback" wants one file to check. The file will run to roughly 600 lines; that is acceptable for a file that is a table.
+**One file for all 22 definitions, not one per moment.** They share a shape and a set of rules, and a reader checking "does every keyed class end in a fallback" wants one file to check. The file will run to roughly 950 lines — a ground class is 67 of them and there are ten — which is acceptable for a file that is a table and is read one definition at a time.
 
 **The loc keys interleave with the existing ones rather than appending in a block.** Each moment's fragments go directly under that moment's toast desc, so the assembled sentence and its parts are read together. The two shared classes get their own section at the end of the toast block.
 
@@ -92,7 +94,38 @@ If the user has no such run, **stop here.** This plan is blocked on a run, not o
 
 - [ ] **Step 4: Record the decision**
 
-Whatever the answer, append one line to the README's run log saying which row of that table the run landed on and on what date. A later session must not have to ask again.
+The README has no "run log" section. Its convention is one `## <Kind> run, <date>`
+heading per run, in chronological order, with `## Not yet verified in game`
+always **last** (`README.md:558`). Follow it: insert a new
+
+```
+## Spike gate, 2026-08-15 (Plan B task 1)
+```
+
+section immediately **above** `## Not yet verified in game`, naming which row of
+the step-3 table the run landed on, what the toast actually said, and what
+`probe 'BC: ground'` reported.
+
+Then **delete the spike entry from `## Not yet verified in game`** — it has now
+been verified, or it has failed, and either way it is no longer pending. Leaving
+it there is how a later session is made to ask for the same run twice.
+
+- [ ] **Step 5: Commit the record**
+
+Do this even when step 3 said stop. The observation is the deliverable; losing it
+costs another run.
+
+```bash
+cd /d/ck3/mods/battle_chronicles && git add README.md && git commit -m "$(cat <<'EOF'
+docs: record the spike gate result
+
+Plan B task 1. The one thing no static check can answer - whether a
+Custom() call renders inside a send_interface_toast desc against the
+invoking character's variables - and the answer decides whether the
+remaining twenty-one definitions get written at all.
+EOF
+)"
+```
 
 ---
 
@@ -189,7 +222,7 @@ bc_bond_clause = {
 
 - [ ] **Step 2: Add the six keys**
 
-In `bc_l_english.yml`, after the last moment toast desc (`bc_shieldbrother_forged_toast_desc`, currently line 107), add a section:
+In `bc_l_english.yml`, after the last moment toast desc (`bc_shieldbrother_forged_toast_desc`), add a section:
 
 ```
 
@@ -268,8 +301,9 @@ Append to `bc_flavour.txt`:
 
 # --- the scale, shared by all ten moments ------------------------------------
 #
-# bc_battle_size IS A NUMBER, NOT A FLAG. bc_ledger_effects.txt:99-112 writes it
-# with `value = 3` / `2` / `1`. Every other keyed class in this file compares
+# bc_battle_size IS A NUMBER, NOT A FLAG. The size ladder inside
+# bc_battle_open_effect, in bc_ledger_effects.txt, writes it with
+# `value = 3` / `2` / `1`. Every other keyed class in this file compares
 # `var:X = flag:y`; these three compare `var:bc_battle_size = 3`. A flag
 # comparison here would be a silent no-match that validate passes clean, and the
 # scale clause would simply never render - indistinguishable from a battle whose
@@ -349,7 +383,7 @@ import re
 f = open('common/customizable_localization/bc_flavour.txt',encoding='utf-8-sig').read()
 b = f[f.index('bc_scale_clause = {'):]
 b = b[:b.index('\n}')]
-print('flag comparisons in scale clause:', re.findall(r'var:bc_battle_size = (\S+)', b))
+print('scale clause compares:', re.findall(r'var:bc_battle_size = (\S+)', b))
 l = open('common/scripted_effects/bc_ledger_effects.txt',encoding='utf-8-sig').read()
 print('writer values:', re.findall(r'name = bc_battle_size value = (\S+)', l))
 "
@@ -358,7 +392,7 @@ print('writer values:', re.findall(r'name = bc_battle_size value = (\S+)', l))
 Expected:
 
 ```
-flag comparisons in scale clause: ['3', '2', '1']
+scale clause compares: ['3', '2', '1']
 writer values: ['3', '2', '1']
 ```
 
@@ -385,7 +419,7 @@ EOF
 The shared classes land on every moment in one commit, so that a partially-wired state never exists in the tree.
 
 **Files:**
-- Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml:78-107`
+- Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml` (the ten toast descs)
 
 - [ ] **Step 1: Rewrite the ten toast descs**
 
@@ -479,9 +513,15 @@ bc_<moment>_core = {
 	type = character
 	random_valid = yes
 
-	text = { localization_key = bc_frag_<moment>_core1 }
-	text = { localization_key = bc_frag_<moment>_core2 }
-	text = { localization_key = bc_frag_<moment>_core3 }
+	text = {
+		localization_key = bc_frag_<moment>_core1
+	}
+	text = {
+		localization_key = bc_frag_<moment>_core2
+	}
+	text = {
+		localization_key = bc_frag_<moment>_core3
+	}
 }
 
 bc_<moment>_ground = {
@@ -512,19 +552,24 @@ bc_<moment>_ground = {
 2. **Add the ten keys** to `bc_l_english.yml`, directly under that moment's toast desc.
 3. **Rewrite the toast desc** to open with the core call and follow with the ground call.
 4. **Validate** — expect `0 errors, 2 warnings` — then run the arm-shape check from task 2 step 5 and confirm the new `_ground` entry reads `arms 7 unguarded at [6]` and the new `_core` entry reads `arms 3 unguarded at [0, 1, 2]`.
-5. **Commit**, one moment per commit.
+5. **Commit**, one moment per commit. Every one of these ten tasks touches the
+   same two files and no others, so the stage line is the same every time:
 
-**`_core` showing anything other than `[0, 1, 2]`** means a trigger got copied into a core arm, and a trigger in a `random_valid` class quietly biases the randomiser.
+```bash
+cd /d/ck3/mods/battle_chronicles && git add common/customizable_localization/bc_flavour.txt localization/english/bc_l_english.yml && git commit -m "<subject>"
+```
+
+**`_core` showing anything other than `[0, 1, 2]`** means a trigger got copied into a core arm, and a trigger in a `random_valid` class quietly biases the randomiser. **`_core` showing `arms 0`** means the arms were written on one line each; see the warning under task 5 step 1.
 
 ---
 
 ### Task 5: The Banner Falls
 
-Its ground class already exists — Plan A task 7 wrote it as the spike. This task adds only the core.
+Its ground class already exists — Plan A task 7 wrote it as the spike. This task adds only the core, so it has **four** steps rather than the template's five: the toast-desc rewrite happens inside step 2, because the desc line and the three new keys are one contiguous edit.
 
 **Files:**
 - Modify: `mods/battle_chronicles/common/customizable_localization/bc_flavour.txt`
-- Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml:78`
+- Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
 
 - [ ] **Step 1: Append the core definition**
 
@@ -539,15 +584,39 @@ bc_banner_falls_core = {
 	type = character
 	random_valid = yes
 
-	text = { localization_key = bc_frag_banner_falls_core1 }
-	text = { localization_key = bc_frag_banner_falls_core2 }
-	text = { localization_key = bc_frag_banner_falls_core3 }
+	text = {
+		localization_key = bc_frag_banner_falls_core1
+	}
+	text = {
+		localization_key = bc_frag_banner_falls_core2
+	}
+	text = {
+		localization_key = bc_frag_banner_falls_core3
+	}
 }
 ```
 
+**Each arm spans three lines. Do not collapse them to `text = { localization_key = X }`.**
+The arm-shape check in task 2 step 5 matches on `text = {` … newline-tab-`}`, so a
+one-line arm is invisible to it — and an invisible arm makes a `random_valid`
+class report `arms 0 unguarded at []`, which the task 14 whole-file check scores
+as **passing**. The check would then be watching nothing. Three lines per arm is
+what keeps it honest.
+
 - [ ] **Step 2: Add the three keys**
 
-Replace the existing `bc_banner_falls_toast_desc` line's neighbourhood in `bc_l_english.yml` so it reads:
+**Change exactly two things and delete nothing.** Plan A task 7 left a six-line
+comment and seven `bc_frag_banner_falls_*` ground keys directly under this desc.
+All of them must survive — they are the arms of `bc_banner_falls_ground`, and
+removing them is 7 `has no loc entry` errors from Plan A's task 1 check.
+
+With `Edit`, replace **only this one line**:
+
+```
+ bc_banner_falls_toast_desc:0 "The standard goes down in the press, and the men nearest it look for it and do not find it.[bc_chronicle_subject.Custom('bc_banner_falls_ground')][bc_chronicle_subject.Custom('bc_bond_clause')][bc_chronicle_subject.Custom('bc_scale_clause')]"
+```
+
+with these four:
 
 ```
  bc_banner_falls_toast_desc:0 "[bc_chronicle_subject.Custom('bc_banner_falls_core')][bc_chronicle_subject.Custom('bc_banner_falls_ground')][bc_chronicle_subject.Custom('bc_bond_clause')][bc_chronicle_subject.Custom('bc_scale_clause')]"
@@ -555,6 +624,21 @@ Replace the existing `bc_banner_falls_toast_desc` line's neighbourhood in `bc_l_
  bc_frag_banner_falls_core2:0 "The banner dips once, comes up crooked, and does not come up again."
  bc_frag_banner_falls_core3:0 "Whoever was carrying the standard is not carrying it now, and nobody has picked it up."
 ```
+
+The lines that follow — `# SPIKE.` through `bc_frag_banner_falls_any:0 ""` — stay
+exactly as they are. After the edit, confirm they did:
+
+```bash
+cd /d/ck3/mods/battle_chronicles && python -c "
+import re
+t = open('localization/english/bc_l_english.yml',encoding='utf-8-sig').read()
+bands = ['desert','open','rough','forest','jungle','winter','any']
+print('ground keys lost', [b for b in bands if 'bc_frag_banner_falls_%s:0' % b not in t])
+print('core keys added', ['core%d' % n for n in (1,2,3) if 'bc_frag_banner_falls_core%d:0' % n in t])
+"
+```
+
+Expected: `ground keys lost []` and `core keys added ['core1', 'core2', 'core3']`.
 
 `core1` is the sentence the toast used to hold verbatim. Keeping it is not sentiment: it is the reading the one proven game run produced, and if the toast stops looking familiar there is no way to tell a rendering failure from a randomiser working.
 
@@ -617,7 +701,7 @@ Follow the five steps. Both definitions are new.
 
 ### Task 7: The Horse Killed Under Him
 
-**Note the key is `bc_horse_killed_*`, not `bc_horse_killed_under_him_*`** — the event is `bc_horse_killed_under_him` but its toast key is `bc_horse_killed_toast_desc` (`bc_l_english.yml:84`). Match the **loc key**, not the event name, or task 2's naming rule stops protecting you.
+**Note the key is `bc_horse_killed_*`, not `bc_horse_killed_under_him_*`** — the event is `bc_horse_killed_under_him` but its toast key is `bc_horse_killed_toast_desc`. Match the **loc key**, not the event name, or task 2's naming rule stops protecting you.
 
 - [ ] **Step 1: Append both definitions** — template, `<moment>` = `horse_killed`.
 
@@ -725,7 +809,7 @@ Follow the five steps. Both definitions are new.
  bc_frag_lines_bogged_down_core1:0 "Neither host can move. The battle becomes a matter of who tires of it last."
  bc_frag_lines_bogged_down_core2:0 "The two lines have found each other and neither can get past."
  bc_frag_lines_bogged_down_core3:0 "Nothing is happening except that men are dying, which is the worst kind of battle to be in."
- bc_frag_lines_bogged_down_desert:0 " They are standing in it long enough that the water is running out."
+ bc_frag_lines_bogged_down_desert:0 " They are standing in the sand long enough that the water is running out."
  bc_frag_lines_bogged_down_open:0 " Two lines on open ground with nowhere to be but where they are."
  bc_frag_lines_bogged_down_rough:0 " Nobody can outflank anybody; the ground will not let them."
  bc_frag_lines_bogged_down_forest:0 " Between the trees there is no room to do anything but push."
@@ -849,6 +933,38 @@ malformed []
 
 A non-empty `malformed` list is one of exactly two faults. In a `random_valid` class, an arm that carries a trigger — which biases the randomiser silently. In a keyed class, a fallback that is not last — which swallows every arm below it, because `Custom()` takes the first valid arm and an unguarded arm is always valid.
 
+Then the BOM, which nothing else in this plan or in `validate` can see:
+
+```bash
+cd /d/ck3 && python -c "
+import pathlib
+p = pathlib.Path('mods/battle_chronicles/common/customizable_localization/bc_flavour.txt')
+print(p.read_bytes()[:3])
+"
+```
+
+Expected: `b'\xef\xbb\xbf'`.
+
+**This is the plan's one unrecoverable silent failure and it has to be checked by
+hand.** If any task rewrote `bc_flavour.txt` with `Write` instead of appending
+with `Edit`, the BOM is gone and CK3 ignores the entire file — all 22
+definitions, every toast falling back to a raw key. And every other check in
+this plan still passes clean, because they all open the file with `utf-8-sig`,
+which does not care whether the BOM was there. `validate` cannot catch it either:
+`has_bom` is called only from `_check_loc_file`, never on a script file.
+
+If it prints anything else, restore it:
+
+```bash
+cd /d/ck3 && python -c "
+import pathlib
+p = pathlib.Path('mods/battle_chronicles/common/customizable_localization/bc_flavour.txt')
+b = p.read_bytes()
+if not b.startswith(b'\xef\xbb\xbf'): p.write_bytes(b'\xef\xbb\xbf' + b)
+print(p.read_bytes()[:3])
+"
+```
+
 - [ ] **Step 5: Count the keys**
 
 ```bash
@@ -887,11 +1003,18 @@ Append to `mods/battle_chronicles/README.md`, under "Not yet verified in game":
   | what to look at | pass | fail |
   |---|---|---|
   | any moment toast | one sentence, then up to three clauses, no double spaces and no run-together words | a missing leading space in a fragment, or a stray one before a `[` |
-  | the same moment twice in one battle | different opening sentences | `random_valid` is not picking, or a trigger got into a core arm |
-  | a moment in a battle whose `probe 'BC: bond'` says `nofoe` | no clause about the foe at all | the fallback is not last, or is not empty |
+  | the same moment three or more times across a session | not always the same opening sentence | `random_valid` is not picking, or a trigger got into a core arm |
+  | a moment in a battle whose `probe 'BC: bond'` says `nofoe` | the **stranger** clause — "Nobody on that side is anybody to him." | anything else, including silence |
   | a moment whose `BC: ground` band is known | a clause matching that band | the flag names in the arms do not match what bc_write_ground_effect writes |
   | The Ground Favours Us on flat ground | no claim about slopes or trees | the core arms were not rewritten |
 ```
+
+**`nofoe` renders the stranger clause, not silence,** and that row is easy to get
+backwards. `bc_write_bond_effect`'s `else` — the leaderless-enemy-side arm —
+writes `value = flag:stranger` and *then* logs `BC: bond nofoe`. So a `nofoe`
+battle has a bond flag like any other. `bc_frag_bond_any` is reachable only from
+a render after `bc_clear_scratch_effect`, or from a stale anchor; if it shows up
+in a live battle, something upstream is wrong.
 
 - [ ] **Step 7: Commit**
 
@@ -919,8 +1042,15 @@ EOF
 - **Anything on the eve.** Plan A task 10 finished the eve. It uses `first_valid` in an event `desc`, not `Custom()`, and the two mechanisms stay separate on purpose: the eve is read once and carefully, a toast is read in passing.
 - **Localisation beyond English.** The mod ships English only.
 
+## Where this plan departs from the spec
+
+Two deliberate divergences, recorded so that a later reader does not treat them as drift.
+
+- **The spec's assembled example puts a space between the `Custom()` calls** (§3, the assembled form). This plan mandates the opposite: no space before `[`, and a leading space inside every non-core fragment. The spec's form leaves a **trailing space** on every render whose scale fallback is empty, and empty fallbacks are the common case. This plan's form is also what Plan A's spike already shipped, so changing it now would invalidate the one thing task 1 is gating on.
+- **The two shared classes are named `bc_bond_clause` and `bc_scale_clause`**, not `_bond` and `_scale` as Plan A's naming rule reads. See the preamble; the suffix does the same collision-proofing job under a different spelling.
+
 ## The one thing this plan cannot check
 
-**Whether the prose is any good.** Every check here is structural: keys resolve, fallbacks are last, arms are counted. None of them can tell that `bc_frag_rally_the_line_jungle` reads awkwardly after `core2`, because there are 30 × 7 = 210 core-plus-ground readings per moment class and no way to see them without playing.
+**Whether the prose is any good.** Every check here is structural: keys resolve, fallbacks are last, arms are counted. None of them can tell that `bc_frag_rally_the_line_jungle` reads awkwardly after `core2`, because each moment has 3 × 7 = 21 core-plus-ground readings, 210 across the ten, and no way to see any of them without playing.
 
 The mitigation is the shape, not a check: every fragment is a **complete clause that stands alone**, and the classes are concatenated in a fixed order — what happened, where, against whom, at what scale. A reading assembled from four independently sensible clauses in a fixed order is at worst flat. It cannot be ungrammatical, which is the failure that would actually matter.

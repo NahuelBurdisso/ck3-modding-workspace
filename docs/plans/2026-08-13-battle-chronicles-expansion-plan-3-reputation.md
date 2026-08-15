@@ -1614,8 +1614,7 @@ checking that the same commander does not produce it on every subsequent battle.
 
 `BC: award blocked terrain` is the ambiguous one. If it appears without any
 `BC: style award` on the same commander, the cause was the budget gate or an unresolved
-bucket, not
-precedence — cross-check against `BC: terrain NONE MATCHED` from step 3.
+bucket, not precedence — cross-check against `BC: terrain NONE MATCHED` from step 3.
 
 - [x] **Step 5: Error sweep**
 

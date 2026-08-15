@@ -122,8 +122,8 @@ in row 3 that is true of the `BC: fired bc_<event>` family and of nothing else �
 `BC: combat end cleanup`, the four grading lines, `BC: nickname awarded`, the three
 `BC: moment` lines and the `BC: popup` lines are all invisible to `probe "bc_"`. Row 3
 lists them because it is a *rule about what is allowed through*, and it stays correct if a
-future marker is renamed
-into range. Seeing only the `fired` family means the sweep is working, not that markers are
+future marker is renamed into range. Seeing only the `fired` family means the sweep is
+working, not that markers are
 missing; the marker sweeps are separate commands and each names its own text.
 
 **`probe` patterns are Python regex, not grep regex.** `\t`, `\s`, `\d`, `+`, `?` and bare
@@ -2254,8 +2254,8 @@ moments, so the `decisive` rung of the escalation ladder is exercised.
 **Q4 additionally needs `bc_knight_holds_the_breach` to fire on a side whose commander is
 AI** — watch an ally's or a vassal's army fight, not only your own. Without that,
 `subject AI` is 0, Q4 lands on the inconclusive row, and the run reproduces exactly the
-all-human
-sample that produced the contradiction it exists to resolve. The event needs a knight with
+all-human sample that produced the contradiction it exists to resolve. The event needs a
+knight with
 `prowess >= 10` on the side, so it is not rare — but it is not guaranteed in a short
 session either.
 

@@ -74,8 +74,9 @@ Section 4 defines *N* as 1 for an ordinary notable battle and 2 when `scope:wipe
 
 **`scope:wipe` is not plan 5's and is not saved by any script. The engine provides it**, on
 both combat-end hooks, and it is available to this plan the moment it ships. AGOT documents
-it in its own headers — `common/on_action/combat_on_actions.txt:13`, `# scope:wipe - Was
-this a wipe?`, directly above `on_combat_end_winner`, and the identical comment at `:527`
+it in its own headers — `common/on_action/combat_on_actions.txt:13`,
+`# scope:wipe - Was this a wipe?`, directly above `on_combat_end_winner`, and the
+identical comment at `:527`
 above `on_combat_end_loser`. It survives into events raised from those hooks' `events = { }`
 lists; vanilla `combat_event.1001` is raised that way and reads it. Plan 5 does not create
 this scope, it only wraps the *reading* of it in a named trigger.

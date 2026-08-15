@@ -29,9 +29,9 @@ How to build one:
    cannot number it, you do not know what you are testing.
 2. **One marker per probe, all sharing a greppable prefix.**
    `BC_SPIKE: P4 terrain = other but readable`. Include the *negative* branch
-   too — an `else`
-   that logs `P4 FAILED ...` distinguishes "the check was false" from "the code
-   never ran", and that distinction is most of debugging here.
+   too — an `else` that logs `P4 FAILED ...` distinguishes "the check was
+   false" from "the code never ran", and that distinction is most of debugging
+   here.
 3. **Turn the weights up absurdly.** `chance = { base = 100000 }`. You are not
    testing pacing, you are testing whether the hook exists at all.
 4. **Chain the probes** so one run covers the dependent ones: probe A locks

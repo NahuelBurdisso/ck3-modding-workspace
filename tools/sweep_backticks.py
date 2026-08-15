@@ -11,40 +11,58 @@ quotations - of loc text, of script, of command lines, of engine output - and
 those wrap on purpose, so a hard error would fire on a clean tree. Read the
 output and judge each line; do not gate on the count.
 
-KNOWN LIMITS, the first two also written down in that same paragraph:
+KNOWN LIMITS. The first two are also written down in that same paragraph:
+
   - a span wrapped across three or more lines leaves the middle lines with no
     backtick at all, so it is caught at its two ends and not in its middle;
   - two independent unbalanced spans on one line sum to even and hide each
     other;
-  - a fence opened inside a blockquote is handled, but a fence whose opener and
-    closer use different markers is not;
-  - an escaped backtick is stripped before counting. Without that, a balanced
-    line containing one flips to odd, which is a FALSE POSITIVE - but a line
-    that is genuinely unbalanced AND carries one escaped backtick flips to
-    even, which is a FALSE NEGATIVE and is the dangerous direction. Neither has
-    been observed; the stripping trades the common noise for the rare miss.
+  - a fence whose opener and closer use different markers is not recognised as
+    a pair, and the state machine then treats the rest of the file as fenced,
+    which is a silent MISS of everything below. No such fence exists today;
+  - a backslash immediately before a real backtick is read as an escape and
+    stripped, which flips a balanced line to odd. That is a false positive, the
+    harmless direction, and no line in the tree does it.
+
+EXTENSIONS ARE MATCHED CASE-INSENSITIVELY, because the rule the sweep enforces
+is casing-blind and a `README.MD` would otherwise be skipped in silence.
+
+AN UNREADABLE FILE IS NOT SKIPPED. Only `UnicodeDecodeError` is caught, so a
+file this process cannot open raises out of the sweep. `validate.py` takes the
+same stance for the same reason - its
+`test_an_unopenable_entry_is_skipped_rather_than_crashing` records it - and a
+sweep that quietly drops what it could not read is the exact defect this tool
+exists to catch, one level up.
 
 THIS FILE SPELLS ITS OWN BACKTICKS AS `\\x60`. A detector that matches on a
 character will contain that character, and writing it literally made the sweep
-report three lines of its own source on every run. Excluding this file by name
-would be a carve-out of exactly the kind the rule exists to prevent, so the
-character is escaped instead and the count stays even.
+report lines of its own source on every run. Excluding this file by name would
+be a carve-out of exactly the kind the rule exists to prevent, so the character
+is escaped instead and the count stays even.
 """
 
+import os
 import re
 import sys
 from pathlib import Path
 
 # Every extension that can carry a comment or prose. The mod's script, its loc,
-# its gui, the tooling's Python, and the docs.
-EXTS = {".txt", ".yml", ".gui", ".info", ".md", ".py"}
+# its gui, its descriptor, the tooling's Python, and the docs.
+EXTS = {".txt", ".yml", ".gui", ".info", ".md", ".mod", ".py"}
 
 # A fence may be indented, and may sit inside one or more blockquote markers.
-# `> ` followed by a fence is a real line of
-# docs/plans/2026-08-13-battle-chronicles-expansion-plan-3-reputation.md, and
-# reading it as prose put two fenced lines into the report.
+# `> ` followed by three backticks is a real line of
+# docs/plans/2026-08-13-battle-chronicles-expansion-plan-3-reputation.md. What
+# it costs to miss is the DELIMITER, not the fenced body: a delimiter is three
+# backticks, so an unrecognised one is odd and reports itself. The body is
+# scanned too, and would report if it held an odd count - in that file it holds
+# no backtick at all, so the delimiters were the whole of the noise.
 FENCE_RE = re.compile(r"^\s*(?:>\s*)*(?:\x60{3}|~{3})")
 
+# Stripping this removes BOTH failure modes rather than trading one for the
+# other. Counted raw, an escaped backtick flips a balanced line to odd - noise -
+# and flips a genuinely unbalanced line to even, which is a miss. Stripped,
+# neither happens.
 ESCAPED_BACKTICK_RE = re.compile(r"\\\x60")
 
 BACKTICK = "\x60"
@@ -54,24 +72,29 @@ PRUNE = {".git", "__pycache__"}
 
 def sweep(root: Path) -> list[tuple[str, int, str]]:
     hits = []
-    for path in sorted(root.rglob("*")):
-        if any(part in PRUNE for part in path.parts):
-            continue
-        if path.suffix not in EXTS or not path.is_file():
-            continue
-        try:
-            lines = path.read_text(encoding="utf-8-sig").splitlines()
-        except (UnicodeDecodeError, OSError):
-            continue
-        fenced = False
-        for lineno, line in enumerate(lines, 1):
-            if FENCE_RE.match(line):
-                fenced = not fenced
+    for dirpath, dirnames, filenames in os.walk(root):
+        # In place, so os.walk does not descend. Filtering the paths afterwards
+        # is correct but walks every git object to do it.
+        dirnames[:] = sorted(d for d in dirnames if d not in PRUNE)
+        filenames.sort()
+        for name in filenames:
+            path = Path(dirpath) / name
+            if path.suffix.lower() not in EXTS or not path.is_file():
                 continue
-            if fenced:
+            try:
+                lines = path.read_text(encoding="utf-8-sig").splitlines()
+            except UnicodeDecodeError:
                 continue
-            if ESCAPED_BACKTICK_RE.sub("", line).count(BACKTICK) % 2:
-                hits.append((path.relative_to(root).as_posix(), lineno, line.strip()))
+            fenced = False
+            for lineno, line in enumerate(lines, 1):
+                if FENCE_RE.match(line):
+                    fenced = not fenced
+                    continue
+                if fenced:
+                    continue
+                if ESCAPED_BACKTICK_RE.sub("", line).count(BACKTICK) % 2:
+                    rel = path.relative_to(root).as_posix()
+                    hits.append((rel, lineno, line.strip()))
     return hits
 
 

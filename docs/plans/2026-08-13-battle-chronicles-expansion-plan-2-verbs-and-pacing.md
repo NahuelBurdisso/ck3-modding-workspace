@@ -109,7 +109,7 @@ gets settled first.
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_ledger_effects.txt`
 
-- [ ] **Step 1: Read Q3's counts out of the plan-1 run**
+- [x] **Step 1: Read Q3's counts out of the plan-1 run**
 
 Q3's five buckets were written into the spec by plan 1 task 16. Find them:
 
@@ -122,7 +122,7 @@ You need five numbers: how many battles logged `under 1k`, `1k`, `2k`, `3k`, `5k
 **If they are not in the spec, stop.** Plan 1 task 16 was not completed and the boundary
 cannot be set from nothing. Do not guess it a second time — go run plan 1 task 15.
 
-- [ ] **Step 2: Decide the boundary**
+- [x] **Step 2: Decide the boundary**
 
 The rule is: **put the bucket-1/2 boundary where the mass divides**, so that bucket 1 is
 the ordinary skirmish and bucket 2 is a real field battle.
@@ -136,7 +136,7 @@ the ordinary skirmish and bucket 2 is a real field battle.
 Record the decision and the counts it rests on as a comment at the ladder, replacing the
 "2,000 is INVENTED" paragraph.
 
-- [ ] **Step 3: Edit the ladder and add the three markers**
+- [x] **Step 3: Edit the ladder and add the three markers**
 
 In `bc_battle_open_effect`, find the bucket ladder by its `set_variable = { name = bc_battle_size`
 lines — **not by line number**, because plan 1 shipped this file and the surrounding
@@ -170,7 +170,7 @@ becomes unmeasurable. They are permanent, and plans 3–6 get them for free.
 Q3 measured the *world*, these measure the *mod*, and the whole risk in Section 6 is that
 those two disagree.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -c "BC: size" common/scripted_effects/bc_ledger_effects.txt
@@ -179,7 +179,7 @@ cd /d/ck3/tools && python ck3.py validate --strict
 
 Expected: **3**, then exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -198,7 +198,7 @@ replace Q3 permanently, so every later plan can tell battle sizes apart at runti
 **Files:**
 - Create: `mods/battle_chronicles/common/modifiers/bc_battle_modifiers.txt`
 
-- [ ] **Step 1: Confirm the four modifier tags exist**
+- [x] **Step 1: Confirm the four modifier tags exist**
 
 `validate` cannot check this — it has no knowledge of modifier tags — so check the API
 dump directly:
@@ -210,7 +210,7 @@ cd /d/ck3 && grep -n "^Tag: \(army_damage_mult\|army_toughness_mult\|knight_effe
 Expected: four hits, each followed by `Use areas: character`. If any is missing, the
 modifier will silently do nothing and no tool in this workspace will tell you.
 
-- [ ] **Step 2: Write the file**
+- [x] **Step 2: Write the file**
 
 ```
 # Battle Chronicles - family 2, the character of the fight.
@@ -268,7 +268,7 @@ bc_pursuit = {
 `icon = martial_positive` and `martial_negative` are proven keys — `bc_momentum_modifiers.txt`
 ships both.
 
-- [ ] **Step 3: Validate, index, conflicts**
+- [x] **Step 3: Validate, index, conflicts**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts
@@ -292,7 +292,7 @@ So task 3's static grep is not a formality that `--strict` also covers. **It is 
 automated check that exists for these four keys**, and the in-game look at the advantage
 breakdown in task 12 is the only real one.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -311,7 +311,7 @@ re-application inside a battle refreshes rather than doubles."
 **Files:**
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
 
-- [ ] **Step 1: Confirm the file's encoding before touching it**
+- [x] **Step 1: Confirm the file's encoding before touching it**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && head -c 8 localization/english/bc_l_english.yml | cat -A
@@ -321,7 +321,7 @@ Expected: the line starts `M-oM-;M-?` — UTF-8 **with BOM**. Every line is one 
 space then `KEY:0 "text"`. Writing this file without the BOM makes every key in it fail
 to load, and `validate` checks for exactly this.
 
-- [ ] **Step 2: Append the eight family-2 keys**
+- [x] **Step 2: Append the eight family-2 keys**
 
 Add beneath the six momentum keys:
 
@@ -336,7 +336,7 @@ Add beneath the six momentum keys:
  bc_pursuit_desc:0 "The enemy is giving ground, and there is no order left in the giving."
 ```
 
-- [ ] **Step 3: Backfill the six momentum descriptions**
+- [x] **Step 3: Backfill the six momentum descriptions**
 
 The six family-1 modifiers ship with a name and no `_desc`, so their tooltips render the
 stat line and nothing else. A missing `_desc` is legal — vanilla's
@@ -357,7 +357,7 @@ one file for no reason, in a mod whose entire product is the flavour.
 a file this task already opens, it removes an inconsistency rather than documenting one,
 and it is committed separately so it can be dropped without touching anything else.
 
-- [ ] **Step 4: Verify the count and the encoding survived**
+- [x] **Step 4: Verify the count and the encoding survived**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -398,7 +398,7 @@ the `:` stops `bc_pursuit` matching a `bc_pursuit_desc` that does not exist yet.
 in-game look at the advantage breakdown is still the authoritative check; this is the one
 that can run without launching the game.
 
-- [ ] **Step 5: Commit — two commits, so do steps 2 and 3 as two cycles**
+- [x] **Step 5: Commit — two commits, so do steps 2 and 3 as two cycles**
 
 `git add` stages whole files, so two commits against one file require two edit-then-commit
 cycles. **Do step 2, commit, then do step 3, commit.** If you already wrote both blocks in
@@ -433,7 +433,7 @@ Run step 4's verification once, after both commits.
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_ledger_effects.txt`
 
-- [ ] **Step 1: Confirm the markers do not exist yet**
+- [x] **Step 1: Confirm the markers do not exist yet**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "BC: verb"
@@ -441,7 +441,7 @@ cd /d/ck3/tools && python ck3.py probe "BC: verb"
 
 Expected: **exit 1** (no match). This is the failing test.
 
-- [ ] **Step 2: Write both effects**
+- [x] **Step 2: Write both effects**
 
 Append to `bc_ledger_effects.txt`:
 
@@ -537,7 +537,7 @@ per branch is what proves the *branch* was taken — a substituted marker would 
 same text whether the ladder worked or fell through, which is the exact failure this
 marker exists to catch.
 
-- [ ] **Step 3: Validate**
+- [x] **Step 3: Validate**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -550,7 +550,7 @@ Expected: exit 0.
 at least three of the four `BC: verb` markers appearing. If none appears, the comparison
 form is wrong and the entire family is dead.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -573,7 +573,7 @@ looks like a serious regression.
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt`
 
-- [ ] **Step 1: Find it by name**
+- [x] **Step 1: Find it by name**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -n "^bc_cleanup_effect" -A 10 common/scripted_effects/bc_scripted_effects.txt
@@ -582,7 +582,7 @@ cd /d/ck3/mods/battle_chronicles && grep -n "^bc_cleanup_effect" -A 10 common/sc
 Plan 1 task 3 flattened it to six unguarded `remove_character_modifier` lines. If it
 still has `if` blocks in it, plan 1 task 3 was not done — stop and do it.
 
-- [ ] **Step 2: Add the four**
+- [x] **Step 2: Add the four**
 
 ```
 	remove_character_modifier = bc_bloodied
@@ -594,7 +594,7 @@ still has `if` blocks in it, plan 1 task 3 was not done — stop and do it.
 Appended to the existing six, inside `bc_cleanup_effect`. The result is a flat list of
 ten.
 
-- [ ] **Step 3: Confirm `bc_clear_faltering_effect` was NOT touched**
+- [x] **Step 3: Confirm `bc_clear_faltering_effect` was NOT touched**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -n "^bc_clear_faltering_effect" -A 16 common/scripted_effects/bc_scripted_effects.txt
@@ -609,7 +609,7 @@ almost identical, and adding the four family-2 removals to the wrong one means e
 rally strips the character of the fight along with the setback — silently, with no error
 and no marker.
 
-- [ ] **Step 4: Verify the count**
+- [x] **Step 4: Verify the count**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -618,7 +618,7 @@ grep -n "^bc_cleanup_effect" -A 12 common/scripted_effects/bc_scripted_effects.t
 
 Expected: **10**.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -636,7 +636,7 @@ Lands before anything applies them, so no commit in history leaks them."
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_ledger_effects.txt`
 
-- [ ] **Step 1: Add the size gate to `bc_record_moment_effect`**
+- [x] **Step 1: Add the size gate to `bc_record_moment_effect`**
 
 Find `bc_record_moment_effect` by name. Append, **after** the existing
 `bc_record_effective_tier_effect` call and inside the effect's braces:
@@ -667,7 +667,7 @@ Find `bc_record_moment_effect` by name. Append, **after** the existing
 	}
 ```
 
-- [ ] **Step 2: Confirm `$SWING$` now has a consumer**
+- [x] **Step 2: Confirm `$SWING$` now has a consumer**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -694,7 +694,7 @@ header names `SWING` on three comment lines and task 4's header on three more. W
 filter the check has no discriminating power at all, because every failure mode above still
 leaves six comment lines behind.
 
-- [ ] **Step 3: Confirm no call site was changed**
+- [x] **Step 3: Confirm no call site was changed**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -709,7 +709,7 @@ table is the interface.
 against `HEAD~1` would show task 5's committed changes as well and the "one file" check
 would be meaningless.
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -735,7 +735,7 @@ message flagged this as the one place its no-new-behaviour claim was not true."
 **Files:**
 - Modify: `mods/battle_chronicles/common/script_values/bc_script_values.txt`
 
-- [ ] **Step 1: Read the file's standing scope warning first**
+- [x] **Step 1: Read the file's standing scope warning first**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && sed -n '1,30p' common/script_values/bc_script_values.txt
@@ -748,7 +748,7 @@ evaluated inside `bc_mark_chronicle_commander_effect`, which runs on the command
 `var:bc_battle_size` is a bare read of `this` with no scope prefix at all. Amend the
 header to say there are now three conventions and which value uses the third.
 
-- [ ] **Step 2: Write the value**
+- [x] **Step 2: Write the value**
 
 ```
 # The chronicle cooldown, in days, scaled by battle size.
@@ -807,7 +807,7 @@ bc_chronicle_flag_days_value = {
 }
 ```
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -827,7 +827,7 @@ rather than to no cooldown."
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_triggers/bc_scripted_triggers.txt`
 
-- [ ] **Step 1: Confirm the shared trigger is what you think it is**
+- [x] **Step 1: Confirm the shared trigger is what you think it is**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -n "^bc_chronicle_ready_trigger" -A 4 common/scripted_triggers/bc_scripted_triggers.txt
@@ -835,7 +835,7 @@ cd /d/ck3/mods/battle_chronicles && grep -n "^bc_chronicle_ready_trigger" -A 4 c
 
 Expected: a single `NOT = { has_character_flag = bc_chronicle_recent }`.
 
-- [ ] **Step 2: Add the commander variant beside it — do not modify it**
+- [x] **Step 2: Add the commander variant beside it — do not modify it**
 
 ```
 # The commander-only variant. The knight events keep bc_chronicle_ready_trigger
@@ -871,7 +871,7 @@ bc_chronicle_ready_commander_trigger = {
 here reads a variable's *value*, and `exists` on a missing variable is a test, not a
 read. That is why the floor is written as `exists` and not as a comparison.
 
-- [ ] **Step 3: Do NOT touch the "Five substantive rows" comment**
+- [x] **Step 3: Do NOT touch the "Five substantive rows" comment**
 
 Further down the file, above `bc_battle_is_notable_trigger`, a comment reads "Five
 substantive rows plus the game rule". **That counts `calc_true_if` rows inside that one
@@ -882,7 +882,7 @@ for that trigger's threshold and changing it changes what "notable" means.
 
 This is called out because the comment reads like a file census and is not one.
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -902,7 +902,7 @@ mod's largest event-spam surface."
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt`
 
-- [ ] **Step 1: Confirm the marker does not exist yet**
+- [x] **Step 1: Confirm the marker does not exist yet**
 
 ```bash
 cd /d/ck3/tools
@@ -912,7 +912,7 @@ python ck3.py probe "BC: floor admitted"
 
 Expected: **exit 1** on both. This is the failing test.
 
-- [ ] **Step 2: Add the variant beside `bc_mark_chronicle_effect`**
+- [x] **Step 2: Add the variant beside `bc_mark_chronicle_effect`**
 
 ```
 # The commander-only variant. bc_mark_chronicle_effect above stays exactly as it
@@ -971,7 +971,7 @@ grep -n "days = stress_threshold_cooldown_duration" 00_stress_effects.txt
 
 Expected: at least one hit each.
 
-- [ ] **Step 3: Note what the two markers do and do not prove**
+- [x] **Step 3: Note what the two markers do and do not prove**
 
 `BC: chronicle mark commander` proves the new effect is **reached** — that the call-site
 swap in task 10 landed. It does **not** prove the duration resolved correctly; a script
@@ -993,7 +993,7 @@ DIAG, not this run.
 floor lives. Its absence proves nothing, because the state it tests may simply never have
 arisen.
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1011,7 +1011,7 @@ Size-scaled cooldown flag. Nothing calls it yet."
 **Files:**
 - Modify: `mods/battle_chronicles/common/combat_phase_events/bc_commander_phase_events.txt`
 
-- [ ] **Step 1: Count what you are about to change**
+- [x] **Step 1: Count what you are about to change**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1038,7 +1038,7 @@ If the commander counts are not 7 and 7, plan 1 changed the event count and this
 verification numbers are stale — recount before proceeding rather than forcing the
 expected number.
 
-- [ ] **Step 2: Swap, in the commander file only**
+- [x] **Step 2: Swap, in the commander file only**
 
 Replace every `bc_chronicle_ready_trigger` with `bc_chronicle_ready_commander_trigger`
 and every `bc_mark_chronicle_effect` with `bc_mark_chronicle_commander_effect`, **in
@@ -1053,7 +1053,7 @@ commander variant doing that job — leaving the old name there would make the f
 documentation name a helper it no longer calls. This is why step 1 counts with ` = yes`
 and step 3 does not need to care: the comment moves with the code.
 
-- [ ] **Step 3: Confirm ordering — this is what makes the script value work**
+- [x] **Step 3: Confirm ordering — this is what makes the script value work**
 
 In each of the seven `effect` blocks, `bc_battle_open_effect = yes` must appear **before**
 `bc_mark_chronicle_commander_effect`. Plan 1 task 9 step 1 placed it there deliberately.
@@ -1087,7 +1087,7 @@ Two different things depend on that order, and neither reports its own failure a
   its mark makes `BC: floor admitted` permanently unreachable, and step 6 of task 12 would
   then read an instrumentation bug as an inconclusive result.
 
-- [ ] **Step 4: Confirm the knight file is untouched**
+- [x] **Step 4: Confirm the knight file is untouched**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1102,7 +1102,7 @@ This is the whole design of Section 6. A single leaked swap in the knight file u
 the mod's largest event-spam surface and makes a script value read a variable that
 cannot exist.
 
-- [ ] **Step 5: Validate, index, conflicts, deploy**
+- [x] **Step 5: Validate, index, conflicts, deploy**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy
@@ -1111,7 +1111,7 @@ cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && pyt
 Expected: all exit 0. `conflicts` reads a sqlite index that only `index` rebuilds — never
 run it alone.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1132,7 +1132,7 @@ launching the game. Do them before spending seven minutes on a restart.
 
 **Files:** none — this task only reads.
 
-- [ ] **Step 1: Every modifier the mod can apply is stripped at combat end**
+- [x] **Step 1: Every modifier the mod can apply is stripped at combat end**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1151,7 +1151,7 @@ modifier leaks past combat end for 20 days and nothing at runtime will say so.
 **A line only in `bc_mods_stripped` is also a failure** — it means cleanup names a
 modifier that does not exist, which is a silent no-op rather than an error.
 
-- [ ] **Step 2: No call site names a family-2 modifier**
+- [x] **Step 2: No call site names a family-2 modifier**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1161,7 +1161,7 @@ grep -rn "bc_bloodied\|bc_shieldwall\|bc_spent_horse\|bc_pursuit" \
 
 Expected: **no output**. The `(KIND, SWING)` table is the interface.
 
-- [ ] **Step 3: Every seam parameter is consumed**
+- [x] **Step 3: Every seam parameter is consumed**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1187,7 +1187,17 @@ some effect that ignores it, which is precisely the state `SWING` was in at the 
 exactly two lines**, one of each shape; task 6 step 2 already established that count and
 this step is where it is confirmed to have survived the rest of the plan.
 
-- [ ] **Step 4: Nothing compares a parameter without `flag:`**
+> **RUN CORRECTION 2026-08-14 — `SWING` shows THREE lines, not two, and that is correct.**
+> This plan was written before plan 1's compile fix, which added
+> `limit = { flag:$SWING$ = flag:down }` at `bc_ledger_effects.txt:158` — a scripted
+> effect that does not READ every parameter its call sites pass fails to compile, so that
+> row is not optional. Actual output: **158** (read), **186** (passed on to
+> `bc_apply_verb_effect`), **388** (read, the `ordered`+`up` row). Both required shapes are
+> present. The extra line maps `SWING` to nothing, so task 4's rule that the `(KIND, SWING)`
+> table is the only place the mapping lives is intact. Task 6 step 2's expected count of 2
+> is stale for the same reason.
+
+- [x] **Step 4: Nothing compares a parameter without `flag:`**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1213,15 +1223,27 @@ Three details, each of which an earlier draft of this step got wrong:
   and this plan puts a parameterless one there (`bc_chronicle_flag_days_value`) while plan 1
   puts parameterised ladders next to it.
 
-- [ ] **Step 5: Full static pass**
+- [x] **Step 5: Full static pass**
 
 ```bash
-cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy
+cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy battle_chronicles
 ```
 
 Expected: all exit 0.
 
-- [ ] **Step 6: Nothing to commit**
+> **RUN CORRECTION 2026-08-14 — two fixes to the commands in this task.**
+> 1. **`deploy` requires a mod slug.** Bare `python ck3.py deploy` exits **2** with
+>    `error: the following arguments are required: mods`, and inside an `&&` chain that
+>    reads as the whole sweep failing. Same correction applies to task 10 step 5.
+> 2. **Step 4's grep needs `grep -v "#"` like step 3's.** As written it returns two hits,
+>    `bc_ledger_effects.txt:203` and `:340` — both are the header comments that document
+>    this exact trap in prose (`` `$TIER$ = decisive` substitutes textually to … ``). The
+>    check is otherwise clean; there is no `$PARAM$ = literal` in code anywhere.
+>
+> Run result: `v=0 i=0 c=0 d=0`, `git status --short` empty, ten modifiers defined and ten
+> stripped, no call site names a family-2 modifier.
+
+- [x] **Step 6: Nothing to commit**
 
 This task changes no files. If `git status --short` is not clean, something in steps 1–4
 was "fixed" in passing — review it as its own change.

@@ -2434,7 +2434,7 @@ exactly what task 1 had to clean up.
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_reward_effects.txt` (one comment, step 3)
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_ledger_effects.txt` (one comment, step 3)
 
-- [ ] **Step 1: Remove Q1, Q3, Q4 and Q5**
+- [x] **Step 1: Remove Q1, Q3, Q4 and Q5**
 
 Strip every `debug_log = "BC: DIAG ..."` and the ladders that exist only to emit them.
 
@@ -2444,7 +2444,7 @@ Strip every `debug_log = "BC: DIAG ..."` and the ladders that exist only to emit
 markers from the seam. The seam markers stay — they are how every later plan proves its
 call sites fire.
 
-- [ ] **Step 2: Decide what happens to the `on_combat_start` hook**
+- [x] **Step 2: Decide what happens to the `on_combat_start` hook**
 
 Two cases:
 
@@ -2462,7 +2462,7 @@ Two cases:
   `bc_diag_events.txt` entirely. Record the failure in the spec — plan 5's eve section
   needs rewriting before it can be executed.
 
-- [ ] **Step 3: Retire the two permanent comments that name a DIAG question**
+- [x] **Step 3: Retire the two permanent comments that name a DIAG question**
 
 **Two comments this plan ships are written in the future tense and will outlive the
 questions they name.** They are not diagnostics and must not be deleted — they are the
@@ -2520,7 +2520,7 @@ proved nothing; every toast had a human subject." A comment that overstates what
 measured is worse than one that admits the gap, and this is the specific failure the
 five-row table exists to prevent.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -rn "DIAG" --exclude-dir=.git common/ events/
@@ -2538,15 +2538,17 @@ check reported clean.
 the same commit.** Leaving the hook behind recreates exactly the dangling reference that
 task 13 was restructured to avoid.
 
-- [ ] **Step 5: Full verification sweep**
+- [x] **Step 5: Full verification sweep** — deferred to task 17 step 4 and discharged
+      there, so the index was built once over the final tree rather than over an
+      intermediate one. `deploy` takes a mod name; see the correction in that step.
 
 ```bash
-cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy
+cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy battle_chronicles
 ```
 
 Expected: all exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 **Name the files. Do not use `git add -A`.** Task 15 is a runtime task run against a live
 game, and the mod directory is the deploy target — a blanket add sweeps up whatever the
@@ -2600,7 +2602,10 @@ distribution that plan 2 retunes against is measured on a bug.
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_triggers/bc_scripted_triggers.txt:32-61`
 
-- [ ] **Step 1: Confirm the bug is still there and measure it**
+- [x] **Step 1: Confirm the bug is still there and measure it** — 5 bare keys found at
+      lines 47, 48, 56, 57, 58 (plus a comment reference at 33), and all nine province
+      counts measured against AGOT's `00_province_terrain.txt` matched the plan's table
+      exactly.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -2638,7 +2643,7 @@ match — 15.8% of the ground it is meant to describe. `bc_terrain_bogs_us_down_
 misses 51. Neither failure is visible: a province on `majorroad_hills` simply does not
 match `terrain = hills`, no error is logged, and the event silently does not fire.
 
-- [ ] **Step 2: Replace both triggers and their comment**
+- [x] **Step 2: Replace both triggers and their comment**
 
 The comment block above them is as wrong as the code and must go with it. Replace
 `bc_scripted_triggers.txt:32-61` — from the `# --- ground` header through the closing
@@ -2706,31 +2711,43 @@ bc_terrain_bogs_us_down_trigger = {
 adding four terrains is exactly when it recurs. `highlands` and `terraced_hills` are
 hill-like, `the_bog` and `taiga_bog` are bog-like, and no helper appears twice.
 
-- [ ] **Step 3: Verify the replacement**
+- [x] **Step 3: Verify the replacement**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
-grep -c "terrain = [a-z]" common/scripted_triggers/bc_scripted_triggers.txt
+grep -cE '^[[:space:]]+terrain = [a-z_]+[[:space:]]*$' common/scripted_triggers/bc_scripted_triggers.txt
 grep "agot_is_" common/scripted_triggers/bc_scripted_triggers.txt | grep -vc "#"
 grep -n "agot_is_" common/scripted_triggers/bc_scripted_triggers.txt | grep -v "#"
 ```
 
 The first must be **0**. The second must be **9**. The third must list **9 lines**, four
 under `bc_terrain_favours_us_trigger` and five under `bc_terrain_bogs_us_down_trigger`,
-with no key appearing twice.
+with no key appearing twice. **All three came out right: 0, 9, and the nine lines at
+68-71 and 79-83, no key twice.**
 
 **The first count is the one that matters and it must be exactly 0, not "lower".** A
-single surviving bare key is the entire bug, and it validates clean. Before this task it
-returns **6** — the five bare keys plus the old comment's own `terrain = x` example, which
-step 2's replacement comment rewrites as "a terrain check" precisely so this grep can mean
-what it says.
+single surviving bare key is the entire bug, and it validates clean.
+
+**RUN CORRECTION, 2026-08-14 — the first grep was originally written `grep -c "terrain =
+[a-z]"` and CANNOT return 0 on a correctly fixed file.** It returned **10**. The plan
+argued the comment line ``# NEVER `terrain = X`.`` is safe because `X` is uppercase. True
+of that half of the line — but the *same line* ends `ALWAYS agot_is_X_terrain = yes`, and
+so does every one of the nine helper calls the fix introduces. `[a-z]` matches the `y` of
+`yes`. 9 helpers + 1 comment = 10. The check was counting the cure, not the disease, and
+would have read 10 forever while looking like a failure.
+
+The anchored form above is the correct check. It matches only the bare vanilla shape — a
+line that is nothing but indentation, `terrain = `, and a lowercase key — which is exactly
+what this task deletes, and which no helper call can resemble because a helper call has
+text before `terrain`. Before the fix it returns 5 (the five bare keys; the old comment's
+`terrain = x` example sat inline after `#` and never matched an anchored pattern). After,
+0.
 
 **The second command filters comments and a plain `grep -c` would not.** The replacement
 comment contains the line ``# NEVER `terrain = X`. ALWAYS `agot_is_X_terrain = yes`.``, so
 an unfiltered `grep -c "agot_is_"` returns **10** on a correct file. That line is doing real
 work — it is the instruction a future editor needs at the moment they are looking at these
-two triggers — so the grep gives way, not the comment. Note the same line is why the *first*
-grep still reads 0: `X` is uppercase and `[a-z]` does not match it.
+two triggers — so the grep gives way, not the comment.
 
 Then confirm the helpers this file now depends on all exist:
 
@@ -2740,7 +2757,11 @@ for h in hills forest highlands terraced_hills wetlands jungle mountains the_bog
 done
 ```
 
-Expected: **no output**. `validate` cannot do this — it does not resolve references, so a
+Expected: **no output** — and that is what it gave; all nine helpers exist.
+
+One caveat found on the run: the `= {` in that grep is load-bearing only if AGOT's
+formatting never varies. It held here, but the safer form drops it and greps the bare name.
+`validate` cannot do this — it does not resolve references, so a
 misspelled `agot_is_hils_terrain` passes cleanly and the trigger silently never matches,
 which is the same class of failure being fixed here.
 
@@ -2748,16 +2769,27 @@ which is the same class of failure being fixed here.
 `common/*.txt` files, and `agot_is_farmlands_terrain` is on line 1 of this one — a
 `^`-anchored version would report it missing.
 
-- [ ] **Step 4: Full sweep and deploy**
+- [x] **Step 4: Full sweep and deploy**
 
 ```bash
-cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy
+cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy battle_chronicles
 ```
 
 Expected: all exit 0. `conflicts` reads the index, so it must run after `index` — on a
 stale index it can only ever report a pass.
 
-- [ ] **Step 5: Commit**
+**RUN CORRECTION, 2026-08-14: `deploy` takes a mod name and the plan omitted it.** Bare
+`python ck3.py deploy` exits 2 with `error: the following arguments are required: mods`,
+which in a `&&` chain reads as the sweep failing at the last step. The argument is
+`battle_chronicles`.
+
+All four passed. `index` covered 48 sources / 31502 files and lists `[45] Battle
+Chronicles: 16 files, 71 defs, 107 loc`. `conflicts` reports 300 colliding files across the
+playset and **Battle Chronicles appears in none of the chains** — which is the only part of
+that report this mod is answerable for. This step also discharges task 16 step 5, whose
+index/conflicts sweep was deferred to here.
+
+- [x] **Step 5: Commit** — `2bd7f13`.
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -2785,38 +2817,68 @@ no tuning.
 
 ## Done when
 
-- [ ] Three combat-end events are two, and grading provably runs before scratch clearing.
-- [ ] `bc_addressed_toast_effect` exists and the nickname path has executed at runtime.
-- [ ] All eighteen moment call sites reach `bc_record_moment_effect`.
-- [ ] A battle's log shows N moment markers with tiers that respect the ceiling.
-- [ ] No `bc_battle_*` variable exists on any commander at the start of a new battle.
+- [x] Three combat-end events are two, and grading provably runs before scratch clearing.
+      Verified structurally: `bc_chronicles.0091` opens at line 51, grades at 65, clears at
+      152; `.0092` opens at 164, grades at 178, clears at 226. Both gradings sit at a
+      shallower ancestor depth than their clear, so no game-rule branch can skip one and
+      keep the other.
+- [x] `bc_addressed_toast_effect` exists and the nickname path has executed at runtime —
+      `BC: nickname awarded` ×6 in the run log.
+- [x] All eighteen moment call sites reach `bc_record_moment_effect`. Reconciled through
+      the `args#` hash: every `BC: fired` count matches its site's swing/tier lines exactly.
+- [x] A battle's log shows N moment markers with tiers that respect the ceiling — 707
+      moments logged, no tier above its site's ceiling.
+- [x] No `bc_battle_*` variable exists on any commander at the start of a new battle.
       **Ledger variables persist by design** — `bc_notable_battles` is deliberately never
       cleared ("Never cleared - that is the point", `bc_scripted_effects.txt`), and task 12
       correctly leaves it out of the clear list. A criterion phrased "no `bc_` variable"
       would fail on a correct build.
-- [ ] No `bc_` variable of any kind exists on any knight, ever. Knights hold no ledger, so
-      here the broad phrasing is the right one.
-- [ ] `validate --strict`, `index`, `conflicts` and `deploy` all exit 0.
-- [ ] On a **cleared** log, every group returned by `probe "bc_"` satisfies the three-item
+      **Established by exhaustive static audit, not by console inspection** — see task 15
+      step 6: all 31 write sites live in 4 effects in one file, every one is cleared, and
+      the clear sits outside the game-rule gate. The one residual leak static analysis
+      cannot reach is a commander killed or replaced mid-battle, which
+      `bc_ledger_effects.txt`'s own header already anticipates.
+- [x] No `bc_` variable of any kind exists on any knight, ever. Knights hold no ledger, so
+      here the broad phrasing is the right one. Same audit.
+- [x] `validate --strict`, `index`, `conflicts` and `deploy` all exit 0 — task 17 step 4.
+- [x] On a **cleared** log, every group returned by `probe "bc_"` satisfies the three-item
       whitelist: a game-rule option key, the launcher's `BC Spike` line, or a line
       beginning `BC: `. No group names any other `bc_` key.
+      **Two engine-emitted groups are not in that whitelist and never could be**: the
+      `>=== NAMESPACE > 'bc_chronicles' is set to #3830000` line and one
+      `Loaded [N] events from 'events/bc_*.txt'` line per event file. Both are the engine
+      reporting on the mod rather than the mod logging, and both appear on any healthy
+      build. The whitelist as written was a three-item list of *mod* output and should be
+      read that way.
 - [ ] All three of `BC: moment minor` / `major` / `decisive` have appeared. If only
       `minor` ever appears, the `flag:$TIER$` comparison is silently failing and both
       upper arms of the ceiling are dead.
-- [ ] All five DIAG answers are recorded — **Q1/Q2/Q3/Q5 in the spec**, Q4 in the mod's
+      **NOT MET, AND DELIBERATELY LEFT SO.** `minor` and `major` both appeared; `decisive`
+      is 0 across 707 moments. This is **not** the failure the criterion was written to
+      catch — the `flag:$TIER$` comparison is proven working, by reconciling
+      `bc_flank_collapses` (37 fires = 4 major + 33 minor) through its `args#` hash: those
+      4 `major` lines can only have come through the decisive arm of the OR. `decisive = 0`
+      is pacing, not logic — 707 moments over 286 side-commanders is a mean of 2.5, and the
+      decisive rung needs a longer run of moments than a 2.5-mean battle produces. It is
+      also measured entirely on a campaign that **lost every battle**, so it may be a
+      losing-side artefact. Recorded, not retuned; plan 2 owns the pacing curve and should
+      re-measure on a run with wins in it before touching the ladder.
+- [x] All five DIAG answers are recorded — **Q1/Q2/Q3/Q5 in the spec**, Q4 in the mod's
       README next to the claim it corrects or confirms. That is the split task 15 step 7
       commits, and **Q2 belongs in it**: plan 5 gates its entire eve on Q2's verdict, and
       the only other record of that verdict is whether `events/bc_combat_start_events.txt`
       exists — a fact about the filesystem that says nothing about *why*. An earlier draft
       of this checklist listed only Q1/Q3/Q5 and left Q2 with no written home at all.
-- [ ] Q4 was answered on a run in which `BC: DIAG Q4 subject AI` appeared at least once.
+- [x] Q4 was answered on a run in which `BC: DIAG Q4 subject AI` appeared at least once.
       If that count is 0, the run only ever named a human subject and the question is
-      untouched — record no verdict.
-- [ ] No DIAG marker remains in `common/` or `events/`.
-- [ ] `grep -c "terrain = [a-z]" common/scripted_triggers/bc_scripted_triggers.txt` returns
-      **0**, and the file names nine `agot_is_<x>_terrain` helpers across two disjoint
-      lists. Exactly 0, not "fewer" — one surviving bare key is the whole bug and it
-      validates clean.
+      untouched — record no verdict. **It appeared 131 times; human 0.**
+- [x] No DIAG marker remains in `common/` or `events/`.
+- [x] `grep -cE '^[[:space:]]+terrain = [a-z_]+[[:space:]]*$' common/scripted_triggers/bc_scripted_triggers.txt`
+      returns **0**, and the file names nine `agot_is_<x>_terrain` helpers across two
+      disjoint lists. Exactly 0, not "fewer" — one surviving bare key is the whole bug and
+      it validates clean. **The unanchored `grep -c "terrain = [a-z]"` this criterion
+      originally named is defective and can never return 0 after a correct fix; see the
+      run correction in task 17 step 3.**
 
 ## What comes next
 

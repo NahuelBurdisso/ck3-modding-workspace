@@ -153,7 +153,7 @@ class TestStructure(ValidateTestCase):
         # and nothing went red - a number in a commit message moved instead.
         # The others are here so that a rewrite of the allowlist that drops one
         # of them fails on the name it dropped.
-        for name in (".gitattributes", ".gitignore", "README.md", "descriptor.mod"):
+        for name in (".gitattributes", ".gitignore", "README.md", "descriptor.mod", "thumbnail.png"):
             self.write(name, "")
         (self.root / ".vscode").mkdir()
         (self.root / ".git").mkdir()
@@ -192,6 +192,33 @@ class TestScriptFile(ValidateTestCase):
     def test_top_level_definitions_come_back_for_script_directories(self) -> None:
         _, defs = self.check_script("common/a.txt", "first = {\n}\nsecond = {\n}\n")
         self.assertEqual(defs, [("first", 1), ("second", 3)])
+
+    def test_every_directory_the_check_names_yields_definitions(self) -> None:
+        # ONE FIXTURE PER PREFIX. The test above covers `common/` alone, so
+        # dropping `events/` or `history/` from the tuple was a silent
+        # narrowing: definitions in those trees would stop being collected and
+        # the duplicate-key check would stop seeing them, with nothing red.
+        for prefix in ("common", "events", "history"):
+            _, defs = self.check_script(f"{prefix}/a.txt", "only = {\n}\n")
+            self.assertEqual(defs, [("only", 1)], prefix)
+
+    def test_a_directory_the_check_does_not_name_yields_nothing(self) -> None:
+        # The other side of the same boundary: a tuple widened to everything
+        # passes the test above and this one is what notices.
+        _, defs = self.check_script("gfx/a.txt", "only = {\n}\n")
+        self.assertEqual(defs, [])
+
+    def test_an_unreadable_file_is_an_error_and_yields_no_definitions(self) -> None:
+        # THE ONLY ARM OF THIS FUNCTION THAT CANNOT BE REACHED BY WRITING A
+        # FIXTURE, so it is reached by making the read fail. It matters because
+        # the alternative to reporting is a file the gate skipped in silence,
+        # which is the failure mode the whole module exists to end.
+        path = self.write("common/a.txt", "a = {\n}\n")
+        issues: list[V.Issue] = []
+        with mock.patch.object(V, "read_text", side_effect=OSError("boom")):
+            defs = V._check_script_file("common/a.txt", path, issues)
+        self.assertEqual(defs, [])
+        self.assertOneMatching([i.format() for i in issues], "common/a.txt: unreadable: boom")
 
     def test_no_definitions_come_back_from_gui(self) -> None:
         # A .gui carries no top-level `key = {` the duplicate check can use, and
@@ -249,6 +276,18 @@ class TestLocFile(ValidateTestCase):
                 f"localization/{lang}/a_l_{lang}.yml", f'l_{lang}:\n bc_one:0 "One"\n'
             )
             self.assertEqual(found, [], f"{lang} warned")
+
+    def test_a_file_with_no_language_folder_has_nothing_to_disagree_with(self) -> None:
+        # `localization/a_l_english.yml` splits into two parts, so there IS no
+        # folder to compare and `folder_lang` stays None. Loosening the length
+        # test to `> 1` makes `parts[1]` the FILENAME, which never equals a
+        # language and false-errors on a legal layout. Both directions of that
+        # boundary are pinned - the wrong-folder case below is the other one.
+        found, keys = self.write_loc(
+            "localization/a_l_english.yml", 'l_english:\n bc_one:0 "One"\n'
+        )
+        self.assertEqual(found, [])
+        self.assertEqual(keys, ["bc_one"])
 
     def test_a_file_in_the_wrong_language_folder_is_an_error(self) -> None:
         found, _ = self.write_loc(
@@ -455,6 +494,103 @@ class TestValidateMod(ValidateTestCase):
         # directory warns under --strict.
         self.write("common/traits/t.txt", "@bc_macro = 3\nbc_trait = {\n}\n")
         self.assertNoneMatching(self.validate(strict=True), "@bc_macro")
+
+    # THE LIST IS WRITTEN OUT, NOT READ BACK OUT OF V.LOC_EXPECTED. The first
+    # version of the test below took its fixtures from the constant, which puts
+    # the same set on both sides: dropping `common/decisions` also dropped the
+    # fixture that would have caught it, and both single-drop mutants survived.
+    # This is the trap the extension list in test_sweep_backticks.py records,
+    # walked into again three commits later. NO NUMBER IS GIVEN for the length.
+    LISTED_LOC_EXPECTED = (
+        "common/character_interactions",
+        "common/decisions",
+        "common/traits",
+    )
+
+    def test_every_category_that_expects_localization_is_checked(self) -> None:
+        # One definition per listed category, one warning per listed category.
+        for i, category in enumerate(self.LISTED_LOC_EXPECTED):
+            self.write(f"{category}/f{i}.txt", f"bc_def{i} = {{\n}}\n")
+        found = self.validate(strict=True)
+        for i in range(len(self.LISTED_LOC_EXPECTED)):
+            self.assertOneMatching(found, f"`bc_def{i}` has no localization key in this mod")
+
+    def test_the_literal_category_list_is_the_one_the_module_declares(self) -> None:
+        # What the literal buys, beyond killing the single drops: a category
+        # added to LOC_EXPECTED without a fixture beside it fails HERE, naming
+        # the line to edit, rather than being checked by no test at all.
+        self.assertEqual(V.LOC_EXPECTED, set(self.LISTED_LOC_EXPECTED))
+
+    def test_a_category_outside_the_list_is_not_expected_to_have_localization(self) -> None:
+        # The widening side. A LOC_EXPECTED holding every category passes the
+        # test above; this is what notices, and common/scripted_effects is the
+        # case that matters - nothing in it is ever named in a tooltip.
+        self.write("common/scripted_effects/e.txt", "bc_effect = {\n}\n")
+        self.assertNoneMatching(self.validate(strict=True), "has no localization key")
+
+    def test_every_scanned_extension_is_read(self) -> None:
+        # ONE FIXTURE PER EXTENSION the file loop names, each carrying a brace
+        # error, so a dropped extension fails on the file it stopped opening.
+        # Written out rather than derived: the tuple is inline in validate_mod
+        # and reading it back out would put the same list on both sides.
+        for ext in (".txt", ".gui", ".gfx", ".asset", ".info"):
+            self.write(f"common/scripted_effects/x{ext}", "bc_a = {\n")
+        found = self.validate()
+        for ext in (".txt", ".gui", ".gfx", ".asset", ".info"):
+            self.assertOneMatching(found, f"x{ext}: unbalanced braces")
+
+    def test_an_unscanned_extension_is_not_read(self) -> None:
+        # `.shader`, NOT `.json`: the walk itself filters to SCRIPT_EXTS, so a
+        # .json never reaches this loop at all and asserting on one says
+        # nothing about the loop's own tuple. `.shader` and `.mod` are the two
+        # extensions the walk yields and this loop declines, which makes them
+        # the only fixtures that can see it widened.
+        self.write("common/scripted_effects/x.shader", "bc_a = {\n")
+        self.assertNoneMatching(self.validate(), "x.shader")
+
+    def test_a_custom2_call_resolves_like_a_custom_call(self) -> None:
+        # `.Custom2('name')` is the two-scope form and names the same kind of
+        # definition. Dropping the optional `2` from the pattern stops every
+        # one of them being checked, which is silent by construction: a missing
+        # definition renders as nothing at all in game.
+        self.write(
+            "localization/english/a_l_english.yml",
+            BOM + 'l_english:\n bc_line:0 "[dude.Custom2(\'bc_missing\', other)]"\n',
+        )
+        self.assertOneMatching(
+            self.validate(),
+            "`Custom('bc_missing')` has no customizable_localization definition in this mod",
+        )
+
+    def test_a_comment_touching_an_arm_key_is_not_read_as_part_of_it(self) -> None:
+        # `localization_key = bc_present# note` is legal script with no space
+        # before the comment. `\S+` captures `bc_present#` and false-errors on
+        # a key that is present, which is why the pattern excludes `#`.
+        self.write(
+            "common/customizable_localization/c.txt",
+            "bc_there = {\n\ttext = {\n\t\tlocalization_key = bc_present# note\n\t}\n}\n",
+        )
+        self.write(
+            "localization/english/a_l_english.yml", BOM + 'l_english:\n bc_present:0 "Here"\n'
+        )
+        self.assertNoneMatching(self.validate(), "localization_key")
+
+    def test_a_file_that_vanilla_also_ships_is_reported_as_an_override(self) -> None:
+        # THE ONLY INFO-LEVEL LINE THE VALIDATOR EMITS, and nothing reached it:
+        # every other fixture here points game_dir at a directory that does not
+        # exist precisely so this branch stays out of the way. It is worth a
+        # line because an accidental override of a vanilla file is how a mod
+        # breaks something it never mentions.
+        rel = "common/scripted_effects/a.txt"
+        game_copy = self.root / "nonexistent_game" / "game" / rel
+        game_copy.parent.mkdir(parents=True, exist_ok=True)
+        game_copy.write_text("vanilla = {\n}\n", encoding="utf-8")
+        self.write(rel, "bc_a = {\n}\n")
+        self.assertOneMatching(self.validate(), f"overrides 1 vanilla file(s); first: {rel}")
+
+    def test_a_mod_overriding_nothing_says_nothing(self) -> None:
+        self.write("common/scripted_effects/a.txt", "bc_a = {\n}\n")
+        self.assertNoneMatching(self.validate(), "overrides")
 
 
 class TestSummarize(ValidateTestCase):

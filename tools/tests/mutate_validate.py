@@ -88,6 +88,11 @@ MUTANTS = [
         "        if entry.name not in allowed:",
         "        if False:",
     ),
+    (
+        "structure: drop thumbnail.png from the allowlist",
+        '        "thumbnail.png",\n',
+        "",
+    ),
     # --- braces ---------------------------------------------------------
     (
         "script: stop reporting an unbalanced count",
@@ -104,6 +109,31 @@ MUTANTS = [
         'if relpath.startswith(("common/", "events/", "history/")) and path.suffix.lower() == ".txt":',
         'if relpath.startswith(("common/", "events/", "history/", "gui/")):',
     ),
+    # ONE MUTANT PER PREFIX, DROPPED SINGLY. The widening entry above dies to
+    # almost anything; it is the single drop that finds a test covering
+    # `common/` and calling that the tuple.
+    (
+        "script: stop collecting definitions under common/",
+        'startswith(("common/", ',
+        "startswith((",
+    ),
+    (
+        "script: stop collecting definitions under events/",
+        '"events/", "history/"',
+        '"history/"',
+    ),
+    (
+        "script: stop collecting definitions under history/",
+        ', "history/"))',
+        "))",
+    ),
+    # RAISES NOTHING AND REPORTS NOTHING - the file is simply gone from the
+    # run, which is the failure mode this whole module exists to end.
+    (
+        "script: swallow a file that cannot be read",
+        '        issues.append(Issue(ERROR, relpath, None, f"unreadable: {exc}"))\n        return []',
+        "        return []",
+    ),
     # --- localization ---------------------------------------------------
     (
         "loc: stop checking for the BOM",
@@ -114,6 +144,14 @@ MUTANTS = [
         "loc: forget which folder the file is in",
         '    folder_lang = parts[1] if len(parts) > 2 else None',
         "    folder_lang = None",
+    ),
+    # THE OTHER SIDE OF THAT BOUNDARY. At `> 1` a file sitting directly under
+    # localization/ takes its own FILENAME as the folder language, which never
+    # matches and false-errors on a legal layout.
+    (
+        "loc: read the filename as the folder it sits in",
+        '    folder_lang = parts[1] if len(parts) > 2 else None',
+        "    folder_lang = parts[1] if len(parts) > 1 else None",
     ),
     (
         "loc: accept any language in the filename",
@@ -253,6 +291,83 @@ MUTANTS = [
         "run: expect localization in no category at all",
         '            if category in LOC_EXPECTED and key not in loc_keys and not key.startswith("@"):',
         '            if category in set() and key not in loc_keys and not key.startswith("@"):',
+    ),
+    # --- what the file loop opens ----------------------------------------
+    # ONE PER EXTENSION, DROPPED SINGLY, then the widening. A dropped extension
+    # is silent: the file stops being braced-checked and its definitions stop
+    # being collected, and nothing anywhere says so.
+    (
+        "run: stop opening .txt",
+        '(".txt", ".gui"',
+        '(".gui"',
+    ),
+    (
+        "run: stop opening .gui",
+        '".gui", ".gfx"',
+        '".gfx"',
+    ),
+    (
+        "run: stop opening .gfx",
+        '".gfx", ".asset"',
+        '".asset"',
+    ),
+    (
+        "run: stop opening .asset",
+        '".asset", ".info")',
+        '".info")',
+    ),
+    (
+        "run: stop opening .info",
+        ', ".info"):',
+        "):",
+    ),
+    (
+        "run: open everything that is not localization",
+        'if ext in (".txt", ".gui", ".gfx", ".asset", ".info"):',
+        'if ext != ".yml":',
+    ),
+    # --- the two resolvers' patterns -------------------------------------
+    (
+        "run: stop recognising the two-scope Custom2 form",
+        'CUSTOM_CALL_RE = re.compile(r"\\.Custom2?\\(\\s*\'([^\']+)\'")',
+        'CUSTOM_CALL_RE = re.compile(r"\\.Custom\\(\\s*\'([^\']+)\'")',
+    ),
+    (
+        "run: read a trailing comment as part of the arm key",
+        'LOC_ARM_RE = re.compile(r"^\\s*localization_key\\s*=\\s*([^\\s#]+)", re.M)',
+        'LOC_ARM_RE = re.compile(r"^\\s*localization_key\\s*=\\s*(\\S+)", re.M)',
+    ),
+    # --- the categories that expect localization -------------------------
+    (
+        "run: stop expecting localization for traits",
+        '{"common/traits", ',
+        "{",
+    ),
+    (
+        "run: stop expecting localization for decisions",
+        '"common/decisions", ',
+        "",
+    ),
+    (
+        "run: stop expecting localization for character interactions",
+        ', "common/character_interactions"}',
+        "}",
+    ),
+    (
+        "run: expect localization for scripted effects as well",
+        'LOC_EXPECTED = {"common/traits", "common/decisions", "common/character_interactions"}',
+        'LOC_EXPECTED = {"common/traits", "common/decisions", "common/character_interactions", "common/scripted_effects"}',
+    ),
+    # --- the vanilla override notice -------------------------------------
+    (
+        "run: stop noticing that a file overrides vanilla",
+        "        if (cfg.game_root / relpath).is_file():",
+        "        if False:",
+    ),
+    (
+        "run: collect the overrides and never report them",
+        "    if vanilla_overrides:",
+        "    if False:",
     ),
     # --- the counts every commit message quotes --------------------------
     (

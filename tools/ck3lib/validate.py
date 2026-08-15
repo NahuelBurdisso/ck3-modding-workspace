@@ -201,11 +201,22 @@ def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issu
                     def_categories.append((category, key))
         elif ext == ".yml" and relpath.startswith("localization/"):
             loc_keys.update(_check_loc_file(relpath, path, issues))
+            for line, key in _scan_matches(path, CUSTOM_CALL_RE):
+                custom_calls.append((relpath, line, key))
 
     for relpath, line, key in custom_loc_arms:
         if key not in loc_keys:
             issues.append(
                 Issue(ERROR, relpath, line, f"`localization_key = {key}` has no loc entry in this mod")
+            )
+
+    # Only this mod's own keys. A Custom() call naming a vanilla or AGOT
+    # definition is legitimate and unresolvable from the mod root alone.
+    custom_loc_defs = {key for category, key in def_categories if category.rstrip("/") == CUSTOM_LOC_DIR.rstrip("/")}
+    for relpath, line, key in custom_calls:
+        if key.startswith("bc_") and key not in custom_loc_defs:
+            issues.append(
+                Issue(ERROR, relpath, line, f"`Custom('{key}')` has no customizable_localization definition in this mod")
             )
 
     if strict:

@@ -1254,7 +1254,7 @@ was "fixed" in passing — review it as its own change.
 
 **This is the runtime checkpoint. Everything before it is unproven.**
 
-- [ ] **Step 1: Clear the logs — with the game closed**
+- [x] **Step 1: Clear the logs — with the game closed**
 
 Delete `error.log` and `debug.log` from
 `D:\Documents\Paradox Interactive\Crusader Kings III\logs`.
@@ -1263,7 +1263,7 @@ Skipping this makes every sweep below unfalsifiable — `error.log` accumulates 
 sessions. This also discards plan 1's run, so if anything from it is still unrecorded,
 write it into the README or the spec first.
 
-- [ ] **Step 2: Fight battles of different sizes**
+- [x] **Step 2: Fight battles of different sizes**
 
 Launch. Fight at least one battle you can see is small (a few hundred men) and at least
 one large one (several thousand). **Both halves of this plan are about the difference
@@ -1271,7 +1271,7 @@ between them, so a run with only one size proves nothing.**
 
 Let at least one large battle run long enough to produce several moments.
 
-- [ ] **Step 3: Sweep the size markers**
+- [x] **Step 3: Sweep the size markers**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "BC: size"
@@ -1288,7 +1288,7 @@ If only `BC: size 1` appears no matter what the world is doing, the bucket ladde
 misreading `num_total_troops` and every gate in this plan is dead. That is a blocker on
 the whole plan, not a tuning question.
 
-- [ ] **Step 4: Sweep the verb markers**
+- [x] **Step 4: Sweep the verb markers**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "BC: verb"
@@ -1303,7 +1303,7 @@ Expected: exit 0, with **at least two distinct verbs**.
 | nothing at all, but `BC: size 2` or `3` appeared | **the ladder is dead.** Check the `flag:` wrapping in `bc_apply_verb_effect` first, then the nested size gate in the seam |
 | nothing at all, and only `BC: size 1` appeared | not a failure — size 1 gets no family-2 modifier by design. Go fight a bigger battle |
 
-- [ ] **Step 5: Sweep the pacing marker**
+- [x] **Step 5: Sweep the pacing marker**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "BC: chronicle mark commander"
@@ -1312,7 +1312,7 @@ cd /d/ck3/tools && python ck3.py probe "BC: chronicle mark commander"
 Expected: exit 0. Its absence alongside any `BC: fired bc_` line means the task-10 swap
 did not land — the events are firing and marking through the old shared effect.
 
-- [ ] **Step 6: Check the floor — and understand what cannot be checked**
+- [x] **Step 6: Check the floor — and understand what cannot be checked**
 
 **You cannot attribute markers to a battle from this log.** `type = commander` has no
 `is_ai` gate — `bc_commander_phase_events.txt`'s header records 59 commander fires in one
@@ -1370,7 +1370,7 @@ value is *reached* (step 5's marker) and that the floor can override it (this st
 marker). Whether 40 days is the right number for a large battle is untested and untestable
 from this log; it needs a purpose-built DIAG.
 
-- [ ] **Step 7: Error sweep**
+- [x] **Step 7: Error sweep**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "bc_"
@@ -1390,7 +1390,7 @@ the expected result and says nothing about whether they fired.
 readers are guarded; a hit means a guard is written as a sibling row somewhere instead of
 nested.
 
-- [ ] **Step 8: Record the findings**
+- [x] **Step 8: Record the findings**
 
 Write into `README.md`:
 
@@ -1416,7 +1416,7 @@ git add README.md
 git commit -m "docs: record the plan 2 runtime findings"
 ```
 
-- [ ] **Step 9: Record the Q3 boundary in the spec — a workspace commit**
+- [x] **Step 9: Record the Q3 boundary in the spec — a workspace commit**
 
 The boundary gates plan 6's wound gate as well, so it belongs in the spec, not only in
 the mod's README. Section 6's "Risk" paragraph says the threshold is invented and must be

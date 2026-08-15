@@ -1305,9 +1305,12 @@ multiplicative ladders would be untunable.
 
 ### Risk
 
-The `< 2,000` threshold is invented. The 2026-08-13 calibration run recorded `under 5k`
-as a single bucket of 26 of 39 battles and never subdivided it. Must be measured. See
-the DIAG pass, Q3.
+**Retired — measured.** The `< 2,000` threshold was invented, because the 2026-08-13
+calibration run recorded `under 5k` as a single bucket of 26 of 39 battles and never
+subdivided it. The DIAG pass answered Q3 by subdividing it: per side, 5k+ 46, 3k 42,
+2k 31, 1k 14, under-1k 4. The 2,000 boundary splits the low band **73/18** rather than
+leaving one undivided lump, so it earns its place and stays. Plan 6's wound gate reads
+the same `bc_battle_size` and inherits this boundary — re-measure before moving it.
 
 ---
 

@@ -1586,13 +1586,17 @@ Expected: all exit 0.
 **This is the runtime checkpoint.** A game restart costs about seven minutes, so this run
 must answer everything it can.
 
-- [ ] **Step 1: Clear the logs — game closed**
+- [x] **Step 1: Clear the logs — game closed**
 
 Delete `error.log` and `debug.log` from
 `D:\Documents\Paradox Interactive\Crusader Kings III\logs`. Write any unrecorded findings
 from the previous run into the README first.
 
-- [ ] **Step 2: Confirm the rule exists before fighting anything**
+- [ ] **Step 2: Confirm the rule exists before fighting anything** — PARTIAL. The
+  load half is proven: the mod loaded and the rungs fired, so the option list is
+  well formed and `bc_rivalry_rival` is the live default. The *localization* half
+  — three readable descriptions rather than raw keys on the rules screen — was not
+  looked at. Carried into the README.
 
 Start a game and open the game-rules screen. **`Battle Chronicles: Rivalry` must be present
 with three options and readable descriptions.** A raw key here means task 1 step 3's
@@ -1601,7 +1605,7 @@ localization did not land, and every other check in this task would still pass.
 This is also the only check that the mod still loads at all — a game rule with a malformed
 option list fails at load, not at use.
 
-- [ ] **Step 3: Fight, and fight the same man twice**
+- [x] **Step 3: Fight, and fight the same man twice**
 
 C needs **notable losses**, which is the hardest thing in the expansion to produce on demand:
 `bc_battle_is_notable_trigger` was calibrated against 39 combat ends and most battles fail it,
@@ -1611,7 +1615,7 @@ and you have to *lose*.
 `BC: nemesis escalate` and a rung above `grudge` are a bonus and should not be expected in one
 session.
 
-- [ ] **Step 4: Sweep the rivalry markers**
+- [x] **Step 4: Sweep the rivalry markers**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "BC: nemesis"
@@ -1629,7 +1633,10 @@ and groups per LINE rather than per error.** It exits 1 when nothing matches.
 | `BC: nemesis rule off` | the rule is set to off. Change it and re-run — the rung ladder is unverified until one fires |
 | `BC: nemesis held` | a commander lost to a second man while a grudge was running. Correct behaviour, and worth seeing at least once |
 
-- [ ] **Step 5: Confirm the relation actually landed**
+- [ ] **Step 5: Confirm the relation actually landed** — STILL OPEN after the
+  2026-08-14 checkpoint run. Everything else in this task passed; this one needs a
+  human at a character screen and was not done. Carried into the README's
+  "Not yet verified in game".
 
 **This is the one thing no marker proves.** `set_relation_grudge` targeting a saved scope is
 the form this plan chose *because* the variable form is unshipped — but that reasoning is an
@@ -1645,7 +1652,7 @@ his relations**. A `grudge` must be listed, against the right man, with the tool
 | the grudge, with a raw `bc_reason_battle_grudge` key | the effect works; task 6 step 3's loc key is misspelled on one side |
 | no grudge at all, but the marker fired | **the saved-scope target is also being declined.** Do not guess — this is the point to stop and re-derive the target form from a shipped call site |
 
-- [ ] **Step 6: Error sweep**
+- [x] **Step 6: Error sweep**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "bc_"
@@ -1659,7 +1666,7 @@ task 10 step 4 exists to prevent and which no static check in this plan can catc
 **Also watch for anything naming a dead character.** C is the first thing in the mod to hold
 a character reference across battles, so it is the first thing that can produce one.
 
-- [ ] **Step 7: Record and commit**
+- [x] **Step 7: Record and commit**
 
 Write into `README.md`:
 - whether the relation was seen on a character screen, and with what reason text — **this is

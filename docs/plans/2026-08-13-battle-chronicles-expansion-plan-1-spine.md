@@ -2850,19 +2850,23 @@ no tuning.
       reporting on the mod rather than the mod logging, and both appear on any healthy
       build. The whitelist as written was a three-item list of *mod* output and should be
       read that way.
-- [ ] All three of `BC: moment minor` / `major` / `decisive` have appeared. If only
+- [x] All three of `BC: moment minor` / `major` / `decisive` have appeared. If only
       `minor` ever appears, the `flag:$TIER$` comparison is silently failing and both
       upper arms of the ceiling are dead.
-      **NOT MET, AND DELIBERATELY LEFT SO.** `minor` and `major` both appeared; `decisive`
-      is 0 across 707 moments. This is **not** the failure the criterion was written to
-      catch — the `flag:$TIER$` comparison is proven working, by reconciling
+      **MET on the 2026-08-14 checkpoint run** — `BC: moment decisive` fired once. It
+      had been the last unmet criterion on this plan.
+      The history is worth keeping. At the DIAG run this read **NOT MET, AND
+      DELIBERATELY LEFT SO**: `minor` and `major` both appeared; `decisive` was 0 across
+      707 moments. That was **not** the failure the criterion was written to catch — the
+      `flag:$TIER$` comparison was already proven working, by reconciling
       `bc_flank_collapses` (37 fires = 4 major + 33 minor) through its `args#` hash: those
       4 `major` lines can only have come through the decisive arm of the OR. `decisive = 0`
-      is pacing, not logic — 707 moments over 286 side-commanders is a mean of 2.5, and the
-      decisive rung needs a longer run of moments than a 2.5-mean battle produces. It is
-      also measured entirely on a campaign that **lost every battle**, so it may be a
-      losing-side artefact. Recorded, not retuned; plan 2 owns the pacing curve and should
-      re-measure on a run with wins in it before touching the ladder.
+      was pacing, not logic — 707 moments over 286 side-commanders is a mean of 2.5, and
+      the decisive rung needs a longer run of moments than a 2.5-mean battle produces. It
+      was also measured entirely on a campaign that **lost every battle**. The decision to
+      record rather than retune was the right one: the rung was reachable all along and a
+      run with wins in it found it. **Do not retune the ladder on the strength of one
+      `decisive`, either** — n=1 says reachable, not correctly paced.
 - [x] All five DIAG answers are recorded — **Q1/Q2/Q3/Q5 in the spec**, Q4 in the mod's
       README next to the claim it corrects or confirms. That is the split task 15 step 7
       commits, and **Q2 belongs in it**: plan 5 gates its entire eve on Q2's verdict, and

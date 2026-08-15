@@ -1558,13 +1558,13 @@ Expected: all exit 0.
 
 **This is the runtime checkpoint.**
 
-- [ ] **Step 1: Clear the logs — game closed**
+- [x] **Step 1: Clear the logs — game closed**
 
 Delete `error.log` and `debug.log` from
 `D:\Documents\Paradox Interactive\Crusader Kings III\logs`. Write any unrecorded findings
 from the previous run into the README first.
 
-- [ ] **Step 2: Fight**
+- [x] **Step 2: Fight**
 
 B needs **notable** battles, which is a high bar — `bc_battle_is_notable_trigger` was
 calibrated against 39 combat ends and most battles fail it. And a style award needs three
@@ -1574,7 +1574,7 @@ notable battles of the *same* style by the *same* commander.
 the *bookkeeping* works. The award ladders are verified by the static checks in task 9 plus
 the fact that they share their shape with the streak effects.
 
-- [ ] **Step 3: Sweep the bookkeeping**
+- [x] **Step 3: Sweep the bookkeeping**
 
 ```bash
 cd /d/ck3/tools
@@ -1591,7 +1591,7 @@ battles the same way — `streak` lines.
 | neither appears, but `BC: win notable` / `BC: lose notable` did | **phase 1's `exists = var:bc_battle_style` guard is swallowing everything.** Either the seam is not writing style, or `bc_clear_scratch_effect` is running before the chain — check task 7 step 3 |
 | `BC: terrain NONE MATCHED` appears | an unhandled `terrain =` key exists. Find it and add it to the right bucket before B ships |
 
-- [ ] **Step 4: Sweep the blocked markers**
+- [x] **Step 4: Sweep the blocked markers**
 
 ```bash
 cd /d/ck3/tools
@@ -1616,7 +1616,7 @@ checking that the same commander does not produce it on every subsequent battle.
 award` on the same commander, the cause was the budget gate or an unresolved bucket, not
 precedence — cross-check against `BC: terrain NONE MATCHED` from step 3.
 
-- [ ] **Step 5: Error sweep**
+- [x] **Step 5: Error sweep**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "bc_"
@@ -1633,7 +1633,7 @@ shipped code — the counter wrote it on the line above — and this plan moves 
 effect the loser grader calls without the counter. If it appears here, the nesting in phase
 2c was not written.
 
-- [ ] **Step 6: Record and commit**
+- [x] **Step 6: Record and commit**
 
 Write into `README.md`: Q1's verdict and the budget gate chosen; whether style streaks were
 observed advancing; any `NONE MATCHED` terrain; and that `bc_style_last`,

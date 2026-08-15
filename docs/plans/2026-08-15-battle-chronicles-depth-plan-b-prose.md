@@ -385,6 +385,12 @@ Append to `bc_flavour.txt`:
 # THE BUCKETS ARE 10,000+ / 2,000+ / under. Measured over 143 battles per side:
 # 5k+ 46, 3k 42, 2k 31, 1k 14, under-1k 4. Do not re-guess the boundaries here;
 # they belong to bc_battle_open_effect and this file only names them.
+#
+# [DRAFT. The shipped header adds four things this one lacks and is the one to
+# copy: the citation for the ladder (bc_ledger_effects.txt:112-125) and for the
+# bucket derivation (:95-111); the monotonicity rule for the three strings; the
+# fallback's reachability by call site, which is the same argument bc_bond_clause
+# carries; and the fact that nothing calls the clause yet.]
 bc_scale_clause = {
 	type = character
 
@@ -432,9 +438,9 @@ In `bc_l_english.yml`, after the bond section:
 
 # --- shared fragments: the scale --------------------------------------------
 
- bc_frag_scale_huge:0 " On a field this size it will be an hour before anyone knows whether it mattered."
- bc_frag_scale_large:0 " The field is wide enough that half of it has not heard yet."
- bc_frag_scale_small:0 " There are few enough men here that every one of them sees it."
+ bc_frag_scale_huge:0 " There are so many men in this that word of it will reach most of them as rumour, if at all."
+ bc_frag_scale_large:0 " Enough men are engaged that whole companies of them will never hear of this."
+ bc_frag_scale_small:0 " The fight is small enough that every man in it will know of this by nightfall."
  bc_frag_scale_any:0 ""
 ```
 
@@ -471,6 +477,14 @@ writer values: ['3', '2', '1']
 
 Any `flag:` in the first list is the silent-no-op bug. Any mismatch between the two lists is an arm that can never match.
 
+**The silent-no-op was proved, not assumed.** Temporarily replacing `var:bc_battle_size = 2` with `var:bc_battle_size = flag:large` leaves `validate --strict` at `0 errors, 2 warnings`. That is why this step exists: the validator cannot see this class of mistake, so the check above is the only thing that can. Reverted immediately after.
+
+For contrast, the loc-key check *does* fire: renaming `localization_key = bc_frag_scale_large` to `bc_frag_scale_largee` produces exactly one error naming it. Both proofs are cheap; run both when touching this class.
+
+- [ ] **Step 4b: Fix the file header's opening line**
+
+Adding this class falsifies the first paragraph of `bc_flavour.txt`, which reads "THE ARMS ONLY COMPARE FLAGS". Rewrite it to say the arms compare a recorded classification, name the three writers (`bc_context_effects.txt` for the ground and the bond, the size ladder in `bc_ledger_effects.txt` for the scale), and add a second paragraph saying most comparisons are against a flag and `bc_scale_clause` is the exception. Do not leave the old line standing — it is the first thing a reader of this file sees.
+
 - [ ] **Step 5: Commit**
 
 ```bash
@@ -480,7 +494,10 @@ feat: add the shared scale clause
 Three size buckets plus a fallback. This is the only class in the file
 that compares a number rather than a flag, because bc_battle_size is
 written as one - a flag comparison would be a silent no-match that
-validate passes.
+validate passes, which step 4 proves rather than assumes.
+
+The file header's opening line said the arms only compare flags. This
+class falsifies it; rewritten, with the exception named.
 EOF
 )"
 ```

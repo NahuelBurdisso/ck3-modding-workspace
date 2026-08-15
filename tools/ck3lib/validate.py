@@ -107,8 +107,13 @@ CUSTOM_CALL_RE = re.compile(r"\.Custom2?\(\s*'([^']+)'")
 CITE_EXTS = {".txt", ".yml", ".gui", ".info", ".md"}
 CITE_TAIL = r":(\d+)(?:-(\d+))?"
 _CITE_EXT_ALT = "|".join(sorted(ext.lstrip(".") for ext in CITE_EXTS))
-RESOLVABLE_CITE_RE = re.compile(r"\b([A-Za-z0-9_]+\.(?:" + _CITE_EXT_ALT + "))" + CITE_TAIL)
-ANY_CITE_RE = re.compile(r"\b([A-Za-z0-9_.-]+\.[A-Za-z0-9]{1,8})" + CITE_TAIL)
+# The STEM is shared for the same reason the extension is. When the two stems
+# differed, `bc_missing-2.txt:1` matched the broad pattern, failed the narrow
+# one, and was dropped as unresolvable - so a `bc_` file that does not exist
+# escaped the error, purely because of a hyphen.
+_CITE_STEM = r"[A-Za-z0-9_.-]+"
+RESOLVABLE_CITE_RE = re.compile(r"\b(" + _CITE_STEM + r"\.(?:" + _CITE_EXT_ALT + "))" + CITE_TAIL)
+ANY_CITE_RE = re.compile(r"\b(" + _CITE_STEM + r"\.[A-Za-z0-9]{1,8})" + CITE_TAIL)
 # `(?<![\w.])`: without it `bc_frag_x:0 "text"` in a loc file matches as `:0`.
 # Only ever applied to comment lines, where a key/value pair cannot appear.
 BARE_CITE_RE = re.compile(r"(?<![\w.])" + CITE_TAIL + r"\b")
@@ -309,33 +314,34 @@ def _citation_files(
     second file to claim a shared basename was never scanned for its own outgoing
     citations, silently, with nothing reported.
 
-    ROOT-LEVEL FILES ARE INCLUDED BY HAND. `iter_files` walks SCAN_DIRS, which
-    starts at `common/`, so it never yields anything sitting beside descriptor.mod.
-    README.md is the one that matters: it is the largest body of prose in a
-    Battle-Chronicles-shaped mod and it cites the scripts constantly, so leaving
-    it out would leave the citations most likely to rot unchecked. descriptor.mod
-    is skipped because `.mod` is not in CITE_EXTS, which is fine - it is nine
-    lines long and nothing in the mod cites a line of it.
+    EVERY FILE WITH A CITABLE EXTENSION, WHEREVER IT SITS. This deliberately does
+    not use `iter_files`: that walks SCAN_DIRS, and anything outside them - a
+    root-level README.md, a `tests/` directory `_check_structure` explicitly
+    allows - would be invisible as a citer AND as a target, the second of which
+    turns a citation into a present file into a false "this mod does not contain
+    it". descriptor.mod falls out anyway because `.mod` is not in CITE_EXTS,
+    which is fine: nine lines, and nothing in the mod cites a line of it.
     """
     texts: dict[str, list[str]] = {}
     owners: dict[str, str] = {}
     ambiguous: set[str] = set()
     citers: list[tuple[str, list[str]]] = []
-    # `exts=CITE_EXTS`, not the default. `iter_files` falls back to SCRIPT_EXTS,
-    # which has no `.md` in it, so a markdown file anywhere under `common/` or
-    # `events/` would reach neither collection and be silently unscanned in both
-    # directions - the same defect the two collections above exist to fix, one
-    # level further out. Passing the set keeps this function's notion of a
-    # citable file in one place.
-    candidates = [(path.name, relpath, path) for relpath, path in iter_files(mod_root, CITE_EXTS)]
-    candidates += [
-        (path.name, path.name, path)
-        for path in sorted(mod_root.glob("*"))
-        if path.is_file() and path.suffix.lower() in CITE_EXTS
-    ]
-    for name, relpath, path in candidates:
-        if path.suffix.lower() not in CITE_EXTS:
+    # WALK THE WHOLE MOD, NOT SCAN_DIRS. Three rounds running found a file the
+    # citation check could not see, each time in a new dimension - a shadowed
+    # basename, then an extension SCRIPT_EXTS omits, then any `.md` below a
+    # SCAN_DIR - and each time the file was invisible in BOTH directions, which
+    # means a citation INTO it also reports the false "this mod does not contain
+    # it". `tests/` was the next one queued up: `_check_structure` allows it at
+    # root and SCAN_DIRS does not list it. Rather than enumerate the exceptions
+    # a fourth time, the extension is now the only filter. `.git` is skipped
+    # because it is not part of the mod.
+    for path in sorted(mod_root.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in CITE_EXTS:
             continue
+        if ".git" in path.relative_to(mod_root).parts:
+            continue
+        relpath = path.relative_to(mod_root).as_posix()
+        name = path.name
         # splitlines(), not a newline split: the latter leaves a phantom empty
         # last element on any file ending in a newline, which is every file, and
         # a citation one past the last real line would then be reported as

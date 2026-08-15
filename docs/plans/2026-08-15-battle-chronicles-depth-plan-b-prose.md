@@ -452,8 +452,8 @@ That axis is unavailable too, and worse: `bc_chronicle_flag_days_value`
 (`bc_script_values.txt:110-128`) already grades recurrence off the same variable
 at 10 / 20 / 40 days, so prose promising another moment the same afternoon
 contradicts a shipped mechanic by an order of magnitude. It also fails the
-shared-clause test — at least seven of the ten moments are states or one-offs
-and cannot recur, five of them for the whole battle and two more only per man.
+shared-clause test — at least seven of the ten moments *read* as states or
+one-offs, though nothing in their `is_valid` blocks enforces that.
 
 A third draft kept that axis but phrased it as the commander's own companies
 standing idle, which contradicts `bc_flank_collapses` outright: that moment's
@@ -466,7 +466,10 @@ both hosts, because the size ladder sets `bc_battle_size` by comparing
 `num_total_troops` on the combat scope — and say nothing about the moment
 itself. Their verbs are agentless for the same reason the subject is shared: a
 clause naming men who could have acted and did not reads as a reproach aimed at
-the man whose portrait is on the toast. Copy the shipped section
+the man whose portrait is on the toast. A fourth draft closed on a universal —
+"there is not a man who is not in the fighting" — which `bc_knight_shames_himself`
+falsifies in the sentence directly above it, and which put a singular "a man"
+one word away from the bond clause's "The man commanding here". Copy the shipped section
 comment and strings from `bc_l_english.yml`, not this block; the shipped
 `bc_scale_clause` header carries the four-row test a replacement axis has to
 pass.

@@ -266,7 +266,7 @@ in the mod uses. Family 3 runs in the seam's scope, like everything else.
 - Modify: `mods/battle_chronicles/common/game_rules/bc_game_rules.txt`
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
 
-- [ ] **Step 1: Record the localization baseline**
+- [x] **Step 1: Record the localization baseline**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -277,7 +277,7 @@ grep -c "^ bc_\|^ rule_bc_\|^ setting_bc_" localization/english/bc_l_english.yml
 localization tasks in this plan, and that is not a check you can run without the number from
 before.
 
-- [ ] **Step 2: Read the file's warning before touching it**
+- [x] **Step 2: Read the file's warning before touching it**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && sed -n '1,20p' common/game_rules/bc_game_rules.txt
@@ -290,7 +290,7 @@ to that set. **That is expected and is not a reason to skip the rule** — the a
 mod that can wound a player's commander with no way to turn it off — but it does mean the
 rule must land in one commit and never be renamed afterwards.
 
-- [ ] **Step 3: Add the rule**
+- [x] **Step 3: Add the rule**
 
 Append to `common/game_rules/bc_game_rules.txt`:
 
@@ -317,7 +317,7 @@ rule that defaults off is a feature nobody sees.
 
 **`categories = { flavor }`, matching the other three.** Do not invent a category.
 
-- [ ] **Step 4: Add the six rule localization keys**
+- [x] **Step 4: Add the six rule localization keys**
 
 Append to `localization/english/bc_l_english.yml`, **after the last existing `setting_bc_`
 line**, so the rule keys stay in one block. **One leading space per line.**
@@ -341,7 +341,7 @@ last key would interleave them.
 the only place in the game a player can read what the mod promises before it happens to them.
 "He is never killed" is the locked decision, in the player's own words.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -405,7 +405,7 @@ mod, which the file's header already warns about."
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_ledger_effects.txt`
 
-- [ ] **Step 1: Confirm the marker does not exist**
+- [x] **Step 1: Confirm the marker does not exist**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "BC: wound"
@@ -429,7 +429,7 @@ to be taken here, before the first edit, rather than asserted later.
 The comment block in the next step names `bc_battle_tier` twice while explaining why not to
 read it, which is why the filter is on both the baseline and the check.
 
-- [ ] **Step 2: Write the effect**
+- [x] **Step 2: Write the effect**
 
 Append to `common/scripted_effects/bc_ledger_effects.txt`, **after**
 `bc_record_effective_tier_effect` and `bc_write_style_effect`, so the file reads in call
@@ -526,7 +526,7 @@ battle, which is a bug that would only ever show up as "wounds are rarer than th
 the runtime run shows wounds firing at the wrong rate the toast is not in the way of reading
 why.
 
-- [ ] **Step 3: Confirm nothing calls it yet**
+- [x] **Step 3: Confirm nothing calls it yet**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -536,7 +536,7 @@ grep -rn "bc_wound_effect" common/ events/ | grep -v "#"
 Expected: **exactly one line**, the definition. Task 4 adds the second. If a call site already
 exists, task 4 has run out of order and the file needs reading before anything else happens.
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -572,7 +572,7 @@ one vanilla wound from the ranks that kill."
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_ledger_effects.txt`
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
 
-- [ ] **Step 1: Understand why this task is not optional**
+- [x] **Step 1: Understand why this task is not optional**
 
 AGOT `common/traits/00_traits.txt:6330` — `wounded_1` carries `flag = no_message`. **The trait
 arrives with no vanilla notification of any kind.** Without this task a player's commander
@@ -582,7 +582,7 @@ Every other trait this mod grants is a reputation trait earned across several ba
 the player has been watching it accumulate. This one is taken, in one moment, and removes
 something.
 
-- [ ] **Step 2: Add the toast**
+- [x] **Step 2: Add the toast**
 
 In `bc_wound_effect`, inside the inner `if`, after `set_variable` and `debug_log`:
 
@@ -614,7 +614,7 @@ character, and most commanders in the world are AI.
 job. That is not noise: `send_interface_toast` only renders for the player actually playing
 the scoped character, so a wound in a war on the other side of the map reaches nobody.
 
-- [ ] **Step 3: Add the two localization keys**
+- [x] **Step 3: Add the two localization keys**
 
 Append to `localization/english/bc_l_english.yml`. **One leading space per line.**
 
@@ -633,7 +633,7 @@ when they cannot assign him to an army.
 **`[bc_wounded_commander.GetName]`, matching the mod's existing convention** — bare saved-scope
 name, no `scope:` prefix, as in `[shieldbrother.GetFullName]` and `[owner.GetName]`.
 
-- [ ] **Step 4: Verify the key count**
+- [x] **Step 4: Verify the key count**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -661,7 +661,7 @@ substring of `bc_wounded_toast_desc`, so an unanchored count would read **2** on
 row and hide a missing `TITLE`. The `$` end-anchor works because both are written as
 `TITLE = bc_wounded_toast` and `DESC = bc_wounded_toast_desc`, each alone on its line.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -698,7 +698,7 @@ it starts mattering."
 
 This is the task the whole plan is shaped around. Two edits, both in one file, both small.
 
-- [ ] **Step 1: Confirm `bc_record_effective_tier_effect` has exactly one call site**
+- [x] **Step 1: Confirm `bc_record_effective_tier_effect` has exactly one call site**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -717,7 +717,7 @@ this check reports the correct file as three.
 being reached through exactly one door, because that is what makes `$SWING$` guaranteed to be
 in scope inside it.
 
-- [ ] **Step 2: Thread `SWING` through the seam**
+- [x] **Step 2: Thread `SWING` through the seam**
 
 In `bc_record_moment_effect`, change the one call line:
 
@@ -739,7 +739,7 @@ proves it rather than assuming it.
 scripted-effect parameters textually; an unused one is simply not substituted anywhere. Plan 1
 shipped `SWING` unused for a whole plan on exactly this basis.
 
-- [ ] **Step 3: Call the wound from the decisive arm**
+- [x] **Step 3: Call the wound from the decisive arm**
 
 In `bc_record_effective_tier_effect`, in the **first** arm — the one whose `limit` is
 `flag:$TIER$ = flag:decisive` and `var:bc_battle_moments >= 5` — append after
@@ -784,7 +784,7 @@ rank this mod will ever grant.
 happen whether or not a wound lands. Putting the wound first buries the more important write
 under the rarer one for no gain.
 
-- [ ] **Step 4: Verify both edits landed and no call site was touched**
+- [x] **Step 4: Verify both edits landed and no call site was touched**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -827,7 +827,7 @@ on.
 
 The third must be **exactly two lines** — the definition from task 2 and the call from step 3.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -861,7 +861,7 @@ Every check here is a filtered grep with a stated expected number, and every num
 counted against the tree rather than inferred from intent. Where a number depends on a
 previous plan it says so.
 
-- [ ] **Step 1: Re-assert that a wound cannot reach a knight**
+- [x] **Step 1: Re-assert that a wound cannot reach a knight**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -877,7 +877,7 @@ Read the surrounding lines and confirm the indentation by eye. **Plan 6 changes 
 file**, so any deviation from 6 is drift introduced by another plan and must be chased down
 before this one ships.
 
-- [ ] **Step 2: `bc_battle_tier` is untouched by this plan**
+- [x] **Step 2: `bc_battle_tier` is untouched by this plan**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -897,7 +897,14 @@ moments with nothing at runtime reporting it.
 The first, unfiltered number is printed only so the two can be compared: it will be much
 larger, because task 2's header names the variable twice while explaining the trap.
 
-- [ ] **Step 3: Every seam call still carries `SWING`**
+**RUN CORRECTION — the measured numbers.** Baseline at task 2 step 1: filtered **5**,
+unfiltered **8**. After the plan: filtered **5**, unchanged, which is the check. Unfiltered
+rose to **11**, not the 10 the "names it twice" sentence implies — task 2's header names
+`bc_battle_tier` three times and task 4 step 3's comment block names it once more. **The
+unfiltered number is not a check and must never be turned into one**; it moves with every
+comment anyone writes, which is precisely why the filtered one is the assertion.
+
+- [x] **Step 3: Every seam call still carries `SWING`**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -919,7 +926,7 @@ the gap, not the absolutes.
 substitutes to the literal `flag:$SWING$ = flag:down` inside the gate — an unknown key, a
 silent no-op, and `validate` passes it.
 
-- [ ] **Step 4: `bc_battle_wounded` has exactly three roles**
+- [x] **Step 4: `bc_battle_wounded` has exactly three roles**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -930,9 +937,15 @@ Expected: **exactly three lines**.
 
 | line | where | added by |
 |---|---|---|
-| `remove_variable = { name = bc_battle_wounded }` | `bc_clear_scratch_effect` | plan 1 task 12 |
+| `remove_variable = bc_battle_wounded` | `bc_clear_scratch_effect` | plan 1 task 12 |
 | `NOT = { exists = var:bc_battle_wounded }` | `bc_wound_effect`'s outer `limit` | task 2 |
 | `set_variable = { name = bc_battle_wounded value = yes }` | `bc_wound_effect`'s inner `if` | task 2 |
+
+**RUN CORRECTION — the first row is the bare form, not the braced one.** Plan 1 shipped
+`remove_variable = bc_battle_wounded` at `bc_ledger_effects.txt:461`, and the whole clear list
+is written that way. The plan wrote it braced. Cosmetic — the grep matches either — but a
+reader checking the row against the file by eye would otherwise conclude the line was missing
+and go add a second one, which is the exact failure the next paragraph warns about.
 
 **Four lines means the variable was added to `bc_clear_scratch_effect` a second time.** Plan 1
 put it there ahead of anything writing it, deliberately, and plan 6's preamble says not to add
@@ -942,7 +955,7 @@ list, and a duplicate `remove_variable` is harmless at runtime and therefore inv
 **The `grep -v "#"` is load-bearing.** Plan 1's clear list carries a comment explaining why the
 variable is listed although nothing writes it yet.
 
-- [ ] **Step 5: The toast caller sweep**
+- [x] **Step 5: The toast caller sweep**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -959,7 +972,7 @@ one. This plan adds one to each side, so whatever gap plans 1 through 5 left, it
 `TYPE` has no default. An omitted one emits the literal text `type = $TYPE$` into the toast
 block and `validate` passes it.
 
-- [ ] **Step 6: `wounded` is a real trait group and `max` is a real key**
+- [x] **Step 6: `wounded` is a real trait group and `max` is a real key**
 
 ```bash
 grep -n "group = wounded" "D:/SteamLibrary/steamapps/workshop/content/1158310/2962333032/common/traits/00_traits.txt"
@@ -983,7 +996,7 @@ worse, does something unbounded.
 **AGOT overrides vanilla's `00_traits.txt` wholesale**, so the AGOT path above is the one that
 loads. Do not check the vanilla copy.
 
-- [ ] **Step 7: The full sweep**
+- [x] **Step 7: The full sweep**
 
 ```bash
 cd /d/ck3/tools
@@ -1003,7 +1016,7 @@ so the index is unlikely to have moved, but a vacuous pass is worth nothing eith
 cd /d/ck3/tools && python ck3.py deploy
 ```
 
-- [ ] **Step 8: Commit nothing**
+- [x] **Step 8: Commit nothing**
 
 This task writes no files. If `git status --short` is not empty, a check was "fixed" instead of
 being reported. Read what changed and why before continuing.

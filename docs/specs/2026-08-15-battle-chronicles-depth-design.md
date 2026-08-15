@@ -462,8 +462,8 @@ Nothing here needs a dedicated run; they accumulate in ordinary play and
 
 **They count different things and the decision table must say so.** Everything
 written by `bc_battle_open_effect` — ground, bond, creed — fires **once per
-moment**, so those counts share the 233-per-44-battles denominator. `BC: eve
-ground missing` counts **eves offered**, and `BC: award no creed` counts
+moment**, so those counts share the 233-per-44-battles denominator.
+`BC: eve ground missing` counts **eves offered**, and `BC: award no creed` counts
 **notable wins graded**. Comparing a creed count against an award count directly
 would be an error of exactly the kind handoff §2.4 was written about, so the
 denominator goes into the source-comment decision table that handoff §2.1

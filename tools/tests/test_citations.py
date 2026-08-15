@@ -199,9 +199,11 @@ class TestBareContinuations(CitationTestCase):
         self.assertNoIssues()
 
     def test_a_target_outside_cite_exts_clears_the_running_file(self) -> None:
-        # THE BROAD PATTERN EXISTS FOR THIS. `effects.log:9770 (grudge), :9810
-        # (nemesis)` is a real line of bc_rivalry_effects.txt. `.log` is not in
-        # CITE_EXTS, so ANY_CITE_RE matches it and RESOLVABLE_CITE_RE does not;
+        # THE BROAD PATTERN EXISTS FOR THIS. The real line, in
+        # bc_rivalry_effects.txt, is
+        # `effects.log:9770 (grudge), :9810 (nemesis), :9860 (rival), all character scope.`
+        # `.log` is not in CITE_EXTS, so ANY_CITE_RE matches it and
+        # RESOLVABLE_CITE_RE does not;
         # the match still has to clear `current`, or the bare `:9810` would
         # resolve against whatever mod file was named earlier on the line.
         # Narrowing ANY_CITE_RE to CITE_EXTS makes this fail: the `.log` match
@@ -300,10 +302,12 @@ class TestWalkCoverage(CitationTestCase):
         # nothing. Injection covers exactly one other case besides the broken
         # symlink: the file being deleted between the scandir and the read,
         # which raises ENOENT and which `Path.is_file()` swallows. It does NOT
-        # cover an unreadable file. `Path.is_file()` ignores only ENOENT,
-        # ENOTDIR, EBADF and ELOOP, so EACCES propagates out of the guard and
-        # out of `validate`. That case is unhandled, deliberately: a mod folder
-        # this process cannot read is a broken checkout, not a file to skip.
+        # cover an unreadable file. `Path.is_file()` swallows ENOENT, ENOTDIR,
+        # EBADF and ELOOP - plus, on Windows only, NOT_READY, INVALID_NAME and
+        # CANT_RESOLVE_FILENAME. EACCES is in neither list, so it propagates out
+        # of the guard and out of `validate`. That case is unhandled,
+        # deliberately: a mod folder this process cannot read is a broken
+        # checkout, not a file to skip.
         self.write("common/bc_citer.txt", "# see bc_citer.txt:1\n")
         real_walk = V.os.walk
 

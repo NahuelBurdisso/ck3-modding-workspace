@@ -118,10 +118,11 @@ mentioning `bc_`" — that is the whole sweep.
 pattern with Python `re` and passes `re.IGNORECASE` **only** when `-i` is given
 (`ck3lib/launch.py:81`), so the sweep pattern `bc_` is case-sensitive and matches a `BC: `
 marker only when the marker's *text* also contains a lowercase `bc_`. Of the markers listed
-in row 3 that is true of the `BC: fired bc_<event>` family and of nothing else — `BC: combat
-end cleanup`, the four grading lines, `BC: nickname awarded`, the three `BC: moment` lines
-and the `BC: popup` lines are all invisible to `probe "bc_"`. Row 3 lists them because it is
-a *rule about what is allowed through*, and it stays correct if a future marker is renamed
+in row 3 that is true of the `BC: fired bc_<event>` family and of nothing else —
+`BC: combat end cleanup`, the four grading lines, `BC: nickname awarded`, the three
+`BC: moment` lines and the `BC: popup` lines are all invisible to `probe "bc_"`. Row 3
+lists them because it is a *rule about what is allowed through*, and it stays correct if a
+future marker is renamed
 into range. Seeing only the `fired` family means the sweep is working, not that markers are
 missing; the marker sweeps are separate commands and each names its own text.
 
@@ -257,8 +258,8 @@ Those four are permanent instrumentation, not diagnostics.
 **The `.0090` marker you are deleting asks a question the mod never wrote down an answer
 to — answer it here, in the commit message, before it is gone.** Its comment says "Nothing
 in the mod has ever proven that `side_commander` still resolves once combat is OVER", and
-nothing in `README.md` records a result (grep it: no hit for `side_commander`, `scope
-entered` or `DIAG`). The log that would have held the answer has rotated. Removal is
+nothing in `README.md` records a result (grep it: no hit for `side_commander`,
+`scope entered` or `DIAG`). The log that would have held the answer has rotated. Removal is
 nonetheless safe, and the proof is in vanilla, not in our logs: `combat_event.0001`, which
 is dispatched from `on_combat_end_winner`, opens `side_commander = { ... }` **unguarded**
 at `events/war_events/combat_events.txt:84`. The scope resolves after combat ends.
@@ -1966,8 +1967,8 @@ are in that one file:
   `send_interface_toast`. A toast only reaches the player playing the scoped character,
   so anything nested in one is unreliable for the AI."
 - `README.md:158-159`, the 2026-08-13 calibration result: "**Resolved:** a
-  `send_interface_toast` body **does** run for an AI character — `fired
-  bc_knight_holds_the_breach` 14 == `toast body ran` 14."
+  `send_interface_toast` body **does** run for an AI character —
+  `fired bc_knight_holds_the_breach` 14 == `toast body ran` 14."
 
 They cannot both be right, and the later one is marked Resolved. Vanilla sides with the
 later one: `add_legitimacy = minor_legitimacy_loss` sits inside a toast body at
@@ -2251,8 +2252,9 @@ and lose at least one. Let at least one battle run long enough to produce five o
 moments, so the `decisive` rung of the escalation ladder is exercised.
 
 **Q4 additionally needs `bc_knight_holds_the_breach` to fire on a side whose commander is
-AI** — watch an ally's or a vassal's army fight, not only your own. Without that, `subject
-AI` is 0, Q4 lands on the inconclusive row, and the run reproduces exactly the all-human
+AI** — watch an ally's or a vassal's army fight, not only your own. Without that,
+`subject AI` is 0, Q4 lands on the inconclusive row, and the run reproduces exactly the
+all-human
 sample that produced the contradiction it exists to resolve. The event needs a knight with
 `prowess >= 10` on the side, so it is not rare — but it is not guaranteed in a short
 session either.

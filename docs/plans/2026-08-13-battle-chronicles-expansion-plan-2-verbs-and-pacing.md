@@ -1381,8 +1381,9 @@ now legitimately covers this plan's nine new markers.
 
 **None of the nine will actually show up here.** `probe` is case-sensitive without `-i`
 (`ck3lib/launch.py:81`), and not one of this plan's marker texts contains a lowercase
-`bc_` — `BC: size 2`, `BC: verb pursuit`, `BC: chronicle mark commander`, `BC: floor
-admitted`. Steps 3 through 6 are where they are read. Their absence from *this* sweep is
+`bc_` — `BC: size 2`, `BC: verb pursuit`, `BC: chronicle mark commander`,
+`BC: floor admitted`. Steps 3 through 6 are where they are read. Their absence from *this*
+sweep is
 the expected result and says nothing about whether they fired.
 
 **Watch specifically for a missing-variable read naming `bc_battle_size` or

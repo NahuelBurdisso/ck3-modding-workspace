@@ -244,8 +244,8 @@ between the mod and wounding a man for winning. Nothing has proven it rejects.
 - **The shieldbrother memory**, and that `[shieldbrother.GetFullName]` resolves.
 - **The 2026-08-14 loc fixes**: `[bc_named_commander.GetNicknameNoTooltip]`
   inside the award toast *including the liege branch*, where the scope has moved;
-  and the 26 `nick_agot_*_desc` keys on hover, with no `Duplicate localization
-  key` in `error.log`.
+  and the 26 `nick_agot_*_desc` keys on hover, with no
+  `Duplicate localization key` in `error.log`.
 
 ### 3.3 Waiting on the world, not on us
 

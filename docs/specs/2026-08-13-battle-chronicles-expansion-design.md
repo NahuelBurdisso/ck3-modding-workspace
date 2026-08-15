@@ -1672,14 +1672,15 @@ against; do not re-derive them by guessing.
 | Q4 | does a toast body run for an AI subject? | **Yes.** human 0, AI 117, marker inside the toast 117 → **B == H + A**. The `subject AI == 0` inconclusive row was not hit, so this is a verdict, not another ambiguity. |
 | Q5 | terrain census | rough 58, forest 32, winter 20, open 19, jungle 8, **desert 0**, `NONE MATCHED` **0**. The `agot_is_<x>_terrain` ladder is exhaustive over everything observed, so plan 3 task 5's copy of it is current. Desert's zero is **recorded, not acted on** — one campaign is one corner of Westeros. |
 
-Also from this run: `win notable` 79 / `lose notable` 79 and `win not notable` 58 / `lose
-not notable` 58 (symmetric, as they must be), and `BC: nickname awarded` 5 under the real
-gate.
+Also from this run: `win notable` 79 / `lose notable` 79 and `win not notable` 58 /
+`lose not notable` 58 (symmetric, as they must be), and `BC: nickname awarded` 5 under the
+real gate.
 
 **And one defect that made the entire ledger dead.** `bc_record_moment_effect` declared
-`SWING` and read it nowhere, so the engine logged `Compiling source for
-bc_record_moment_effect failed for unknown arguments: SWING` 13× at load and **all 18 call
-sites did nothing** — zero `BC: moment` lines all session, with no other symptom anywhere.
+`SWING` and read it nowhere, so the engine logged
+`Compiling source for bc_record_moment_effect failed for unknown arguments: SWING`
+13× at load and **all 18 call sites did nothing** — zero `BC: moment` lines all session,
+with no other symptom anywhere.
 Fixed by reading the parameter with a two-arm log rather than dropping it, so plan 6's
 wound gate keeps the `SWING = down` hook it is written against. `BC: moment` itself is
 therefore still **unproven at runtime** and needs one more run.

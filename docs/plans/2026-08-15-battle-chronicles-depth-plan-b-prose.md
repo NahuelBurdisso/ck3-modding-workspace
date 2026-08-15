@@ -178,6 +178,8 @@ The last two are not optional and were added to this list after the fact. This c
 
 Append to `bc_flavour.txt`:
 
+**The header comment below is the DRAFT, and it was wrong in three ways that four review rounds corrected.** It is left here only so the diff is legible; **the shipped header is the one in `bc_flavour.txt` and it is the one to copy from.** The draft's errors, in the order they were found: (1) it says the fallback covers "there may not have been one", which is false — `bc_write_bond_effect`'s leaderless `else` deliberately writes `flag:stranger`, so a foeless battle takes the `stranger` arm, and the fallback covers a path that left the variable unwritten; (2) it justifies `stranger` by "a man he has never heard of" against "the case where NOTHING is known", a distinction the writer does not make; (3) it says nothing about which call sites can reach the fallback, which is the question a reader actually has. Do not paste this block.
+
 ```
 
 # --- the bond, shared by all ten moments -------------------------------------
@@ -189,15 +191,9 @@ Append to `bc_flavour.txt`:
 # the foe.
 #
 # FIVE VALUES PLUS A FALLBACK, matching bc_write_bond_effect exactly. The five
-# are nemesis, kin, countryman, heathen, stranger. `stranger` gets a real clause
-# rather than sharing the fallback, because "a man he has never heard of" is a
-# fact worth saying and the fallback has to cover the case where NOTHING is
-# known - which is a different thing.
+# are nemesis, kin, countryman, heathen, stranger.
 #
-# THE FALLBACK IS AN EMPTY STRING and that is deliberate. Every other class can
-# say something generic when it knows nothing. This one cannot: any sentence
-# about the foe presumes a foe, and the case this arm covers is precisely that
-# there may not have been one. Silence is the only honest reading.
+# [DRAFT ONLY - superseded, see the note above this block and the shipped header]
 bc_bond_clause = {
 	type = character
 
@@ -267,7 +263,7 @@ In `bc_l_english.yml`, after the last moment toast desc (`bc_shieldbrother_forge
 
  bc_frag_bond_nemesis:0 " The man commanding here does not have to ask whose colours are across the field."
  bc_frag_bond_kin:0 " The man commanding here shares blood with whoever is giving the orders across the field."
- bc_frag_bond_countryman:0 " The man commanding here learned the same songs as the men he is killing."
+ bc_frag_bond_countryman:0 " The man commanding here and the one commanding against him were born to the same people."
  bc_frag_bond_heathen:0 " Whatever the other side was praying to at dawn, the man commanding here was not."
  bc_frag_bond_stranger:0 " The man commanding here has never had cause to learn a name on the other side."
  bc_frag_bond_any:0 ""
@@ -281,7 +277,7 @@ Note the leading space inside each non-empty string, and that `bc_frag_bond_any`
 
 **No fragment may date itself to the start of the battle.** Phase events roll every five days, so these clauses append to toasts arriving on day 20 of a long fight. "at dawn" survives that; "all morning" presumes the battle began this morning.
 
-**A third rule, added in the third review pass and tightened in the fourth.** **No fragment may collide with the sentence it appends to, or with the eve.** A bond clause is appended to a moment toast and read in the same breath as it, and the same battle already showed the player the eve. Four collisions were caught this way:
+**A third rule, added in the third review pass and tightened in the fourth.** **No fragment may collide with the sentence it appends to, or with the eve.** A bond clause is appended to a moment toast and read in the same breath as it, and the same battle already showed the player the eve. Three collisions were caught this way:
 
 - `nemesis` said "banner", which lands on `bc_banner_falls_toast_desc`'s falling standard and reads as if the nemesis's banner is the one going down. Round 3 swapped "banner"→"colours" and kept the demonstrative — `"knew whose colours **those** were"` — which does not fix it, because a bare demonstrative with no antecedent inside the fragment still reaches back to the standard. Round 4 removed the demonstrative outright.
 - `countryman` said "shouting in the same tongue", which is how the eve's `bc_chronicles.0011.desc_countryman` ends. Round 3's replacement, "The men on both sides curse in the same words", kept the skeleton *men … both sides … in the same ⟨X⟩*. Round 4 rewrote it off that skeleton entirely.
@@ -289,7 +285,9 @@ Note the leading space inside each non-empty string, and that `bc_frag_bond_any`
 
 **Run the check against every fragment in the set, not only the ones a reviewer names.** Compare each against the ten `*_toast_desc` keys **and** against every `bc_chronicles.0011.desc_*` key. A synonym swap is not a fix; the skeleton is what collides.
 
-**And check ACROSS clause classes, because task 4 makes them share a sentence.** Once wired, a single toast renders the literal, then the ground clause, then the bond clause, one after another. So a bond fragment collides with a *ground* fragment too. One was caught this way: `countryman` as "was **raised** on the same songs" lands immediately after `bc_frag_banner_falls_jungle`'s "as though it had never been **raised**" whenever a banner falls in a jungle — two senses of one word in adjacent sentences. Now "learned the same songs". The check is the whole `bc_frag_*` set, not one class of it.
+**And check ACROSS clause classes, because task 4 makes them share a sentence.** Once wired, a single toast renders the literal, then the ground clause, then the bond clause, one after another. So a bond fragment collides with a *ground* fragment too. A fourth collision was caught this way: `countryman` as "was **raised** on the same songs" lands immediately after `bc_frag_banner_falls_jungle`'s "as though it had never been **raised**" whenever a banner falls in a jungle — two senses of one word in adjacent sentences. The check is the whole `bc_frag_*` set, not one class of it.
+
+**The singular-foe rule catches culture too, and that took two more rewrites.** "learned the same songs as the men he is killing" fixed the skeleton and the "raised" echo, and broke the rule at the top of this section: the arm's test is `var:bc_battle_foe = { culture = ... }`, one character's culture and nobody else's, so attributing the shared culture to the enemy rank and file says something the variable does not establish and that is false whenever a lord commands foreign sellswords. The shipped string names two commanders and no host. **Re-run every rule against a rewrite, not only the rule the rewrite was for** — three of the four fix rounds on this task broke an older rule while fixing a newer one.
 
 **A fourth rule, from the same pass.** **No fragment may assume the foe has been the foe since the battle opened.** `bc_battle_open_effect` re-captures the enemy commander at every phase event on purpose, to track a mid-battle replacement on the other side (`bc_ledger_effects.txt:42-44`). So "before either host moved" is false whenever the nemesis took command on day 20. This is the battle-start rule above applied to the foe rather than to the clock, and it is the reason the shipped `nemesis` string is timeless rather than past.
 
@@ -339,13 +337,21 @@ Expected for `bc_bond_clause`: `arms 6 unguarded at [5]`. Any other index means 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /d/ck3/mods/battle_chronicles && git add common/customizable_localization/bc_flavour.txt localization/english/bc_l_english.yml && git commit -m "$(cat <<'EOF'
+cd /d/ck3/mods/battle_chronicles && git add common/customizable_localization/bc_flavour.txt localization/english/bc_l_english.yml common/scripted_effects/bc_context_effects.txt events/bc_eve_events.txt && git commit -m "$(cat <<'EOF'
 feat: add the shared bond clause
 
 Five bond values plus a fallback, shared across all ten moments because
 a clause about the foe does not have to agree with the moment's verb.
 The fallback is an empty string: any sentence about the foe presumes
-one, and the case it covers is that there may not have been one.
+one, and the case it covers is a path that left bc_battle_bond unwritten
+- which the ten moment toasts cannot reach, because bc_write_bond_effect
+writes on all six of its paths and runs upstream of all ten. A pop-up
+option's toast answered after the combat ended can.
+
+The two reciprocal notes are in the same commit on purpose: this clause
+is the third carrier of the five bond values, and a carrier that does
+not point at the other two invites a later session to "fix" the ordering
+disagreement that is the whole intent.
 EOF
 )"
 ```

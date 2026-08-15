@@ -2282,25 +2282,51 @@ marker.** A missing-variable error
 repeated once per knight per combat is the highest-volume failure this design can
 produce, and every number below would be measured against a broken build.
 
-- [ ] **Step 4: Read the seam markers** — BLOCKED, needs a second run. The 2026-08-14 run
-  returned **zero** `BC: moment` lines: `bc_record_moment_effect` declared `SWING` and read
-  it nowhere, which stops the whole effect compiling and silently kills all 18 call sites.
-  Fixed, unproven. Neither failure signature described below was in play — the effect never
-  ran at all, which is a third mode this step did not anticipate.
+- [x] **Step 4: Read the seam markers** — DONE on the second run, 2026-08-14.
+
+The first run returned **zero** `BC: moment` lines: `bc_record_moment_effect` declared
+`SWING` and read it nowhere, which stops the whole effect compiling and silently kills all
+18 call sites. That is a **third** failure mode this step did not anticipate, and it looks
+like nothing at all rather than like either signature below.
+
+Second run, 143 combat ends, **707 moments**: minor 614, major 93, **decisive 0**. Swings
+up 422 / down 285. Both totals equal 707, so every moment recorded exactly one tier and
+exactly one swing.
+
+**`decisive = 0` is a pacing result, not the broken-comparison signature described below.**
+The two are distinguishable without a further run, and this is the technique to reuse:
+`probe` groups by an `args#<hash>` that is unique per parameter set, so each call site can
+be reconciled against its own `BC: fired` count.
+
+| site | requested | fires | major | minor |
+|---|---|---|---|---|
+| `bc_knight_holds_the_breach` | major | 128 | 77 | 51 |
+| `bc_van_breaks_through` | major | 53 | 8 | 45 |
+| `bc_banner_falls` | major | 43 | 4 | 39 |
+| `bc_flank_collapses` | **decisive** | 37 | **4** | 33 |
+
+All four reconcile exactly. The decisive-requesting site logged `major` 4 times, and since
+its `TIER` is `decisive`, those lines can only have come through the
+`flag:$TIER$ = flag:decisive` arm of the OR — `flag:decisive = flag:major` is false. **The
+comparison works.** Note that the 93 `major` lines alone would *not* have proven this: the
+major arm is an OR, so it passes on `flag:major` even if the `decisive` row is dead. Only
+the flank reconciliation settles it.
+
+Why the top rung is empty: moments accumulate per side-commander, mean **707 / 286 ≈ 2.5**.
+`decisive` needs `bc_flank_collapses` to fire on a commander already holding 4 moments, and
+it is the only AI-reachable decisive site — the other (`bc_events.txt:61`) is a player
+pop-up. **Recorded, deliberately not retuned:** this campaign lost every battle, and a
+losing commander tends to die, be captured, or have his combat end early, so 2.5 may be a
+losing-side artefact. Same reasoning this plan already applies to Q5's empty desert bucket.
+Retune only if a second campaign that wins battles also reports zero.
 
 ```bash
 python ck3.py probe "BC: moment"
 ```
 
-Expected: minor markers common, major markers present, decisive markers rare in a long
-enough session. **If `decisive` appears in a battle with fewer than five moments the
-ceiling is inverted** — check the `>=` in `bc_record_effective_tier_effect`.
-
 **If `BC: moment minor` is the only marker that ever appears, do not write this off as a
-short session.** That is the exact signature of the `flag:$TIER$` comparison failing: both
-upper arms of the ladder fall through to the `else`. Distinguish the two cases by whether
-any single battle produced five or more markers. If one did and they were all `minor`, the
-comparison is broken.
+short session.** That is the signature of the `flag:$TIER$` comparison failing: both upper
+arms fall through to the `else`. Reconcile by `args#` as above rather than by eye.
 
 - [x] **Step 5: Answer the five questions**
 
@@ -2331,26 +2357,38 @@ opens `side_commander` unguarded from an `on_combat_end_winner` event), so treat
 blocker on the whole plan and not as a Q1 answer. Zero rows with **no** `BC: win notable`
 in the log is the ordinary case: too few notable battles, keep playing.
 
-- [ ] **Step 6: Confirm scratch does not leak** — deferred to the same second run as step 4.
-  Most of the scratch variables are written by the seam, which was not compiling, so a
-  console check on the 2026-08-14 save would have shown "clean" for the wrong reason.
+- [x] **Step 6: Confirm scratch does not leak** — DONE 2026-08-14, **statically**, because
+  the method this step prescribed does not exist.
 
-The single most important runtime property of this plan. Run `debug_show_variables` in the
-console on **three** characters, because the three claims are different and only the first
-is covered by looking at a commander:
+**`debug_show_variables` IS NOT A CK3 CONSOLE COMMAND.** It was invented while writing this
+plan and never checked. The console answers `unknown command`, and there is no
+`debug_show`-anything to autocomplete. Do not send anyone into the game to run it again.
 
-1. **A commander who has just finished a battle.** Expected: no `bc_battle_*` variable.
-   If any remain, task 12's placement is wrong — check that clearing sits outside the
-   game-rule gate.
-2. **A knight who fought in that battle** — not the commander. Expected: **no `bc_`
-   variable of any kind.** The design forbids writing per-character state onto knights,
-   because there are far more of them and nothing clears both sides. This is the only
-   check that can catch a call site that forgot its `side_commander ?=` wrapper, and
-   nothing static can catch it.
-3. **A commander who fought a battle, then fought a second one.** Expected: no
-   `bc_battle_*` left after the second. If `bc_battle_moments` is present and larger than
-   the second battle's marker count, you have hit the answered-late pop-up leak recorded
-   in task 12 step 4 — note it, it does not block.
+**The claim below that "nothing static can catch it" was also wrong, and it is what made
+this step look runtime-only.** Every `bc_battle_*` write in the mod lives in exactly four
+effects in one file (`bc_ledger_effects.txt`), so auditing their call sites is *exhaustive*
+where three sampled characters is not. Script the brace-depth walk over
+`bc_knight_phase_events.txt`, `bc_commander_phase_events.txt`, `bc_events.txt` and
+`bc_aftermath_events.txt`, printing each call site's enclosing-scope chain. Result on
+2026-08-14, 31/31 sites:
+
+1. **No `bc_` variable is ever written onto a knight** — knight events 6/6 inside
+   `scope:combat_side.side_commander ?=`; commander events 14/14 and pop-ups 8/8 root on
+   the commander (`type = commander` roots there, and a `trigger_event` with no `target =`
+   inherits that scope); aftermath 3/3 inside `side_commander ?=`.
+2. **Clearing is not gated by the game rule** — the ancestor chain of both
+   `bc_clear_scratch_effect` calls is `event → immediate → side_commander ?=`, and the
+   `bc_aftermath_off` `if` is not among the ancestors.
+3. **Cleanup runs once per combat end** — `BC: combat end cleanup` logged 143× in each
+   grader against 143 combat ends.
+
+**One thing static analysis genuinely cannot reach, so it stays open:** a commander killed
+or replaced mid-battle. The grader's `side_commander` then resolves to a different man and
+the original keeps his scratch permanently. `bc_ledger_effects.txt` already anticipates
+this in its own header comment. If a future run wants to measure it, the console command
+that *does* exist is `effect`, and `every_living_character` is a global iterator
+(`Supported Scopes: none`), so a one-line world sweep is possible:
+`effect = { every_living_character = { limit = { is_knight = yes exists = var:bc_battle_moments } debug_log = "PROBE: leak" } }`.
 
 - [x] **Step 7: Write the results down — two commits, two repos**
 

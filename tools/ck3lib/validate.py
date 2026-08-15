@@ -76,8 +76,10 @@ CUSTOM_CALL_RE = re.compile(r"\.Custom2?\(\s*'([^']+)'")
 # WHAT THIS CHECKS IS POSITION, NOT MEANING. The full list of what it will
 # report: a citation landing on a blank line, on a bare `#`, on the `}` that
 # closes a block (allowed as the END of a range, never as its start), past the
-# end of the file, below line 1, a range that runs backwards, and a `bc_`-named
-# target this mod does not contain. What it CANNOT report is the case that has
+# end of the file, below line 1, a range that runs backwards, a `bc_`-named
+# target this mod does not contain, and - as a warning, since it cannot be
+# resolved either way without guessing - a target basename that more than one
+# file in the mod carries. What it CANNOT report is the case that has
 # cost the most: `:270` now names an `exists` guard where it used to name the
 # `>=` comparison the sentence is about. Every number in that list is a real
 # line. The mitigation for that is not mechanical - cite a named paragraph or a
@@ -319,7 +321,13 @@ def _citation_files(
     owners: dict[str, str] = {}
     ambiguous: set[str] = set()
     citers: list[tuple[str, list[str]]] = []
-    candidates = [(path.name, relpath, path) for relpath, path in iter_files(mod_root)]
+    # `exts=CITE_EXTS`, not the default. `iter_files` falls back to SCRIPT_EXTS,
+    # which has no `.md` in it, so a markdown file anywhere under `common/` or
+    # `events/` would reach neither collection and be silently unscanned in both
+    # directions - the same defect the two collections above exist to fix, one
+    # level further out. Passing the set keeps this function's notion of a
+    # citable file in one place.
+    candidates = [(path.name, relpath, path) for relpath, path in iter_files(mod_root, CITE_EXTS)]
     candidates += [
         (path.name, path.name, path)
         for path in sorted(mod_root.glob("*"))
@@ -363,8 +371,12 @@ def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
 
     NOT CHECKED, and none of these are oversights this can close: meaning, per
     the module note on RESOLVABLE_CITE_RE; any target outside CITE_EXTS, which
-    is why a `.log` or `.py` citation is skipped; and the D:/ck3 docs repo, which
-    `validate` never sees because it takes one mod folder as its argument.
+    is why a `.log` or `.py` citation is skipped; a citation in a comment that
+    TRAILS code on the same line, since a script line is taken whole and a line
+    that is not entirely a comment ends the paragraph - no such citation exists
+    in this mod, and the rule that a comment owns its own line is worth keeping;
+    and the D:/ck3 docs repo, which `validate` never sees because it takes one
+    mod folder as its argument.
     """
     texts, ambiguous, citers = _citation_files(mod_root)
     reported_ambiguous: set[str] = set()

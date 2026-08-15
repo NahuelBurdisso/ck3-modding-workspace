@@ -18,15 +18,15 @@ battle**, drawn from **ten** phase-event templates each carrying **exactly one**
 title and one description. A player who fights forty battles reads the same ten
 paragraphs twenty-three times.
 
-Every situational input except battle ratio is unread. A battle in a bog in
-winter against a brother reads identically to a summer field battle against a
+Every situational input except battle ratio is unread. A battle on the glacier
+against a brother reads identically to a field battle in the Reach against a
 stranger.
 
 ## 1. Decisions taken before design
 
 | question | answer |
 |---|---|
-| where does depth land | prose, the eve, and outcomes. New *moments* are designed but deferred — see §6 |
+| where does depth land | prose, the eve, and outcomes. New *moments* are designed but deferred — see §7 |
 | are new *outcomes* in scope | yes, non-lethal rule intact |
 | what happens to measured pacing | **hold it.** Variety comes from branching inside existing keys, not from new keys competing for rolls |
 | which inputs may be read | terrain, foe identity, size/odds, commander-vs-foe culture and faith, relation to the foe |
@@ -66,72 +66,136 @@ third is the one that matters:
    distributions is ever measurable — and the terrain census (DIAG Q5) only ever
    measured the *world*, never what the *mod chose*.
 
-### Six band triggers, one source of truth
+### Six band triggers, extracted from the partition the mod already has
 
-New scripted triggers, called **on a province**, collapsing AGOT's 23 terrain
-helpers into six bands:
+**The mod already classifies terrain into six bands.**
+`bc_terrain_bucket_effect` (`bc_reputation_effects.txt:267-339`) maps AGOT's 23
+helpers onto `desert` / `open` / `rough` / `forest` / `jungle` / `winter`, and
+its header records that the ladder was verified exhaustive over all 23,
+`5 + 5 + 7 + 2 + 2 + 2 = 23`, every helper once.
+
+**This design reuses that partition unchanged rather than inventing a second
+one.** An earlier draft proposed `rough`/`forest`/`open`/`bog`/`mountain`/
+`frozen`, which left the whole desert family (drylands, desert, desert_mountains,
+oasis, canyon) and the jungle family (jungle, cloudforest) with no home — seven
+of the 23 helpers and a large share of the AGOT map, Dorne and Essos and
+Sothoryos. Two disagreeing terrain vocabularies in one mod is also how a later
+reader "unifies" them and silently changes which commander trait gets awarded.
+
+The 23-helper ladder is **extracted** into six scripted triggers, called on a
+province:
 
 ```
-bc_ground_is_rough_trigger      bc_ground_is_bog_trigger
-bc_ground_is_forest_trigger     bc_ground_is_mountain_trigger
-bc_ground_is_open_trigger       bc_ground_is_frozen_trigger
+bc_ground_is_desert_trigger     bc_ground_is_forest_trigger
+bc_ground_is_open_trigger       bc_ground_is_jungle_trigger
+bc_ground_is_rough_trigger      bc_ground_is_winter_trigger
 ```
 
-They are triggers rather than an inline ladder because **two callers need the
-same classification**: the script ladder below, and the eve's ground paragraph
-(§5), which reads a saved province scope at render time and so cannot use the
-variable. One definition, two readers.
+`bc_terrain_bucket_effect` is then rewritten to call them. **That rewrite is
+behaviour-preserving**: the same helper sits in the same band and writes the same
+flag value, so `var:bc_terrain_this`, the streak logic and the commander-trait
+award are untouched. Three callers then share one definition — the bucket effect,
+the ladder below, and the eve's ground paragraph (§5), which reads a saved
+province scope at render time and so cannot use a variable at all.
 
 They never test `terrain = X` bare. AGOT defines road variants as distinct
-terrain types; bare keys silently missed 424 and 51 provinces from the first
-live run onward (`bc_scripted_triggers.txt:36-43`).
+terrain types and ~26% of the map is invisible to a bare check, silently
+(`bc_reputation_effects.txt:246-254`, `bc_scripted_triggers.txt:36-43`).
+
+`var:bc_battle_ground` and `var:bc_terrain_this` stay **separate variables**.
+They carry the same vocabulary but not the same lifetime: `bc_terrain_this` is
+written at combat end and is compared against `bc_terrain_last` for the streak,
+so it must survive `bc_clear_scratch_effect`. `bc_battle_ground` is scratch.
 
 ### The change to `bc_battle_open_effect`
 
 That effect already runs on the side commander at **all ten** phase-event call
-sites, once each, at the top of the `effect` block, and already writes
-`bc_battle_foe` and `bc_battle_size`. It gains, in this order:
+sites, once each at its single call site in each event — directly in the seven
+commander events, and inside `scope:combat_side.side_commander ?= { }` in the
+three knight events. It already writes `bc_battle_foe` and `bc_battle_size`. It
+gains, in this order:
 
-1. `save_scope_as = bc_chronicle_subject` on the side commander — the one loc
-   anchor common to all ten toasts, and the unambiguous left-hand side for the
-   bond comparisons below.
-2. `bc_write_ground_effect = yes`, writing `var:bc_battle_ground` as a flag
-   (`rough` / `forest` / `open` / `bog` / `mountain` / `frozen`) from an ordered
-   if-ladder over the six band triggers, evaluated against
-   `scope:combat_side.combat.location`. Each arm carries a `BC: ground <band>`
-   marker.
-3. `bc_write_bond_effect = yes`, writing `var:bc_battle_bond` as a flag from an
-   ordered if-ladder, first match wins, each arm carrying a `BC: bond <band>`
-   marker:
+**1. `save_scope_as = bc_chronicle_subject`** on the side commander — the one loc
+anchor common to all ten toasts, and the unambiguous left-hand side for the bond
+comparisons below.
 
-   | band | test |
-   |---|---|
-   | `nemesis` | `bc_facing_nemesis_trigger = yes` |
-   | `kin` | `var:bc_battle_foe = { is_close_family_of = scope:bc_chronicle_subject }` |
-   | `countryman` | `var:bc_battle_foe = { culture = scope:bc_chronicle_subject.culture }` |
-   | `heathen` | `NOT = { var:bc_battle_foe = { faith = scope:bc_chronicle_subject.faith } }` |
-   | `stranger` | fallback |
+**2. `bc_write_ground_effect = yes`**, writing `var:bc_battle_ground` as a flag
+from an ordered if-ladder over the six band triggers. Each arm carries a
+`BC: ground <band>` marker.
 
-   Every row that *reads* `var:bc_battle_foe` is nested behind
-   `exists = var:bc_battle_foe`, never a sibling of it: CK3 does not
-   short-circuit and guarantees no evaluation order among siblings (handoff
-   §2.3).
+The province is reached with `?=`, because `combat.location` may not resolve —
+the graders already wrap their memory writes in the same guard
+(`bc_reputation_effects.txt:234-236`). The shape:
 
-**Ordering inside the effect is load-bearing.** All three writes go **above** the
+```
+remove_variable = bc_battle_ground          # first, so a failure cannot leave a stale band
+save_scope_as = bc_ground_subject           # the ladder runs in PROVINCE scope; the
+scope:combat_side.combat.location ?= {      #   variable must land back on the commander
+    if / else_if × 6 -> scope:bc_ground_subject = { set_variable = ... } + marker
+    else = { debug_log = "BC: ground NONE MATCHED" }
+}
+```
+
+Three things in that shape are load-bearing and none is decoration:
+
+- **the leading `remove_variable`.** Without it, a battle whose location does not
+  resolve leaves the *previous* battle's band standing on a commander whose
+  scratch was never cleared, and the prose lies. Clearing first makes the failure
+  mode "no ground clause", which the fallback arm covers.
+- **`save_scope_as = bc_ground_subject`.** Inside `combat.location = { }` the
+  scope is a province and the variable has to land on the commander; `root` will
+  not do it, because neither a scripted effect nor `side_commander ?=` rebinds
+  ROOT. This is the same lesson `bc_terrain_bucket_effect` records at
+  `bc_reputation_effects.txt:238-244`, and the same idiom.
+- **the `else`.** The ladder is exhaustive over all 23 helpers, so the `else` is
+  unreachable in principle — which is exactly why it logs. `bc_terrain_bucket_effect`
+  makes the identical argument at `bc_reputation_effects.txt:256-261`.
+
+**3. `bc_write_bond_effect = yes`**, writing `var:bc_battle_bond` as a flag from
+an ordered if-ladder, first match wins, each arm carrying a `BC: bond <band>`
+marker:
+
+| band | test |
+|---|---|
+| `nemesis` | `bc_facing_nemesis_trigger = yes` |
+| `kin` | `var:bc_battle_foe = { is_close_family_of = scope:bc_chronicle_subject }` |
+| `countryman` | `var:bc_battle_foe = { culture = scope:bc_chronicle_subject.culture }` |
+| `heathen` | `NOT = { var:bc_battle_foe = { faith = scope:bc_chronicle_subject.faith } }` |
+| `stranger` | the outer `else` |
+
+**The nesting is one outer `if`, not a guard per row.** CK3 does not
+short-circuit and guarantees no evaluation order among siblings, so a
+`var:bc_battle_foe` read may never sit beside its own `exists` — and that cannot
+be expressed per-arm inside an ordered `if`/`else_if` chain. `bc_reputation_effects.txt:458-463`
+records this exact constraint. The shape is therefore a single
+`if = { limit = { exists = var:bc_battle_foe } }` wrapping the whole chain, with
+the outer `else` writing `stranger`.
+
+`bc_write_bond_effect` also writes **`var:bc_battle_creed`**, a flag of `same` or
+`heathen`, from the one faith comparison the ladder already makes. It is a
+separate variable because the bond bands are *ordered and mutually exclusive*, so
+`nemesis`, `kin` and `countryman` each swallow the faith question — a
+different-faith foe who shares your culture lands in `countryman` and the bond
+flag then says nothing about faith at all. §6's award needs faith orthogonally,
+and one extra `set_variable` is cheaper than either denormalising the bond bands
+or making the award re-derive a comparison this effect already performed.
+
+**Ordering inside the effect is load-bearing.** All the writes go **above** the
 `bc_eve_offer_effect` call, which `bc_ledger_effects.txt:154-158` documents is
 raised last precisely so that everything it reads is already written. The bond
 ladder must come after both the anchor save and the `bc_battle_foe` write, since
 it reads both.
 
-**All three writes are unconditional, not write-if-unset**, following the
-doctrine at `bc_ledger_effects.txt:34-43`: scratch is cleared on
-`side_commander`, so a commander replaced mid-combat is never cleared, and under
-write-if-unset his stale values would freeze **permanently** rather than for one
-battle.
+**Every write is unconditional, not write-if-unset**, following the doctrine at
+`bc_ledger_effects.txt:34-43`: scratch is cleared on `side_commander`, so a
+commander replaced mid-combat is never cleared, and under write-if-unset his
+stale values would freeze **permanently** rather than for one battle. The leading
+`remove_variable` in the ground effect serves the same doctrine by a different
+route, since that one write can legitimately fail to happen.
 
-`bc_clear_scratch_effect` gains `remove_variable = bc_battle_ground` and
-`remove_variable = bc_battle_bond`. **Writers and removers must ship in the same
-commit** — a remover without a writer produces
+`bc_clear_scratch_effect` gains `remove_variable` for `bc_battle_ground`,
+`bc_battle_bond` and `bc_battle_creed`. **Writers and removers must ship in the
+same commit** — a remover without a writer produces
 `Variable 'X' is used but is never set` twice per boot, the exact debt the
 2026-08-15 run just finished retiring.
 
@@ -164,23 +228,25 @@ form, showing all four classes concatenated:
 bc_banner_falls_toast_desc:0 "[bc_chronicle_subject.Custom('bc_banner_falls_core')] [bc_chronicle_subject.Custom('bc_banner_falls_ground')] [bc_chronicle_subject.Custom('bc_bond_clause')] [bc_chronicle_subject.Custom('bc_scale_clause')]"
 ```
 
-| class | count | keyed on | shared or per-moment |
-|---|---|---|---|
-| core | 10 × 3 | nothing — `random_valid = yes` | per-moment |
-| ground | 10 × 6 | `var:bc_battle_ground` | per-moment |
-| bond | 5 | `var:bc_battle_bond` | shared |
-| scale | 4 | `var:bc_battle_size` | shared |
+| class | arms | keyed on | shared or per-moment | keys |
+|---|---|---|---|---|
+| core | 3 | nothing — `random_valid = yes` | per-moment | 30 |
+| ground | 6 + fallback | `var:bc_battle_ground` | per-moment | 70 |
+| bond | 5 + fallback | `var:bc_battle_bond` | shared | 6 |
+| scale | 3 + fallback | `var:bc_battle_size` | shared | 4 |
 
 Ground clauses are per-moment because the verb has to agree: a standard goes down
-*in the mud*, a flank collapses *among the trees*. Bond and scale clauses are
+*in the sand*, a flank collapses *among the trees*. Bond and scale clauses are
 moment-agnostic and shared.
 
-Roughly **100 loc keys covering some hundreds of readings**, against 10 today.
-Cost is additive, coverage is multiplicative.
+**Every keyed class carries a fallback arm with no trigger, last**, and those
+arms are load-bearing rather than decorative. They are what a stale anchor
+resolves to, and what a battle whose `combat.location` did not resolve resolves
+to. Each must read as complete prose on its own. The core class needs none — it
+has no trigger to fail.
 
-Every class carries a **fallback arm with no trigger, last**. That arm is what a
-stale anchor or a cleared variable resolves to, and it must read as complete
-prose on its own.
+Roughly **110 loc keys covering some hundreds of readings**, against 10 today.
+Cost is additive, coverage is multiplicative.
 
 ### `random_valid = yes` is restricted to toasts
 
@@ -222,13 +288,21 @@ would be invisible to the toolchain** — the same failure class as
 
 ### So the tooling comes first
 
-`ck3.py validate` gains two checks, and they land **before any fragment is
+`ck3.py validate` gains three checks, and they land **before any fragment is
 written**:
 
 1. every `localization_key` inside a `common/customizable_localization/` arm
    resolves to a loc key defined in the mod
 2. every `Custom('...')` reference in the mod's loc whose key begins `bc_`
    resolves to a custom-loc definition in the mod
+3. the six `bc_ground_is_*_trigger` definitions between them name each of AGOT's
+   23 `agot_is_*_terrain` helpers exactly once
+
+Check 3 is what makes the `bc_terrain_bucket_effect` rewrite safe to do at all.
+Exhaustiveness is currently guaranteed by a hand-verified comment
+(`bc_reputation_effects.txt:256-261`); moving the ladder into triggers is the
+moment to make it guaranteed by the toolchain instead. It also covers the new
+ladder for free, since both read the same triggers.
 
 Check 2 is scoped to the `bc_` prefix on purpose. An unscoped check would
 false-positive the moment the mod references a vanilla or AGOT definition, and
@@ -248,19 +322,22 @@ variable from loc: `[ROOT.Var('battle_location').GetProvince.GetName]` renders.
 
 So the first content step ships **one** fragment on **one** moment, with the
 script-side band markers, and nothing else. That is the `bc_spike` discipline
-this project already uses. **This is a gate, and §7 sequences the rest behind
+this project already uses. **This is a gate, and §8 sequences the rest behind
 it.** It costs no dedicated run — the spike is observed in ordinary play, in the
 player's first battle — but the work behind it does not start until the player
 confirms it rendered.
 
 ### New permanent markers
 
-- `BC: ground rough|forest|open|bog|mountain|frozen`
+- `BC: ground desert|open|rough|forest|jungle|winter`
+- `BC: ground NONE MATCHED` — unreachable in principle, which is why it logs
 - `BC: bond nemesis|kin|countryman|heathen|stranger`
+- `BC: eve ground missing` — the §5 hole
 
-Eleven, from the two script ladders. They give band distributions the terrain
-census never measured for the mod's own choices, and they are the only
-instrumentation the flavour system can have.
+Fourteen. They give band distributions the terrain census never measured for the
+mod's own choices, and they are the only instrumentation the flavour system can
+have. Nothing here needs a dedicated run; they accumulate in ordinary play and
+`probe 'BC:'` reads them whenever someone next looks.
 
 ## 5. Section 4 — the eve
 
@@ -291,9 +368,25 @@ Everything new in the eve follows that same pattern and **nothing in it reads
   `scope:combat_side.combat.location` one line before the raise in
   `bc_eve_offer_effect`, exactly as `bc_eve_foe` is written one line before the
   raise today. Its arms call the six band triggers from §2 directly on that
-  scope. This is not a meaning-carrying scope in the §2 rule-1 sense: it names a
-  province, the band triggers are pure functions of that province, and freshness
-  comes from its being rewritten at every raise.
+  scope. It names a province and the band triggers are pure functions of that
+  province, so it carries no classification of its own; freshness comes from its
+  being rewritten at every raise.
+
+**The one hole, stated rather than argued away.** That write goes through `?=`,
+and the raise below it does not. If `combat.location` ever fails to resolve, the
+raise still happens and the eve renders with a *previous* battle's province still
+in `scope:bc_eve_ground` — so the ground paragraph and the ground-gated option
+resolve to a **wrong band**, not to the fallback. Adjacency of the two lines does
+not prevent this; only the location resolving does.
+
+It is not closed by mechanism, because the cheap closures are both worse:
+suppressing the whole eve when the location is missing throws away the paragraph
+that does not depend on ground, and a freshness token would have to be scratch,
+which is the thing §5 exists to avoid. Instead the `else` arm of the `?=` logs
+**`BC: eve ground missing`**. If that marker ever reads non-zero the anchor needs
+rethinking; until then the exposure is one wrong clause on a pop-up that fired
+twice in 44 battles, and no state is corrupted. This is the handoff §2.4
+discipline — measure the population before building for it.
 
 ### Changes
 
@@ -326,18 +419,30 @@ here so a future reader knows the lever exists and knows it is safe.
 
 ## 6. Section 5 — what a battle leaves behind
 
-### Outcome varies with who the foe was
+### A notable win pays in the currency the foe implies
 
-On a notable win, the prestige/piety award reads `var:bc_battle_bond` on the
-commander: beating a man of your own faith is worth prestige, beating a
-`heathen` is worth piety, beating a `nemesis` is worth more of whichever
-applies. **No new state and no new comparison** — the flag the prose already
-reads is the flag the award reads, which is the point of classifying in script.
+**This is a new award. There is no combat-end prestige or piety grant today** —
+`add_prestige` appears only in phase events and the eve. It hangs in the graders,
+on the notable path, inside the same `side_commander ?= { if = { limit = { is_alive = yes } } }`
+block that already calls `bc_reputation_effect`, and therefore **before**
+`bc_clear_scratch_effect`, which both graders already place last and outside that
+gate for exactly this class of reason.
 
-The read is on the commander, in the graders, nested behind
-`exists = var:bc_battle_bond`, and it runs **before** `bc_clear_scratch_effect`,
-which `bc_aftermath_events.txt` already places last in both graders for exactly
-this class of reason.
+It reads **two** flags, and reads them independently:
+
+| flag | effect on the award |
+|---|---|
+| `var:bc_battle_creed` = `heathen` | pays **piety**; `same` pays **prestige** |
+| `var:bc_battle_bond` = `nemesis` | pays more of whichever currency the creed flag chose |
+
+The currency question is asked of `bc_battle_creed` and not of `bc_battle_bond`
+because the bond bands are ordered and mutually exclusive: a different-faith foe
+who shares your culture is filed under `countryman`, so the bond flag alone
+cannot answer it. §2 writes both from one comparison for this reason.
+
+Both reads are nested behind their own `exists`, never beside it. No new
+comparison is performed here — §2 already did the work, which is the point of
+classifying in script rather than in loc.
 
 ### Styled memories: designed, then rejected
 
@@ -420,7 +525,8 @@ to hold.
 | # | strand | gate |
 |---|---|---|
 | 1 | validator checks (§4) | none |
-| 2 | six band triggers + context plumbing + markers (§2) | none |
+| 2a | extract the six band triggers, rewrite `bc_terrain_bucket_effect` onto them (§2) | none — behaviour-preserving |
+| 2b | context plumbing: anchor, ground, bond, creed, markers (§2) | none |
 | 3 | **one proving fragment on one moment** (§4) | ships; player reports whether it rendered |
 | 4 | the remaining prose fragments (§3) | **blocked on step 3** |
 | 5 | the eve (§5) | none — uses no `.Custom()` |
@@ -441,9 +547,14 @@ sentence from the player after his next battle.
   ladders live in script.
 - **`type = character_memory` is not known to exist.** Avoided entirely — §6
   drops the styled memory rather than working around it.
-- **The eve's new saved scope is one more scope that cannot be unsaved.** It
-  names a province and is rewritten at every raise, so the worst case is last
-  battle's ground on an eve whose own raise failed to write it — which cannot
-  happen, since the raise and the write are adjacent lines in the same effect.
+- **The eve's new saved scope is one more scope that cannot be unsaved.** If
+  `combat.location` fails to resolve, the eve renders a *previous* battle's
+  ground band. Not closed by mechanism; instrumented with `BC: eve ground missing`
+  and argued in §5.
+- **The `bc_terrain_bucket_effect` rewrite touches shipped, working code.** It is
+  behaviour-preserving by construction — same helper, same band, same flag value
+  — and it is statically checkable by diffing the 23 helper names against the six
+  new triggers. It is still the one change in this design that can regress
+  something that already works, and it should be reviewed helper by helper.
 - **Weight-budget neutrality is predicted, not measured.** §7 only, and §7 is
   deferred for exactly that reason.

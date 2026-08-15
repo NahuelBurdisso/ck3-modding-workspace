@@ -386,11 +386,16 @@ Append to `bc_flavour.txt`:
 # 5k+ 46, 3k 42, 2k 31, 1k 14, under-1k 4. Do not re-guess the boundaries here;
 # they belong to bc_battle_open_effect and this file only names them.
 #
-# [DRAFT. The shipped header adds four things this one lacks and is the one to
-# copy: the citation for the ladder (bc_ledger_effects.txt:112-125) and for the
-# bucket derivation (:95-111); the monotonicity rule for the three strings; the
-# fallback's reachability by call site, which is the same argument bc_bond_clause
-# carries; and the fact that nothing calls the clause yet.]
+# [DRAFT, SUPERSEDED. Read the shipped header in bc_flavour.txt instead; it is
+# the one to copy. Do not count the differences, read them - the shipped header
+# adds the citation for the ladder (bc_ledger_effects.txt:112-125) and for the
+# bucket derivation (:97-105); the pointer to step 4's mechanical check; the
+# correction that a silent no-match IS distinguishable in the log even though it
+# is not on the toast, via the `BC: size` markers at :115, :120 and :124; the
+# monotonicity rule for the three strings; the axis itself and the record of why
+# the first axis was abandoned; the fallback's reachability by call site, which
+# is the same argument bc_bond_clause carries; and the fact that nothing calls
+# the clause yet.]
 bc_scale_clause = {
 	type = character
 
@@ -432,7 +437,13 @@ bc_scale_clause = {
 
 - [ ] **Step 2: Add the four keys**
 
-In `bc_l_english.yml`, after the bond section:
+In `bc_l_english.yml`, after the bond section. **The three strings below are a
+DRAFT and were NOT what shipped.** They grade on who hears about the moment, and
+that axis is unavailable: `bc_frag_banner_falls_open` already settles the same
+question for open ground, in text that renders earlier in the same run, so every
+arm either restated it or contradicted it. The shipped strings grade on how often
+a fight of that size throws up a moment of the kind just described. Copy the
+shipped section comment and strings from `bc_l_english.yml`, not this block.
 
 ```
 

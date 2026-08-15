@@ -18,12 +18,20 @@ pins at all.
 WHAT IT DOES NOT PROVE, and what its first version was read as proving: that
 every test pins the behaviour ITS NAME CLAIMS. "Every test is killed by at
 least one mutant" is a property of the SUITE. Round 18 held that property while
-five behaviours of the sweep had no mutant here at all - the fence exit, the
-`is_file()` guard, BOM handling, five of the seven extensions, and the whole of
-`main()` - and while two tests were weaker than their names. THE LIST BELOW IS
-THE CLAIM. It is only as good as its coverage of the file it points at, so a
-behaviour added to sweep_backticks.py without an entry here is unpinned no
-matter what this run prints.
+behaviours of the sweep had no mutant here at all - the fence exit, the
+`is_file()` guard, BOM handling, most of the extension list, and the whole of
+`main()` - and while two tests were weaker than their names. Round 19 held it
+again, over a longer list, while dropping any one of four extensions and while
+pruning the docs tree alone both went undetected, and while the paragraph named
+`AN UNREADABLE FILE IS NOT SKIPPED` had nothing behind it at all.
+
+THE LIST BELOW IS THE CLAIM. It is only as good as its coverage of the file it
+points at, so a behaviour added to sweep_backticks.py without an entry here is
+unpinned no matter what this run prints. TWO SHAPES OF ENTRY ARE WORTH DRAFTING
+FOR THAT REASON: break each element of a collection SINGLY as well as wholesale
+- a mutant that empties EXTS or that prunes three directories at once dies to
+almost anything, and it is the single drop that finds a test deriving its
+expectation from the thing it is checking.
 
 NOT PART OF THE ACCEPTANCE SET. It edits a tracked file in place, so it is run
 deliberately and never as part of a batch. It restores the file in a `finally`,
@@ -134,9 +142,12 @@ MUTANTS = [
         "                    hits.append((rel, lineno, line.strip()))",
         "                    hits.append((rel, lineno, line))",
     ),
-    # The nine below close the gaps round 18 found: behaviours of the sweep
-    # that no test and no mutant touched, so that "every test is killed" was
-    # true of the suite while five separate behaviours were unpinned.
+    # From here down are the gaps rounds 18 and 19 found: behaviours of the
+    # sweep that no test and no mutant touched, so that "every test is killed"
+    # was true of the suite while separate behaviours were unpinned. NO COUNT
+    # IS GIVEN. The first version of this comment said "the nine below" when
+    # there were ten, which is the drifting-count defect this project's own
+    # rules forbid and which round 19 caught in the file that polices it.
     (
         "fence: enter but never leave the fenced state",
         "                    fenced = not fenced",
@@ -186,6 +197,62 @@ MUTANTS = [
         "main: ignore the path argument",
         'root = (Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")).resolve()',
         'root = Path(".").resolve()',
+    ),
+    # ONE MUTANT PER EXTENSION, dropped singly. "walk: stop reading Python"
+    # above is not enough on its own: the test it kills used to derive both its
+    # fixtures and its expectation from S.EXTS, so shrinking EXTS shrank the
+    # fixture set with it and four of these five survived the whole suite.
+    (
+        "walk: stop reading loc",
+        '{".txt", ".yml",',
+        '{".txt",',
+    ),
+    (
+        "walk: stop reading gui",
+        '".yml", ".gui",',
+        '".yml",',
+    ),
+    (
+        "walk: stop reading the descriptor",
+        '".gui", ".info",',
+        '".gui",',
+    ),
+    (
+        "walk: stop reading the mod file",
+        '".md", ".mod",',
+        '".md",',
+    ),
+    # ONE MUTANT PER TOP-LEVEL TREE, pruned singly. The three-at-once mutant
+    # above dies too easily: pruning only `docs` left the suite green, because
+    # markdown still reaches the scanner through CLAUDE.md and templates/, and
+    # that is exactly the regression round 16 found by hand.
+    (
+        "walk: prune the docs tree",
+        'PRUNE = {".git", "__pycache__"}',
+        'PRUNE = {".git", "__pycache__", "docs"}',
+    ),
+    (
+        "walk: prune the mods tree",
+        'PRUNE = {".git", "__pycache__"}',
+        'PRUNE = {".git", "__pycache__", "mods"}',
+    ),
+    (
+        "walk: prune the tools tree",
+        'PRUNE = {".git", "__pycache__"}',
+        'PRUNE = {".git", "__pycache__", "tools"}',
+    ),
+    # THE WIDENED `except`, which is 8a71ce1's headline fix run backwards. Both
+    # of these left the suite green until round 19, so the paragraph named
+    # `AN UNREADABLE FILE IS NOT SKIPPED` was prose with nothing behind it.
+    (
+        "decode: swallow every OSError too",
+        "            except UnicodeDecodeError:",
+        "            except (UnicodeDecodeError, OSError):",
+    ),
+    (
+        "decode: swallow every exception",
+        "            except UnicodeDecodeError:",
+        "            except Exception:",
     ),
 ]
 

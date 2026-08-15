@@ -31,12 +31,18 @@ KNOWN LIMITS. The first two are also written down in that same paragraph:
     strip as well. An earlier draft of this bullet said no line in the tree did
     it, which one grep disproves.
 
-WHAT IS NOT A LIMIT: A MISMATCHED FENCE PAIR. Until this paragraph was written
-the third bullet above claimed that a block opened with three backticks and
-closed with three tildes was not recognised as a pair, and that the rest of the
-file was then swallowed. That is false, and it hid the real hazard behind an
-invented one for two commits. `FENCE_RE` matches either marker and the toggle
-is marker-agnostic, so a mismatched pair closes exactly like a matched one -
+WHAT IS NOT A LIMIT: A MISMATCHED FENCE PAIR. 8a71ce1 shipped a KNOWN LIMITS
+bullet claiming that a block opened with three backticks and closed with three
+tildes is not recognised as a pair, and that the rest of the file is then
+swallowed. NO ORDINAL IS GIVEN FOR IT, because the bullet is gone and the list
+it sat in is rewritten every round: an earlier draft of this paragraph said
+"the third bullet above", and by the time anyone read it that position held the
+opposite claim. Citing a position in a mutable list is the same defect as
+citing a line number, written into the file that exists to prevent it.
+
+The claim itself is false, and it hid the real hazard behind an invented one
+for two commits. `FENCE_RE` matches either marker and the toggle is
+marker-agnostic, so a mismatched pair closes exactly like a matched one -
 `test_a_fence_closed_by_the_other_marker_is_still_a_pair` is the proof.
 8a71ce1's own message says it recorded the unterminated-fence limit; it did
 not, it recorded this instead, which is the failure this file exists to make
@@ -55,6 +61,12 @@ many words that it does NOT cover an unreadable file. Reading that name as a
 pin is a mistake this docstring made until it was corrected. What is pinned
 either side is the `is_file()` guard, which is a different case - an entry that
 os.walk offered and that is not a file.
+
+The pin for THIS paragraph is
+`test_a_file_that_cannot_be_opened_raises_out_of_the_sweep`, and it did not
+exist until round 19: widening the clause to `(UnicodeDecodeError, OSError)`,
+or to a bare `Exception`, left every test green, so the fix this paragraph
+describes could have been reverted without a red anywhere.
 
 THIS FILE SPELLS ITS OWN BACKTICKS AS `\\x60`. A detector that matches on a
 character will contain that character, and writing it literally made the sweep

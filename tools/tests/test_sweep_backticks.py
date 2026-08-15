@@ -24,6 +24,13 @@ nobody has written down is indistinguishable from a defect nobody has noticed,
 and a limit written down that the code does not actually have is worse than
 either, because it sends the reader looking for the wrong hazard.
 
+A SHA IS UNLABELLED ONLY WHEN IT BELONGS TO THE REPOSITORY THIS FILE LIVES IN.
+Two checkouts are in play - this one, and the mod's own history nested at
+mods/battle_chronicles - and a SHA from one does not resolve in the other, so
+`git show` on it reports an unknown revision rather than the wrong commit.
+Anything cited below out of the mod's history is marked "(mod repo)" at the
+point of citation; everything else resolves from the tooling root.
+
 WHAT PINS WHAT IS STATED PER TEST, NOT IN AGGREGATE. "Every test is killed by
 at least one mutant" is true of this suite and it is weak: it is a property of
 the SUITE, and it says nothing about whether a given test pins the behaviour
@@ -33,11 +40,15 @@ docstring says so.
 
 from __future__ import annotations
 
+import contextlib
+import io
+import re
 import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -186,10 +197,9 @@ class TestFences(SweepTestCase):
         # from FENCE_RE, these are the lines that report - the delimiters, at 1
         # and 3, not the body at 2, which carries no backtick.
         self.write("a.md", "> ```bash\n> grep -n 'x' file\n> ```\n")
-        real = S.FENCE_RE
-        S.FENCE_RE = __import__("re").compile(r"^\s*(?:\x60{3}|~{3})")
-        self.addCleanup(setattr, S, "FENCE_RE", real)
-        self.assertEqual(self.hits(), [("a.md", 1), ("a.md", 3)])
+        no_blockquote = re.compile(r"^\s*(?:\x60{3}|~{3})")
+        with mock.patch.object(S, "FENCE_RE", no_blockquote):
+            self.assertEqual(self.hits(), [("a.md", 1), ("a.md", 3)])
 
     def test_an_unrecognised_delimiter_does_not_exempt_an_odd_body(self) -> None:
         # THE OTHER HALF, and the one f74e420's message actually claimed. The
@@ -197,10 +207,9 @@ class TestFences(SweepTestCase):
         # "the body did not report" and "the body is exempt" look identical.
         # Give the body something to say and it says it, at line 2.
         self.write("a.md", "> ```bash\n> " + ODD_LINE + "> ```\n")
-        real = S.FENCE_RE
-        S.FENCE_RE = __import__("re").compile(r"^\s*(?:\x60{3}|~{3})")
-        self.addCleanup(setattr, S, "FENCE_RE", real)
-        self.assertEqual(self.hits(), [("a.md", 1), ("a.md", 2), ("a.md", 3)])
+        no_blockquote = re.compile(r"^\s*(?:\x60{3}|~{3})")
+        with mock.patch.object(S, "FENCE_RE", no_blockquote):
+            self.assertEqual(self.hits(), [("a.md", 1), ("a.md", 2), ("a.md", 3)])
 
     def test_a_fence_closed_by_the_other_marker_is_still_a_pair(self) -> None:
         # THE REFUTATION OF 8a71ce1'S THIRD BULLET. Opened with backticks,
@@ -244,10 +253,10 @@ class TestEscapedBackticks(SweepTestCase):
     rule out.
 
     f74e420's header did get the direction backwards - "the stripping trades
-    the common noise for the rare miss". 8a0d33e's prose did NOT: it named both
-    failure modes correctly and only implied a trade with the word "but", which
-    is the distinction 6145832 drew and which an earlier draft here flattened
-    back out.
+    the common noise for the rare miss". 8a0d33e's prose (mod repo) did NOT: it
+    named both failure modes correctly and only implied a trade with the word
+    "but", which is the distinction 6145832 (mod repo) drew and which an earlier
+    draft here flattened back out.
     """
 
     def test_a_balanced_line_carrying_an_escape_is_not_reported(self) -> None:
@@ -282,19 +291,36 @@ class TestWalkCoverage(SweepTestCase):
         self.write("b.TXT", ODD_LINE)
         self.assertEqual(self.hits(), [("A.MD", 1), ("b.TXT", 1)])
 
+    # THE SEVEN ARE WRITTEN OUT HERE, NOT READ BACK OUT OF S.EXTS. The first
+    # version of the test below derived its fixtures AND its expectation from
+    # `sorted(S.EXTS)`, which puts the same set on both sides: dropping `.mod`
+    # from EXTS also dropped the fixture that would have caught it, and the
+    # test stayed green. Four mutants survived the whole suite that way until
+    # round 19 wrote them. A literal is the only form in which anything here
+    # says "these seven", which is what bc_flavour.txt claims of the sweep.
+    LISTED_EXTS = (".gui", ".info", ".md", ".mod", ".py", ".txt", ".yml")
+
     def test_every_listed_extension_is_actually_scanned(self) -> None:
-        # NOT `assertEqual(S.EXTS, {...})`, which restates the declaration and
-        # pins nothing about the walk. One fixture per listed extension, each
-        # of which must report. Until this test existed only `.txt` and `.md`
-        # were covered, so dropping `.yml`, `.gui`, `.info`, `.mod` or `.py`
-        # from EXTS was a silent narrowing - which flatly contradicts
-        # bc_flavour.txt's claim that the sweep checks every commentable file.
-        for i, ext in enumerate(sorted(S.EXTS)):
+        # One fixture per listed extension, each of which must report. Until
+        # this test existed only `.txt` and `.md` were covered, so dropping
+        # `.yml`, `.gui`, `.info`, `.mod` or `.py` from EXTS was a silent
+        # narrowing - which flatly contradicts bc_flavour.txt's claim that the
+        # sweep checks every commentable file.
+        for i, ext in enumerate(self.LISTED_EXTS):
             self.write(f"f{i}{ext}", ODD_LINE)
         self.assertEqual(
             self.hits(),
-            [(f"f{i}{ext}", 1) for i, ext in enumerate(sorted(S.EXTS))],
+            [(f"f{i}{ext}", 1) for i, ext in enumerate(self.LISTED_EXTS)],
         )
+
+    def test_the_literal_list_above_is_the_one_the_sweep_declares(self) -> None:
+        # On its own this restates a declaration and pins nothing about the
+        # walk, which is why it is not the whole of the coverage. What it buys
+        # is that the literal cannot drift out of step with EXTS in either
+        # direction: an extension added to the sweep without a fixture beside
+        # it fails HERE, naming the line to edit, instead of being scanned by
+        # no test at all.
+        self.assertEqual(S.EXTS, set(self.LISTED_EXTS))
 
     def test_a_bom_is_not_reported_as_part_of_the_line(self) -> None:
         # Every mod script file carries a UTF-8 BOM, so `utf-8-sig` is not
@@ -312,6 +338,29 @@ class TestWalkCoverage(SweepTestCase):
         (self.root / "bad.txt").write_bytes(b"\xff\xfe an \x60 unbalanced line\n")
         self.assertClean()
 
+    def test_a_file_that_cannot_be_opened_raises_out_of_the_sweep(self) -> None:
+        # THE OTHER HALF OF THE `except` CLAUSE, and the half nothing pinned
+        # until round 19: widening it to `(UnicodeDecodeError, OSError)` or to
+        # `Exception` left the whole suite green, so 8a71ce1's headline fix
+        # could be reverted without a red test. A sweep that quietly drops what
+        # it could not read is the exact defect this tool exists to catch, one
+        # level up, so the failure is loud on purpose. Injected through
+        # `read_text` because making a real file unopenable needs an ACL this
+        # account cannot set, and a test that skips where it is run pins
+        # nothing.
+        self.write("a.md", ODD_LINE)
+
+        real_read = Path.read_text
+
+        def read_text_that_is_denied(self_, *args, **kwargs):
+            if self_.name == "a.md":
+                raise PermissionError(13, "Permission denied")
+            return real_read(self_, *args, **kwargs)
+
+        with mock.patch.object(Path, "read_text", read_text_that_is_denied):
+            with self.assertRaises(PermissionError):
+                S.sweep(self.root)
+
     def test_an_entry_that_is_not_a_file_is_skipped(self) -> None:
         # os.walk puts anything that is not a directory into `filenames`,
         # including a broken symlink and a name deleted between the scandir and
@@ -320,7 +369,10 @@ class TestWalkCoverage(SweepTestCase):
         # that and a crash. Injected rather than symlinked for the reason
         # test_citations.py gives: creating a symlink on Windows needs a
         # privilege this account does not have, and a test that skips on the
-        # only platform anyone runs it on pins nothing.
+        # only platform anyone runs it on pins nothing. PATCHED THROUGH A
+        # CONTEXT MANAGER, not by assignment plus addCleanup: `S.os` is the
+        # real os module, so a failure between the two statements leaves every
+        # later test in the process walking the patched version.
         self.write("real.md", ODD_LINE)
         real_walk = S.os.walk
 
@@ -330,9 +382,8 @@ class TestWalkCoverage(SweepTestCase):
                     filenames = filenames + ["ghost.md"]
                 yield dirpath, dirnames, filenames
 
-        S.os.walk = walk_with_a_ghost
-        self.addCleanup(setattr, S.os, "walk", real_walk)
-        self.assertEqual(self.hits(), [("real.md", 1)])
+        with mock.patch.object(S.os, "walk", walk_with_a_ghost):
+            self.assertEqual(self.hits(), [("real.md", 1)])
 
     def test_the_walk_order_is_sorted_and_parents_lead(self) -> None:
         # ASSERTS THE ORDER, NOT MERELY THAT IT REPEATS. Comparing several runs
@@ -407,10 +458,21 @@ class TestAgainstTheRealTree(unittest.TestCase):
             opened.add(self_.suffix.lower())
             return real_read(self_, *args, **kwargs)
 
-        Path.read_text = read_text_recording
-        self.addCleanup(setattr, Path, "read_text", real_read)
-        S.sweep(self.repo)
+        with mock.patch.object(Path, "read_text", read_text_recording):
+            S.sweep(self.repo)
         self.assertLessEqual({".py", ".md", ".txt"}, opened)
+
+    def test_all_three_top_level_trees_are_swept(self) -> None:
+        # ROUND 16'S REGRESSION, PINNED DIRECTLY. Adding just "docs" to PRUNE
+        # left the whole suite green: `.md` still reaches the scanner through
+        # CLAUDE.md at the root and through templates/, so "the sweep reads
+        # markdown" does not cover it, and the harness's own PRUNE mutant only
+        # dies because it prunes three directories at once. These are the three
+        # the prose the rule governs actually lives in - docs/ the plans and
+        # specs, mods/ the script comments, tools/ the Python.
+        tops = {rel.split("/", 1)[0] for rel, _, _ in self.hits}
+        for top in ("docs", "mods", "tools"):
+            self.assertIn(top, tops, f"nothing reported anywhere under {top}/")
 
     def test_the_sweep_does_not_report_its_own_source(self) -> None:
         # sweep_backticks.py spells its backticks as escapes so that it does not
@@ -433,12 +495,14 @@ class TestTheCommandLine(SweepTestCase):
     change to it invalidates every recorded baseline silently. That prefix is
     kept on one line here for the reason the whole rule exists: a grep target
     broken over a wrap is not a grep target.
+
+    WHAT `run_main` DOES NOT EXERCISE: an encoder. `io.StringIO` accepts every
+    character, and the real stdout on the only platform this is run on does
+    not. `test_a_non_ascii_quotation_is_lost_to_a_cp1252_console` is the pin
+    for that gap, and it pins the limit rather than a fix.
     """
 
     def run_main(self, argv: list[str]) -> str:
-        import io
-        import contextlib
-
         real_argv = sys.argv
         sys.argv = ["sweep_backticks.py"] + argv
         self.addCleanup(setattr, sys, "argv", real_argv)
@@ -461,11 +525,38 @@ class TestTheCommandLine(SweepTestCase):
     def test_a_long_line_is_truncated_in_the_report(self) -> None:
         # The report is meant to be read, so a 4000-character quotation must
         # not push the next hit off the screen. 110 characters, and the cut is
-        # on the STRIPPED text.
-        self.write("a.md", "x" * 400 + " \x60 open\n")
+        # on the STRIPPED text - THE INDENT ON THE FIXTURE IS WHAT PINS THAT
+        # HALF. Without it the two orders give the same 110 characters and the
+        # sentence above is an unbacked claim; with it, cutting first spends
+        # four of the 110 on whitespace and the second assertion names it.
+        self.write("a.md", "    " + "x" * 400 + " \x60 open\n")
         out = self.run_main([str(self.root)])
         body = out.splitlines()[0].split(": ", 1)[1]
         self.assertEqual(len(body), 110)
+        self.assertTrue(body.startswith("x"), repr(body[:8]))
+
+    def test_a_non_ascii_quotation_is_lost_to_a_cp1252_console(self) -> None:
+        # A LIMIT, PINNED AS ONE, NOT A FIX. Every other test in this class
+        # writes into io.StringIO, which encodes nothing, so none of them says
+        # anything about a real console. The Windows default is cp1252, and
+        # `print` on a character it cannot encode raises out of main() - which
+        # loses the SUMMARY LINE as well as the hit, so the run looks truncated
+        # rather than failed. Nothing in either tree puts a non-ASCII character
+        # inside a quoted span today. This is what makes the day one appears a
+        # named failure instead of a mystery, and what has to be deleted by
+        # whoever decides to reconfigure the stream instead.
+        #
+        # U+2192 AND NOT AN EM DASH: cp1252 HAS the em dash, at 0x97, so a
+        # fixture built on one raises nothing and this test asserts an
+        # exception that never comes. That is what the first draft did.
+        self.write("a.md", "an \x60 unbalanced \u2192 line\n")
+        real_argv = sys.argv
+        sys.argv = ["sweep_backticks.py", str(self.root)]
+        self.addCleanup(setattr, sys, "argv", real_argv)
+        console = io.TextIOWrapper(io.BytesIO(), encoding="cp1252", newline="")
+        with contextlib.redirect_stdout(console):
+            with self.assertRaises(UnicodeEncodeError):
+                S.main()
 
     def test_with_no_argument_it_sweeps_the_working_directory(self) -> None:
         import os as real_os

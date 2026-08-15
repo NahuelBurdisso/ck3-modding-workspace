@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .paths import Config, version_matches
 from .pdxscript import brace_report, has_bom, parse_descriptor, parse_loc, read_text, top_level_defs
-from .sources import SCAN_DIRS, iter_files
+from .sources import SCAN_DIRS, iter_files, playset_sources
 
 ERROR = "error"
 WARN = "warn"
@@ -164,6 +164,74 @@ def _scan_matches(path: Path, pattern: re.Pattern[str]) -> list[tuple[int, str]]
     return [(text.count("\n", 0, m.start()) + 1, m.group(1)) for m in pattern.finditer(text)]
 
 
+# The 23 AGOT base terrain helpers, in band order. Held as an explicit list and
+# not globbed: the `agot_is_*_terrain` glob matches 26 names, because AGOT also
+# ships agot_is_majorroad_terrain, agot_is_minorroad_terrain and
+# agot_is_location_valid_vanilla_terrain, which are cross-cutting or
+# character-scoped and must not be banded.
+BC_GROUND_BASES = [
+    "drylands", "desert", "desert_mountains", "oasis", "canyon",
+    "farmlands", "plains", "steppe", "floodplains", "urban",
+    "hills", "mountains", "wetlands", "the_bog", "taiga_bog", "terraced_hills", "highlands",
+    "forest", "taiga",
+    "jungle", "cloudforest",
+    "frozen_flats", "glacier",
+]
+BC_GROUND_NON_BASES = {"majorroad", "minorroad", "location_valid_vanilla"}
+BC_GROUND_FILE = "common/scripted_triggers/bc_ground_triggers.txt"
+AGOT_TERRAIN_FILE = "common/scripted_triggers/00_agot_terrain_type_triggers.txt"
+TERRAIN_HELPER_RE = re.compile(r"agot_is_(\w+)_terrain")
+TERRAIN_DEF_RE = re.compile(r"^agot_is_(\w+)_terrain\s*=\s*\{", re.M)
+
+
+def _check_ground_partition(cfg: Config, mod_root: Path, issues: list[Issue]) -> None:
+    """Mod-specific: the six ground bands must cover every AGOT base exactly once."""
+    path = mod_root / BC_GROUND_FILE
+    if not path.is_file():
+        return
+
+    found = TERRAIN_HELPER_RE.findall(read_text(path))
+    for name in BC_GROUND_BASES:
+        if name not in found:
+            issues.append(Issue(ERROR, BC_GROUND_FILE, None, f"terrain `{name}` is in no ground band"))
+    for name in found:
+        if name not in BC_GROUND_BASES:
+            issues.append(
+                Issue(ERROR, BC_GROUND_FILE, None, f"`agot_is_{name}_terrain` is not a base terrain helper")
+            )
+    for name in sorted({n for n in found if found.count(n) > 1}):
+        issues.append(Issue(ERROR, BC_GROUND_FILE, None, f"terrain `{name}` is in more than one ground band"))
+
+    # THE OTHER HALF: has AGOT grown a terrain the bands do not know about?
+    # BC_GROUND_BASES above is a frozen literal and can only ever catch drift on
+    # the mod's side. Resolved through the playset the way `ck3.py api` and
+    # `ck3.py find` do, last source wins.
+    #
+    # IT SKIPS LOUDLY, NEVER SILENTLY. A validate run on a machine with no
+    # playset configured must say that the cross-check did not happen, because a
+    # silent skip is indistinguishable from a pass and this check exists
+    # precisely for the case nobody is looking.
+    agot: Path | None = None
+    for source in playset_sources(cfg):
+        candidate = source.root / AGOT_TERRAIN_FILE
+        if candidate.is_file():
+            agot = candidate
+    if agot is None:
+        issues.append(
+            Issue(WARN, BC_GROUND_FILE, None, f"SKIPPED the AGOT-side check: no enabled source provides {AGOT_TERRAIN_FILE}")
+        )
+        return
+    shipped = {n for n in TERRAIN_DEF_RE.findall(read_text(agot))} - BC_GROUND_NON_BASES
+    for name in sorted(shipped - set(BC_GROUND_BASES)):
+        issues.append(
+            Issue(ERROR, BC_GROUND_FILE, None, f"AGOT ships `agot_is_{name}_terrain`, which is in no ground band")
+        )
+    for name in sorted(set(BC_GROUND_BASES) - shipped):
+        issues.append(
+            Issue(ERROR, BC_GROUND_FILE, None, f"band uses `agot_is_{name}_terrain`, which AGOT no longer defines")
+        )
+
+
 def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issue]:
     issues: list[Issue] = []
     if not mod_root.is_dir():
@@ -171,6 +239,7 @@ def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issu
 
     _check_descriptor(mod_root, cfg, issues)
     _check_structure(mod_root, issues)
+    _check_ground_partition(cfg, mod_root, issues)
 
     defs_by_key: dict[str, tuple[str, int]] = {}
     def_categories: list[tuple[str, str]] = []

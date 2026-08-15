@@ -35,13 +35,12 @@ FOR THAT REASON: break each element of a collection SINGLY as well as wholesale
 almost anything, and it is the single drop that finds a test deriving its
 expectation from the thing it is checking.
 
-NOT PART OF THE ACCEPTANCE SET. It edits a tracked file in place, so it is run
-deliberately and never as part of a batch. It restores the file in a `finally`,
-and it writes BYTES so that the restore is byte-identical: `write_text` on
-Windows translates every `\\n` to `\\r\\n`, which rewrote the whole of
-sweep_backticks.py to CRLF the first time this harness ran. The working copy is
-LF, so that is a real corruption of a file the harness is supposed to leave
-alone.
+THE MECHANISM IS NOT HERE. Apply, run, restore and report live in `mutate.py`
+beside this file, and so does the reasoning for them - the byte-level restore,
+the mandatory `PYTHONDONTWRITEBYTECODE`, why a non-zero exit is not a kill, and
+why this is never run as part of a batch. It was moved there when a second
+harness needed it: a copy of a mechanism that has already been got wrong twice
+is a copy of both mistakes, and it drifts silently besides.
 
 SOME MUTATIONS ARE DELIBERATELY ABSENT, and they are written down here so that
 their absence is a decision rather than an oversight. NO COUNT IS GIVEN FOR
@@ -70,7 +69,7 @@ list it shipped holds 43. NO CORRECTED NUMBER IS WRITTEN HERE, and that is the
 point rather than an evasion: a number in prose beside a list that grows is
 wrong at the next commit, and this file already refuses to count its own
 deliberate absences for that reason. `len(MUTANTS)` is the only place the answer
-should be read from, and the run prints it.
+should be read from, and `mutate.py` prints it on the baseline line.
 
 Run it with `python tools/tests/mutate_sweep_backticks.py`. Exit 0 means every
 mutant was killed.
@@ -78,11 +77,9 @@ mutant was killed.
 
 from __future__ import annotations
 
-import os
-import re
-import subprocess
-import sys
 from pathlib import Path
+
+from mutate import run_mutants
 
 TOOLS = Path(__file__).resolve().parents[1]
 TARGET = TOOLS / "sweep_backticks.py"
@@ -364,69 +361,6 @@ MUTANTS = [
     ),
 ]
 
-FAIL_RE = re.compile(r"^(test_\w+) \(.*\) \.\.\. (?:FAIL|ERROR)", re.M)
-
-
-def run() -> tuple[bool, set[str]]:
-    """Run the suite once. Returns (passed, names of the tests that did not)."""
-    # PYTHONDONTWRITEBYTECODE IS NOT OPTIONAL. Two mutants of the same byte
-    # length written inside one filesystem timestamp resolution reuse the first
-    # one's cached .pyc, and the second reports a false OK.
-    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
-    proc = subprocess.run(
-        [sys.executable, str(SUITE)], capture_output=True, text=True, env=env
-    )
-    return proc.returncode == 0, set(FAIL_RE.findall(proc.stdout + proc.stderr))
-
-
-def main() -> int:
-    original = TARGET.read_bytes()
-
-    passed, red = run()
-    if not passed:
-        print("BASELINE IS RED - fix that before mutating:", sorted(red))
-        return 1
-    # The count is PRINTED AND NOT WRITTEN DOWN. A number in a docstring beside a
-    # list that grows goes wrong at the next commit - 1af8901's message said 44
-    # over a list of 43 - so this is the only place it is stated.
-    print(f"baseline: green - {len(MUTANTS)} mutants\n")
-
-    survivors = []
-    for name, old, new in MUTANTS:
-        text = original.decode("utf-8")
-        if text.count(old) != 1:
-            print(f"!! ANCHOR MATCHED {text.count(old)}x, expected 1: {name}")
-            survivors.append(name)
-            continue
-        TARGET.write_bytes(text.replace(old, new, 1).encode("utf-8"))
-        try:
-            passed, red = run()
-        finally:
-            TARGET.write_bytes(original)
-        if passed:
-            print(f"SURVIVED  {name}")
-            survivors.append(name)
-        elif not red:
-            # A NON-ZERO EXIT IS NOT A KILL BY ITSELF. A mutant that stops the
-            # suite importing also exits non-zero, and counting it teaches the
-            # harness to accept a mutation no test ever saw. Round 18 found
-            # this reading only the code, before it had cost anything.
-            print(f"CRASHED   {name} - the suite failed without naming a test")
-            survivors.append(name)
-        else:
-            print(f"killed    {name}")
-            for test in sorted(red):
-                print(f"            {test}")
-
-    print()
-    if survivors:
-        print(f"{len(survivors)} SURVIVING MUTANT(S):")
-        for name in survivors:
-            print(f"  {name}")
-        return 1
-    print("every mutant killed")
-    return 0
-
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run_mutants(TARGET, SUITE, MUTANTS))

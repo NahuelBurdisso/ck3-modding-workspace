@@ -41,14 +41,22 @@ sweep_backticks.py to CRLF the first time this harness ran. The working copy is
 LF, so that is a real corruption of a file the harness is supposed to leave
 alone.
 
-TWO MUTATIONS ARE DELIBERATELY ABSENT, and they are written down here so that
-their absence is a decision rather than an oversight. Deleting `filenames.sort()`
-outright survives on NTFS, which returns directory entries in name order anyway,
-so the sort is only observable on a filesystem nobody here runs; what IS pinned
-is the sort being REVERSED. And dropping `.resolve()` from `main()` survives
-because every path a test hands it is already absolute. Adding either entry
-would put a permanent survivor in this list and train the reader to skim the
-result, which is the failure the whole file is arranged against.
+SOME MUTATIONS ARE DELIBERATELY ABSENT, and they are written down here so that
+their absence is a decision rather than an oversight. NO COUNT IS GIVEN FOR
+THEM: round 20's draft said TWO and was short the same round it was written.
+Dropping `.resolve()` from `main()` survives because every path a test hands it
+is already absolute. A `sub(..., count=N)` at or above the width of the suite's
+escape ramp survives because no fixture is wide enough to see it, and no finite
+fixture ever closes that. Adding either would put a permanent survivor in this
+list and train the reader to skim the result, which is the failure the whole
+file is arranged against.
+
+WHAT WAS ABSENT ON A FALSE PREMISE, and is now present: deleting either sort in
+the walk. That was recorded as a decision on the grounds that NTFS returns
+entries in name order anyway. NTFS collates uppercased and case-insensitively,
+which is not Python's order, so both were observable all along and neither was
+observed. A premise nobody checked is how a coverage gap gets written down as a
+choice.
 
 Run it with `python tools/tests/mutate_sweep_backticks.py`. Exit 0 means every
 mutant was killed.
@@ -91,10 +99,29 @@ MUTANTS = [
         'if ESCAPED_BACKTICK_RE.sub("", line).count(BACKTICK) % 2:',
         "if line.count(BACKTICK) % 2:",
     ),
+    # THE TRUNCATED STRIP, AT THREE DEPTHS. One entry is not enough here and
+    # round 20 shipped one: `count=1` died against a two-escape fixture while
+    # `count=2` sailed through it, and `count=2` was the worse mutant, because
+    # at two the real trees cannot see it either - no line of either carries
+    # more than two escapes, so the report is byte-identical and so is the
+    # acceptance total. What kills these is the RAMP of escape counts in the
+    # suite, and a count at or above the ramp's width would survive; 7 is here
+    # because it is the largest the ramp still beats, and adding an 8 would put
+    # a permanent survivor in this list.
     (
         "escape: strip only the FIRST escaped backtick on a line",
         'if ESCAPED_BACKTICK_RE.sub("", line).count(BACKTICK) % 2:',
         'if ESCAPED_BACKTICK_RE.sub("", line, count=1).count(BACKTICK) % 2:',
+    ),
+    (
+        "escape: strip only the first TWO escaped backticks on a line",
+        'if ESCAPED_BACKTICK_RE.sub("", line).count(BACKTICK) % 2:',
+        'if ESCAPED_BACKTICK_RE.sub("", line, count=2).count(BACKTICK) % 2:',
+    ),
+    (
+        "escape: strip only the first SEVEN escaped backticks on a line",
+        'if ESCAPED_BACKTICK_RE.sub("", line).count(BACKTICK) % 2:',
+        'if ESCAPED_BACKTICK_RE.sub("", line, count=7).count(BACKTICK) % 2:',
     ),
     (
         "parity: report every line that carries a backtick",
@@ -127,9 +154,26 @@ MUTANTS = [
         "dirnames[:] = sorted((d for d in dirnames if d not in PRUNE), reverse=True)",
     ),
     (
-        "walk: leave filenames in filesystem order",
+        "walk: reverse the file order",
         "        filenames.sort()",
         "        filenames.reverse()",
+    ),
+    # THE TWO SORTS DELETED OUTRIGHT, which round 20 wrote down as deliberately
+    # absent on the grounds that NTFS hands entries back in name order anyway.
+    # It does not hand them back in PYTHON's name order: it collates uppercased
+    # and case-insensitively, so os.walk offers ["a.md", "B.md"] where `sorted`
+    # gives ["B.md", "a.md"]. A coverage gap was recorded as a decision on a
+    # false premise. Both die against the mixed-case fixture in the suite; the
+    # single-case fixtures beside it cannot see either.
+    (
+        "walk: stop sorting filenames",
+        "        filenames.sort()",
+        "        pass",
+    ),
+    (
+        "walk: stop sorting directories",
+        "dirnames[:] = sorted(d for d in dirnames if d not in PRUNE)",
+        "dirnames[:] = [d for d in dirnames if d not in PRUNE]",
     ),
     (
         "decode: let a non-utf8 file raise",
@@ -186,6 +230,14 @@ MUTANTS = [
         "decode: stop stripping the BOM",
         'lines = path.read_text(encoding="utf-8-sig").splitlines()',
         'lines = path.read_text(encoding="utf-8").splitlines()',
+    ),
+    (
+        # `splitlines` also breaks on \v, \f, \x1c, \x1d, \x1e, \x85, U+2028
+        # and U+2029, which is why the reported number is not always grep's.
+        # Nothing pinned that until round 21 and this mutant survived.
+        "decode: break lines on the newline alone",
+        'lines = path.read_text(encoding="utf-8-sig").splitlines()',
+        'lines = path.read_text(encoding="utf-8-sig").split("\\n")',
     ),
     (
         "walk: stop reading Python",
@@ -250,18 +302,22 @@ MUTANTS = [
         '".md",',
     ),
     # PRUNE, BROKEN IN BOTH DIRECTIONS AND ONE MEMBER AT A TIME. The
-    # three-at-once mutant above dies too easily: pruning only `docs` left the
-    # suite green, because markdown still reaches the scanner through CLAUDE.md
-    # and templates/, and that is exactly the regression round 16 found by
-    # hand. NO ENTRY HERE NAMES A DIRECTORY OF THE REAL TREE ANY MORE. Naming
-    # them one at a time is a losing game - round 20 pointed out that the list
-    # had no entry for templates/, which carries commentable mod script - so
-    # the widening is represented by one arbitrary name and the SET is what the
-    # suite pins.
+    # three-at-once mutant above dies too easily. Round 19 found that adding
+    # just `docs` left the suite green, because markdown still reaches the
+    # scanner through CLAUDE.md at the root and through the README of each mod,
+    # and that is exactly the regression round 16 found by hand.
+    #
+    # THE WIDENING MUTANT NAMES A DIRECTORY THAT DOES NOT EXIST, deliberately.
+    # What kills it is the suite pinning the SET, so the name is arbitrary, and
+    # a real one invites the reader to think the entry is about that tree.
+    # Round 20 wrote that claim as already true, five lines above an entry that
+    # named `docs` - the largest single contributor to the acceptance count -
+    # and argued for it from templates/ carrying commentable mod script, which
+    # holds no files at all.
     (
         "walk: prune one directory more",
         'PRUNE = {".git", "__pycache__"}',
-        'PRUNE = {".git", "__pycache__", "docs"}',
+        'PRUNE = {".git", "__pycache__", "nowhere"}',
     ),
     (
         "walk: stop pruning .git",

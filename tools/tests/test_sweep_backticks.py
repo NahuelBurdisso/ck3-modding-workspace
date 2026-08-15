@@ -117,17 +117,19 @@ class TestTheSignature(SweepTestCase):
 
 
 class TestDocumentedLimits(SweepTestCase):
-    """One test per bullet of sweep_backticks.py's KNOWN LIMITS block.
+    """The bullets of sweep_backticks.py's KNOWN LIMITS block, as limits.
 
     These assert the CURRENT behaviour so that changing it is a deliberate act
     with a failing test attached, not a silent widening nobody records.
 
-    An earlier version of this docstring said the block admitted to TWO misses.
-    It admitted to more than that, and the bullet the miscount dropped was the
-    unterminated fence - the only one of them whose failure mode is to report
-    nothing at all. A test class that undercounts the limits it covers is
-    hiding a defect behind the word "limit", which is the accusation the whole
-    of this file exists to answer.
+    NOT ONE TEST PER BULLET, AND NOT A COUNT OF EITHER. Two earlier drafts of
+    this docstring gave one: the first said the block admitted to TWO misses
+    and dropped the unterminated fence, the only limit whose failure mode is to
+    report nothing at all; the second said "one test per bullet" and went false
+    the same round, because the encoding bullet's pin has to run `main()` and
+    so lives in TestTheCommandLine. A class that counts the limits it covers
+    invites the reader to check the arithmetic instead of the coverage, and
+    gets the arithmetic wrong anyway.
     """
 
     def test_the_middle_of_a_span_broken_twice_is_not_reported(self) -> None:
@@ -166,6 +168,19 @@ class TestDocumentedLimits(SweepTestCase):
         # face it.
         self.write("a.md", "A span ending in a backslash: \x60x\\\x60 and done.\n")
         self.assertEqual(self.hits(), [("a.md", 1)])
+
+    def test_a_form_feed_is_a_line_break_here_and_not_to_grep(self) -> None:
+        # THE SPLITLINES BULLET. `str.splitlines` breaks on the form feed
+        # below and on \v, \x1c, \x1d, \x1e, \x85, U+2028 and U+2029; grep
+        # counts \n alone. So the number this sweep prints for such a file is
+        # one nobody can navigate to, which is the one thing the report is for.
+        # THE SILENT PARTNER is the same text with the form feed replaced by a
+        # space: without it this passes against a sweep that reports line 2 of
+        # everything. Round 20 recorded the absence of a mutant for
+        # `splitlines` nowhere at all, and `split("\n")` survived the suite.
+        self.write("feed.md", "before\x0cafter \x60 open\n")
+        self.write("plain.md", "before after \x60 open\n")
+        self.assertEqual(self.hits(), [("feed.md", 2), ("plain.md", 1)])
 
 
 class TestFences(SweepTestCase):
@@ -270,27 +285,39 @@ class TestEscapedBackticks(SweepTestCase):
         self.write("a.md", "A \\` escape and an open `BC: floor\nadmitted` here.\n")
         self.assertEqual(self.hits(), [("a.md", 1), ("a.md", 2)])
 
-    def test_every_escape_on_a_line_is_stripped_not_only_the_first(self) -> None:
-        # `sub` IS CALLED WITHOUT A COUNT, and until round 20 nothing said so.
-        # Both fixtures above carry exactly ONE escape, so a strip that stopped
-        # after the first was indistinguishable from the real one everywhere in
-        # this suite; the mutant survived every entry of the harness AND left
-        # the acceptance TOTAL unchanged, because it loses two lines of the
-        # docs tree and gains two others. Lines of the rivalry
-        # plan and the before-and-after plan carry two escapes each, so this is
-        # a live behaviour and not a hypothetical.
-        #
-        # Line 1 is balanced and carries two escapes: strip only the first and
-        # an odd count is left behind, which is noise. Line 2 is genuinely
-        # unbalanced and carries two escapes: strip only the first and the
-        # count turns EVEN, which is the miss. One fixture would have pinned
-        # only one of the two directions.
-        self.write(
-            "a.md",
-            "Two \\\x60 escapes \\\x60 and a `BC: x` span.\n"
-            "Two \\\x60 escapes \\\x60 and an open \x60BC: y span.\n",
+    # ONE STEP PER ESCAPE COUNT, AND THE BOUND IS ARBITRARY. A fixture
+    # carrying N escapes on a line catches a `sub(..., count=k)` for every k
+    # below N and is blind to every k at or above it, so NO FINITE FIXTURE
+    # PINS THE WORD "EVERY". What the test below pins is narrower and is worth
+    # stating as what it is: a truncation the ramp is wider than.
+    #
+    # Round 20 shipped a two-escape fixture under a name that claimed EVERY,
+    # and `count=2` then survived - worse than `count=1` had, because at two
+    # it is indistinguishable on the real trees as well: no line of either
+    # checkout carries more than two escapes, so the report is byte-identical
+    # and the acceptance total cannot see it either.
+    ESCAPE_RAMP = range(1, 9)
+
+    def test_a_truncated_strip_is_caught_below_the_ramps_width(self) -> None:
+        # TWO LINES PER STEP, because the truncation fails in both directions
+        # and one direction hides the other. The balanced line of a step
+        # carries no real backtick: leave any odd number of escapes behind and
+        # a clean line reports, which is noise. The unbalanced line carries
+        # one: leave any odd number behind and the count turns EVEN, which is
+        # the miss. `sub` IS CALLED WITHOUT A COUNT, and until round 20 nothing
+        # in this tree said so. Lines of the rivalry plan and of the
+        # before-and-after plan carry two escapes each, so the behaviour is
+        # live and not a hypothetical.
+        lines = []
+        for n in self.ESCAPE_RAMP:
+            escapes = "\\\x60" * n
+            lines.append(f"{escapes} balanced, {n} escapes.\n")
+            lines.append(f"{escapes} open \x60BC: n{n} span.\n")
+        self.write("a.md", "".join(lines))
+        self.assertEqual(
+            self.hits(),
+            [("a.md", 2 * step) for step in range(1, len(self.ESCAPE_RAMP) + 1)],
         )
-        self.assertEqual(self.hits(), [("a.md", 2)])
 
 
 class TestWalkCoverage(SweepTestCase):
@@ -306,12 +333,19 @@ class TestWalkCoverage(SweepTestCase):
         # THE SAME SHAPE AS THE EXTENSION LITERAL BELOW, and for the same
         # reason. Round 16's regression was a sweep that silently skipped a
         # whole tree, and round 19 found that adding just "docs" to PRUNE left
-        # the whole suite green - markdown still reached the scanner through
-        # CLAUDE.md and templates/, so "the sweep reads markdown" did not
-        # cover it. PINNING THE SET rather than any one directory catches
-        # every widening at once, including the ones nobody would think to
-        # name: templates/ carries commentable mod script, and a test written
-        # per directory would have missed it exactly as the first attempt did.
+        # the whole suite green even though docs/ is where most of the
+        # acceptance count lives - markdown still reached the scanner through
+        # CLAUDE.md at the root and through the README of each mod, so "the
+        # sweep reads markdown" did not cover it. PINNING THE SET rather than
+        # any one directory catches every widening at once, including the ones
+        # nobody would think to name.
+        #
+        # Round 20 argued for this shape from templates/ instead, saying that
+        # tree carries commentable mod script a per-directory test would have
+        # missed. IT CARRIES NO FILES AT ALL - one empty subdirectory,
+        # untracked - so the argument was invented and only the conclusion was
+        # right. It is written down because a true claim resting on a false
+        # reason is the defect this suite keeps finding in its own prose.
         self.assertEqual(S.PRUNE, {".git", "__pycache__"})
 
     def test_an_unpruned_directory_is_descended_into(self) -> None:
@@ -323,10 +357,16 @@ class TestWalkCoverage(SweepTestCase):
         # and gitignored checkout being present AND dirty, and made it go RED
         # the day someone unwraps the two citation lines in validate.py - a
         # test that fails when the tree is cleaned.
-        tops = ("docs", "mods", "templates", "tools")
+        #
+        # THE EXPECTATION IS SORTED, NOT TAKEN IN DECLARATION ORDER. It passed
+        # either way only because these names happen to be alphabetical, which
+        # is the same defect the extension test below records against itself:
+        # an expectation that follows the fixture list cannot see an unsorted
+        # walk.
+        tops = ("mods", "docs", "tools")
         for top in tops:
             self.write(f"{top}/a.md", ODD_LINE)
-        self.assertEqual(self.hits(), [(f"{top}/a.md", 1) for top in tops])
+        self.assertEqual(self.hits(), [(f"{top}/a.md", 1) for top in sorted(tops)])
 
     def test_an_unlisted_extension_is_skipped(self) -> None:
         self.write("a.json", ODD_LINE)
@@ -456,6 +496,34 @@ class TestWalkCoverage(SweepTestCase):
                 ("other/x.md", 1),
                 ("sub/aa.md", 1),
                 ("sub/zz.md", 1),
+            ],
+        )
+
+    def test_the_order_is_pythons_sort_and_not_the_filesystems(self) -> None:
+        # THE SORTS ARE ONLY OBSERVABLE ACROSS A CASE BOUNDARY, and every
+        # fixture above is single-case, so DELETING either sort outright
+        # survived them all. Round 20 wrote that absence down as a decision on
+        # the grounds that NTFS returns entries in name order anyway. It does
+        # not return them in PYTHON's name order: NTFS collates uppercased and
+        # case-insensitively, so on this volume os.walk offers
+        # ["a.md", "B.md"] where `sorted` gives ["B.md", "a.md"]. The premise
+        # was false and the coverage gap was real.
+        #
+        # BOTH SORTS IN ONE FIXTURE: the directory names straddle the case
+        # boundary and so do the file names, so removing either one reorders
+        # the report. The unsorted order is the interleaving NTFS hands back,
+        # which no assertion here spells out - it is enough that it differs.
+        self.write("Zsub/a.md", ODD_LINE)
+        self.write("asub/a.md", ODD_LINE)
+        self.write("d/B.md", ODD_LINE)
+        self.write("d/a.md", ODD_LINE)
+        self.assertEqual(
+            self.hits(),
+            [
+                ("Zsub/a.md", 1),
+                ("asub/a.md", 1),
+                ("d/B.md", 1),
+                ("d/a.md", 1),
             ],
         )
 
@@ -596,23 +664,39 @@ class TestTheCommandLine(SweepTestCase):
         # hazard. Since PEP 528 a Windows CONSOLE stdout is _WindowsConsoleIO
         # and is UTF-8, so typing the sweep at a prompt encodes anything. It is
         # a PIPE or a file redirect that falls back to the locale encoding,
-        # cp1252 on this box - and a pipe is how the acceptance baseline is
-        # taken, because the summary line is read with `| tail`. An earlier
+        # cp1252 on this box - and a pipe is how the count is taken, because
+        # only the summary line moves between rounds. THAT PRACTICE IS WRITTEN
+        # DOWN, under the section named `Checking the prose` in
+        # docs/reference/workflow.md; until round 21 it was asserted here and
+        # recorded nowhere, so the hazard had no reachable audience. An earlier
         # draft of this comment named the console, which is the one case where
         # the fault cannot fire.
         #
         # `print` on a character cp1252 cannot encode raises out of main()
-        # before the summary line, so the run looks TRUNCATED rather than
-        # failed, and the count the project quotes at itself simply is not
-        # printed.
+        # before the summary line, so the count the project quotes at itself
+        # simply is not printed. THE RUN DOES NOT LOOK LIKE A SUCCESS ANYWHERE
+        # ANYONE LOOKS: the traceback goes to stderr and the exit status is
+        # non-zero. What it looks like is a well-formed run inside the
+        # redirected file itself, whose only sign of trouble is the missing
+        # summary. An earlier draft of this comment said the run "looks
+        # TRUNCATED rather than failed", which reads as a silent failure and
+        # overstates it.
         #
         # WHAT KEEPS THE BASELINE WORKING is not that the trees are ASCII -
-        # they are not, and spans in the handoff and in README.md carry this
-        # very character. It is that the characters on the lines that actually
-        # REPORT are inside cp1252: most are U+2014, which cp1252 has at 0x97.
-        # That is a narrower and much more fragile invariant than "no non-ASCII
-        # in the tree", and stating the wrong one is how the first draft of
-        # this comment went wrong.
+        # they are not: docs/2026-08-15-battle-chronicles-handoff.md and
+        # mods/battle_chronicles/README.md (mod repo) both carry this very
+        # character, among many others. It is that the characters on the lines
+        # that actually REPORT are inside cp1252. EVERY ONE OF THEM IS U+2014
+        # as this is written, which cp1252 has at 0x97 - not "most", which an
+        # earlier draft said without counting. That is a narrower and much more
+        # fragile invariant than "no non-ASCII in the tree", and stating the
+        # wrong one is how the first draft of this comment went wrong.
+        #
+        # AND THE 110-COLUMN CUT IS PART OF IT, which is a coupling and not a
+        # defence: a character the stream cannot encode sitting past that
+        # column never reaches `print`, so whether a given file raises depends
+        # on where in its line the character falls. The fixture below puts it
+        # well inside the cut on purpose.
         #
         # U+2192 AND NOT AN EM DASH: cp1252 HAS the em dash, so a fixture built
         # on one raises nothing and this test asserts an exception that never

@@ -40,6 +40,36 @@ read a `debug.log` that has grown to tens of megabytes. A restart costs about
 seven minutes, so design each run to answer every open question at once —
 `playbook.md` covers how.
 
+## Checking the prose
+
+    python tools/sweep_backticks.py . | tail -1
+
+Prints every line of the tree whose backtick count is odd, then a total. An odd
+count is the signature of a grep target — a paragraph name, a marker, a filename
+— broken across a line wrap, which makes it unfindable by the search it was
+written for. It is not a `validate` check and must not be gated on: the tree
+carries legitimate multi-line quotations of script, loc and command lines, which
+wrap on purpose. Read the lines and judge each one.
+
+`| tail -1` is how the number is taken, because the body is long and only the
+total moves between rounds. Two hazards ride along with the pipe, both written
+up in `tools/sweep_backticks.py`: on Windows a redirected stdout falls back to
+cp1252, so a hit line carrying a character outside it kills the run before the
+total prints; and an unterminated fence silences the rest of its own file.
+
+    python tools/tests/test_sweep_backticks.py
+    python tools/tests/test_citations.py
+
+Both are stdlib unittest, no pytest, and take about a second each.
+
+    python tools/tests/mutate_sweep_backticks.py
+
+Not part of that set. It edits `tools/sweep_backticks.py` in place, one line at
+a time, and records which tests go red for each break — a surviving mutant names
+a test that cannot fail. Run it deliberately, never in a batch, and never
+alongside anything else that imports the sweep: while it runs, the file on disk
+is the broken one.
+
 ## Research before writing
 
 Never guess at a key. Ask the index:

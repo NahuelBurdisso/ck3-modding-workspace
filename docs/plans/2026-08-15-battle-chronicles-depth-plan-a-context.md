@@ -2071,6 +2071,25 @@ EOF
 
 **Twenty-three permanent markers.** The spec's §4 table lists the eighteen that instrument classification; this plan adds five more that instrument what is done with it — `BC: award piety`, `BC: award prestige`, `BC: award nemesis`, `BC: eve option ground`, `BC: eve option nemesis`. If the spec's table is ever reconciled against reality, it is the table that is out of date, not the code.
 
+**BUILD CORRECTION (2026-08-15, after implementation).** The table below gives
+"moments" as the denominator for the ground, bond and creed markers. **That is
+wrong, and the source comments have been corrected; this table has not been
+rewritten so the error stays visible.** Those markers are written once per
+**phase-event fire**, by `bc_battle_open_effect`. A moment is recorded once per
+**seam call**, by `bc_record_moment_effect`. The two differ in *both* directions:
+
+- a phase event that raises a pop-up writes a band and records **no** moment;
+- the pop-up option, answered later, records a moment and writes **no** band.
+
+Eight of the eighteen seam call sites are pop-up options, so the offset is not
+small. **The correct denominator is the sum of the ten `BC: fired bc_*`
+markers.** Read every "moments" in the rows below as "the ten fired". The
+`BC: creed` row becomes "the ten fired minus `bond nofoe`". The eve and award
+rows are unaffected — their denominators were already right.
+
+See `common/scripted_effects/bc_context_effects.txt:39-49` and `:124-133` for
+the corrected statement in the source.
+
 **Four different denominators — do not compare counts across the groups.**
 
 | marker | denominator | what a zero means |

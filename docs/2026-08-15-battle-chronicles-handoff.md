@@ -12,6 +12,55 @@ already been built twice because a premise was assumed instead of measured.
 
 ---
 
+## 0. UPDATE — Plan A is built, and the next thing is a run
+
+Appended later the same day. **Everything below this section was written before
+Plan A existed**; §1's "where the depth obviously goes" and §3's lists are the
+inputs Plan A consumed, not open work. Read this section first, then §2 (still
+entirely current), then the rest for background.
+
+**What shipped.** Design `docs/specs/2026-08-15-battle-chronicles-depth-design.md`,
+plan `docs/plans/2026-08-15-battle-chronicles-depth-plan-a-context.md`, eleven
+tasks, all committed in `mods/battle_chronicles` (`40f012c`..`27314a4`) plus two
+in `D:/ck3` (`2aff26e`, `b5746ce`). A battle now knows:
+
+| written | where | spent on |
+|---|---|---|
+| `bc_battle_ground` — one of six bands | commander scratch | one prose fragment, the eve's third paragraph, the eve's ground option |
+| `bc_battle_foe` / `bc_battle_bond` — five bond values | commander scratch | the eve's second paragraph; only `flag:nemesis` is read back so far |
+| `bc_battle_creed` — heathen / same | commander scratch | the aftermath award's currency |
+
+Plus `bc_ground_held` (family 2, in `bc_cleanup_effect`), two contextual eve
+options, and a piety-or-prestige payout on a notable win that doubles against a
+nemesis.
+
+**State: `validate --strict` at the 0-errors / 2-warnings baseline; both repos
+clean; no remotes, so nothing to push.** Seven review passes; the last found no
+code defect. The six ground bands are machine-verified to partition all 23 AGOT
+terrain helpers exactly once, by `validate` itself, on every run.
+
+**The next session's job is a game run, not more code.** Nothing statically
+verifiable is left. `README.md`'s "Not yet verified in game" section is the
+sweep list; the plan's "The markers this plan adds" section is the marker table
+— **read its BUILD CORRECTION block first, the original denominators are wrong.**
+
+Three specific things the run settles:
+
+- **The spike.** Does the Banner Falls toast end with a clause naming the ground?
+  The mechanism is no longer in question — vanilla's `court_poet_poetry_desc`
+  ships the identical shape — so a blank clause means the anchor or the variable.
+  **Plan B (the other ninety-nine fragments) is gated on this one clause.**
+- **The eve's five paragraphs and five options**, which no static check reaches.
+- **The award markers**, whose denominator is notable wins with a living,
+  resolvable side commander — *not* `BC: win notable`.
+
+**One thing not to chase.** Comments used to assert that a saved scope leaks
+across battles. That is **unverified** and probably false; it is not in the
+script_docs dump. Every scope read is `exists`-guarded, so it does not affect
+correctness either way. `bc_eve_effects.txt` carries the note.
+
+---
+
 ## 0. Where things live
 
 - **Mod:** `D:/ck3/mods/battle_chronicles` — *its own git repo*. `git status` run

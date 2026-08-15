@@ -13,35 +13,54 @@ output and judge each line; do not gate on the count.
 
 KNOWN LIMITS. The three-line span and the two-spans-on-one-line pair are also
 written down in that same paragraph. NO ORDINAL AND NO COUNT IS USED TO REFER TO
-ANY OF THEM, here or anywhere else: this list is rewritten most rounds, and
-citing a position in it is the defect the paragraph below records against 8a71ce1
-and 94c4c31.
+ANY OF THEM, here or anywhere else, because a position in this list goes false
+without anyone touching the sentence that cites it. 8a71ce1 opened this block
+with "The first two are also written down in that same paragraph"; 1af8901
+replaced that clause with the two subjects it meant and recorded the swap
+nowhere, which is written here instead. For the ordinal that actually drifted see
+the paragraph named `WHAT IS NOT A LIMIT: A MISMATCHED FENCE PAIR`. An earlier
+draft of this sentence cited that paragraph as charging 8a71ce1 with a positional
+citation, which it does not: what it charges 8a71ce1 with is a false limit and a
+commit message that misdescribes it.
 
   - a span wrapped across three or more lines leaves the middle lines with no
     backtick at all, so it is caught at its two ends and not in its middle;
   - two independent unbalanced spans on one line sum to even and hide each
     other;
-  - AN UNTERMINATED FENCE SWALLOWS THE REST OF ITS FILE, and it is the ONLY
-    limit here whose failure mode is silence: the sweep does not report less
-    confidently below an unclosed opener, it reports nothing at all. Every
-    other limit either reports too much or dies loudly. The state machine is one
-    boolean with no stack, so it cannot tell an unclosed fence from a very long
-    one. Pinned by `test_an_unterminated_fence_swallows_the_rest` in
+  - AN UNTERMINATED FENCE SWALLOWS THE REST OF ITS FILE: the sweep does not
+    report less confidently below an unclosed opener, it reports nothing at
+    all. WHAT IS UNIQUE ABOUT IT IS THE BLAST RADIUS, NOT THE SILENCE. An
+    earlier draft called it the only limit here whose failure mode is silence,
+    which the two-spans-on-one-line bullet disproves: that one is a silent miss
+    too, and its own test asserts the silence. The difference is that a hidden
+    pair costs the line it sits on and an unclosed opener costs every line below
+    it. The state machine is one boolean with no stack, so it cannot tell an
+    unclosed fence from a very long one. Pinned by
+    `test_an_unterminated_fence_swallows_the_rest` in
     tools/tests/test_sweep_backticks.py;
   - a backslash immediately before a real backtick is read as an escape and
     stripped, which flips a balanced line to odd. That is a false positive, the
-    harmless direction. Lines of the docs tree DO do it - in the rivalry plan
-    and in the before-and-after plan, quoting comments that themselves contain
-    backticks - and none of them flips: the ones that report are odd before the
-    strip as well. An earlier draft of this bullet said no line in the tree did
-    it, which one grep disproves. `sub` IS CALLED WITHOUT A COUNT, so every
-    escape on a line is stripped and not some prefix of them. BE PRECISE ABOUT
-    WHAT IS PINNED, because the word "every" is not: a fixture carrying N
-    escapes on a line catches a truncation at any count below N and is blind to
-    every count at or above it, and no finite fixture closes that. What the test
-    holds is a ramp of escape counts, and a truncation is caught only where the
-    ramp is wider than it. Pinned by
-    `test_a_truncated_strip_is_caught_below_the_ramps_width`;
+    harmless direction, and it is pinned by
+    `test_a_backslash_before_a_backtick_is_read_as_an_escape`.
+    WHERE THE ESCAPES ACTUALLY SIT has taken two drafts to get right. The docs
+    tree carries them - in the rivalry plan and in the before-and-after plan,
+    quoting comments that themselves contain backticks - and none of THOSE
+    flips, because they come two to a line and an even strip changes no parity.
+    An earlier draft said no line in the tree did it at all, which one grep
+    disproves; the draft after it said none of them flips full stop, which is
+    also wrong. The only lines in either checkout where the strip does flip one
+    are two fixtures of the suite that pins this bullet, at one escape each, and
+    `test_the_sweep_does_not_report_its_own_source` leans on the flip.
+    `sub` IS CALLED WITHOUT A COUNT, so every escape on a line is stripped and
+    not some prefix of them. BE PRECISE ABOUT WHAT PINS THAT: a fixture of N
+    escapes catches a truncation at count k ONLY WHEN N-k IS ODD, because at an
+    even difference the leftover escapes cancel in pairs and the report comes
+    out byte-identical. One width is therefore blind to half the counts below it
+    as well as to every count at or above it, and no finite fixture closes the
+    second half. The claim that a fixture of N catches any count below N was
+    generalised from N=2, one of only two widths where it happens to hold. What
+    closes the odd half is the RAMP, whose consecutive steps alternate parity.
+    Pinned by `test_a_truncated_strip_is_caught_below_the_ramps_width`;
   - THE REPORT DIES ON A CHARACTER THE OUTPUT STREAM CANNOT ENCODE, and takes
     the summary line with it. On Windows a redirected stdout - a pipe or a
     file, which is how the acceptance count is read - falls back to cp1252,
@@ -60,11 +79,16 @@ and 94c4c31.
     all, so the same file raises or does not depending on where in its line the
     character falls. Pinned by
     `test_a_non_ascii_quotation_is_lost_to_a_redirected_stdout`;
-  - `splitlines` BREAKS ON MORE THAN A NEWLINE, so a reported line number is
-    not always the one grep would give. It breaks on \\v, \\f, \\x1c, \\x1d,
-    \\x1e, \\x85, U+2028 and U+2029 as well; grep counts \\n alone. A file
-    carrying any of them reports a number nobody can navigate to, which is the
-    one thing the report exists to give. No line of either tree carries one,
+  - THE REPORTED LINE NUMBER IS NOT ALWAYS GREP'S, and TWO SEPARATE MECHANISMS
+    make it so. `read_text` opens in universal-newline mode, so a lone \\r is
+    already a break before anything else runs; and `splitlines` then breaks on
+    \\v, \\f, \\x1c, \\x1d, \\x1e, \\x85, U+2028 and U+2029 as well as on \\n.
+    grep counts \\n alone, so a file carrying any of them reports a number
+    nobody can navigate to, which is the one thing the report exists to give.
+    An earlier draft named `splitlines` alone and left \\r off the list. \\r IS
+    a splitlines boundary; it is simply consumed a layer earlier and never
+    reaches it, which is a distinction worth the sentence rather than the
+    omission. No line of either tree carries any of them, lone \\r included,
     which is why this is recorded rather than fixed. Pinned by
     `test_a_form_feed_is_a_line_break_here_and_not_to_grep`.
 

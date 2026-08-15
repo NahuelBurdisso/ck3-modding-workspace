@@ -178,6 +178,15 @@ class TestDocumentedLimits(SweepTestCase):
         # space: without it this passes against a sweep that reports line 2 of
         # everything. Round 20 recorded the absence of a mutant for
         # `splitlines` nowhere at all, and `split("\n")` survived the suite.
+        #
+        # A LONE \r IS THE SAME HAZARD BY A DIFFERENT MECHANISM and is not
+        # covered here. `splitlines` does break on it, but it never gets the
+        # chance: `read_text` opens in universal-newline mode and has already
+        # turned it into one. The divergence is identical - the file holds one
+        # \n and the sweep reports line 2 - and swapping this fixture's \f for
+        # a \r would leave the `split("\n")` mutant alive, since that mutant
+        # splits on the translated text. Two fixtures would be needed to pin
+        # both mechanisms; this one pins the mechanism the mutant reaches.
         self.write("feed.md", "before\x0cafter \x60 open\n")
         self.write("plain.md", "before after \x60 open\n")
         self.assertEqual(self.hits(), [("feed.md", 2), ("plain.md", 1)])
@@ -285,11 +294,19 @@ class TestEscapedBackticks(SweepTestCase):
         self.write("a.md", "A \\` escape and an open `BC: floor\nadmitted` here.\n")
         self.assertEqual(self.hits(), [("a.md", 1), ("a.md", 2)])
 
-    # ONE STEP PER ESCAPE COUNT, AND THE BOUND IS ARBITRARY. A fixture
-    # carrying N escapes on a line catches a `sub(..., count=k)` for every k
-    # below N and is blind to every k at or above it, so NO FINITE FIXTURE
-    # PINS THE WORD "EVERY". What the test below pins is narrower and is worth
-    # stating as what it is: a truncation the ramp is wider than.
+    # ONE STEP PER ESCAPE COUNT, AND THE BOUND IS ARBITRARY. A step of N
+    # escapes catches a `sub(..., count=k)` ONLY WHEN N-k IS ODD: at an even
+    # difference the escapes left behind cancel in pairs and the report is
+    # byte-identical to the correct one. So a single width is blind to HALF the
+    # counts below it, on top of being blind to every count at or above it, and
+    # no finite fixture closes the second half. What closes the first is the
+    # ramp itself - consecutive steps alternate parity, so k dies at step k+1.
+    #
+    # ROUND 21 GOT THAT RULE WRONG while fixing the fixture. It wrote that a
+    # width of N catches any count below N, which is true at N=1 and N=2 and
+    # false at every larger width; it was generalised from the one case that
+    # had just been found broken. The ramp shipped is correct - 1 through 7 all
+    # die - and the reasoning beside it was not.
     #
     # Round 20 shipped a two-escape fixture under a name that claimed EVERY,
     # and `count=2` then survived - worse than `count=1` had, because at two
@@ -319,6 +336,25 @@ class TestEscapedBackticks(SweepTestCase):
             [("a.md", 2 * step) for step in range(1, len(self.ESCAPE_RAMP) + 1)],
         )
 
+    def test_the_harness_truncations_all_sit_under_the_ramp(self) -> None:
+        # THE COUPLING RUNS ACROSS TWO FILES AND NOTHING ELSE HOLDS IT. The
+        # harness states that 7 is the largest count the ramp still beats and
+        # that adding an 8 would put a permanent survivor in its list. Both are
+        # functions of ESCAPE_RAMP, which lives here, so narrowing the ramp
+        # turns a listed mutant into a survivor and widening it turns that
+        # sentence quietly false. The harness would report the first, but only
+        # when someone runs it, and it is deliberately not in the acceptance
+        # set. A count is killed exactly when some step of the ramp is wider
+        # than it by an ODD amount, which for a contiguous ramp means any count
+        # below its width.
+        harness = Path(__file__).with_name("mutate_sweep_backticks.py")
+        counts = [
+            int(n)
+            for n in re.findall(r"count=(\d+)", harness.read_text(encoding="utf-8"))
+        ]
+        self.assertTrue(counts, "the harness lists no truncated-strip mutant")
+        self.assertLess(max(counts), len(self.ESCAPE_RAMP))
+
 
 class TestWalkCoverage(SweepTestCase):
     """What the walk offers the scanner, and what it must not offer it."""
@@ -334,9 +370,13 @@ class TestWalkCoverage(SweepTestCase):
         # reason. Round 16's regression was a sweep that silently skipped a
         # whole tree, and round 19 found that adding just "docs" to PRUNE left
         # the whole suite green even though docs/ is where most of the
-        # acceptance count lives - markdown still reached the scanner through
-        # CLAUDE.md at the root and through the README of each mod, so "the
-        # sweep reads markdown" did not cover it. PINNING THE SET rather than
+        # acceptance count lives - markdown still reached the scanner from
+        # outside that tree entirely: every mod README, every file under
+        # .claude/, and CLAUDE.md at the root. So "the sweep reads markdown"
+        # did not cover it. 1af8901 wrote that clause naming CLAUDE.md and the
+        # mod READMEs alone, which reads as the whole of it and is not. NO
+        # COUNT OF THOSE FILES IS GIVEN: it is a number in a comment beside a
+        # tree that grows. PINNING THE SET rather than
         # any one directory catches every widening at once, including the ones
         # nobody would think to name.
         #
@@ -502,21 +542,52 @@ class TestWalkCoverage(SweepTestCase):
     def test_the_order_is_pythons_sort_and_not_the_filesystems(self) -> None:
         # THE SORTS ARE ONLY OBSERVABLE ACROSS A CASE BOUNDARY, and every
         # fixture above is single-case, so DELETING either sort outright
-        # survived them all. Round 20 wrote that absence down as a decision on
-        # the grounds that NTFS returns entries in name order anyway. It does
-        # not return them in PYTHON's name order: NTFS collates uppercased and
-        # case-insensitively, so on this volume os.walk offers
-        # ["a.md", "B.md"] where `sorted` gives ["B.md", "a.md"]. The premise
-        # was false and the coverage gap was real.
+        # survived them all. Round 20 wrote ONE of the two absences down as a
+        # decision - `filenames.sort()`, on the grounds that NTFS returns
+        # entries in name order anyway. THE dirnames SORT WAS NEVER RECORDED AT
+        # ALL; it was simply missing, and round 21 called both of them recorded
+        # in three files and two commit messages, which is the same
+        # misdescription-of-a-past-commit it was written to correct.
+        #
+        # The premise was false either way. NTFS collates uppercased and
+        # case-insensitively, so it offers ["a.md", "B.md"] where `sorted`
+        # gives ["B.md", "a.md"]. THE VOLUME THAT MATTERS IS THE TEMP ONE, not
+        # the one the repo sits on: these fixtures are built under
+        # `tempfile.mkdtemp`, which follows TMP and lands on C: here while the
+        # checkout is on D:.
         #
         # BOTH SORTS IN ONE FIXTURE: the directory names straddle the case
         # boundary and so do the file names, so removing either one reorders
-        # the report. The unsorted order is the interleaving NTFS hands back,
-        # which no assertion here spells out - it is enough that it differs.
+        # the report.
         self.write("Zsub/a.md", ODD_LINE)
         self.write("asub/a.md", ODD_LINE)
         self.write("d/B.md", ODD_LINE)
         self.write("d/a.md", ODD_LINE)
+
+        # THE PREMISE IS ASSERTED, NOT ASSUMED. On a filesystem that already
+        # hands entries back in Python's order this test is vacuous: it stays
+        # green while both deletion mutants survive, and the harness then
+        # prints "every mutant killed" on a false basis. Loud is better than
+        # silently unpinned, so it fails there rather than skipping.
+        walked = {
+            Path(dp).name: (dirs, files)
+            for dp, dirs, files in S.os.walk(self.root)
+        }
+        offered_dirs = walked[self.root.name][0]
+        offered_files = walked["d"][1]
+        self.assertNotEqual(
+            offered_dirs,
+            sorted(offered_dirs),
+            "os.walk already offers directories in Python's order here, so "
+            "the dirnames sort is unpinned by this fixture",
+        )
+        self.assertNotEqual(
+            offered_files,
+            sorted(offered_files),
+            "os.walk already offers files in Python's order here, so "
+            "filenames.sort() is unpinned by this fixture",
+        )
+
         self.assertEqual(
             self.hits(),
             [

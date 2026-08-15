@@ -44,18 +44,26 @@ seven minutes, so design each run to answer every open question at once —
 
     python tools/sweep_backticks.py . | tail -1
 
-Prints every line of the tree whose backtick count is odd, then a total. An odd
-count is the signature of a grep target — a paragraph name, a marker, a filename
-— broken across a line wrap, which makes it unfindable by the search it was
-written for. It is not a `validate` check and must not be gated on: the tree
-carries legitimate multi-line quotations of script, loc and command lines, which
-wrap on purpose. Read the lines and judge each one.
+The tool prints every line of the tree whose backtick count is odd and then a
+total; `| tail -1` throws the body away and keeps the total, which is the only
+part that moves between rounds. An odd count is the signature of a grep target —
+a paragraph name, a marker, a filename — broken across a line wrap, which makes
+it unfindable by the search it was written for. It is not a `validate` check and
+must not be gated on: the tree carries legitimate multi-line quotations of
+script, loc and command lines, which wrap on purpose. Drop the pipe and read the
+lines whenever the total moves; judge each one.
 
-`| tail -1` is how the number is taken, because the body is long and only the
-total moves between rounds. Two hazards ride along with the pipe, both written
-up in `tools/sweep_backticks.py`: on Windows a redirected stdout falls back to
-cp1252, so a hit line carrying a character outside it kills the run before the
-total prints; and an unterminated fence silences the rest of its own file.
+The pipe itself causes one hazard, and it is the reason for the warning here
+rather than only in the tool: on Windows a redirected stdout falls back to
+cp1252, so a hit line carrying a character outside it raises before the total is
+printed, and the total is the whole of what `tail -1` was asked for. A console
+stdout is UTF-8 and does not do this.
+
+A second hazard is merely hidden by the pipe rather than caused by it: an
+unterminated fence silences the rest of its own file, and it does that whether
+or not the output is redirected. `tail -1` is what makes it invisible, because
+the missing lines were never going to be read. Both are written up at length in
+`tools/sweep_backticks.py`.
 
     python tools/tests/test_sweep_backticks.py
     python tools/tests/test_citations.py

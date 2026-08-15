@@ -11,9 +11,11 @@ the same move one level up.
 WHAT IT PROVES. Rounds 15 and 16 both found tests in test_citations.py that
 passed against a build with the checked behaviour deleted. A test that cannot
 fail is not a test, and reading one does not tell you which kind it is. Each
-entry below breaks one line of sweep_backticks.py and the run records which
-tests go red. A SURVIVING MUTANT NAMES A VACUOUS TEST, or a behaviour nothing
-pins at all.
+entry below anchors on ONE line of sweep_backticks.py and the run records which
+tests go red. AN ENTRY IS ONE ANCHOR AND NOT ONE LINE OF OUTPUT: the entry named
+`report: at most one line per file` puts a second line back in place of the one
+it matched, and the anchor is what has to be unique, not the replacement. A
+SURVIVING MUTANT NAMES A VACUOUS TEST, or a behaviour nothing pins at all.
 
 WHAT IT DOES NOT PROVE, and what its first version was read as proving: that
 every test pins the behaviour ITS NAME CLAIMS. "Every test is killed by at
@@ -51,12 +53,24 @@ fixture ever closes that. Adding either would put a permanent survivor in this
 list and train the reader to skim the result, which is the failure the whole
 file is arranged against.
 
-WHAT WAS ABSENT ON A FALSE PREMISE, and is now present: deleting either sort in
-the walk. That was recorded as a decision on the grounds that NTFS returns
-entries in name order anyway. NTFS collates uppercased and case-insensitively,
-which is not Python's order, so both were observable all along and neither was
-observed. A premise nobody checked is how a coverage gap gets written down as a
-choice.
+WHAT WAS ABSENT ON A FALSE PREMISE, and is now present: deleting `filenames.sort()`.
+That one was recorded as a decision, on the grounds that NTFS returns entries in
+name order anyway. NTFS collates uppercased and case-insensitively, which is not
+Python's order, so it was observable all along and was not observed. A premise
+nobody checked is how a coverage gap gets written down as a choice.
+
+THE dirnames SORT WAS A DIFFERENT AND PLAINER GAP: nothing recorded it, it was
+simply missing, and both are present now. 1af8901 described the two as one thing
+- "deleting either sort ... was recorded as a decision" - in this file, in the
+suite and in two commit messages, which is a misdescription of a past commit
+inside the commit that exists to correct one.
+
+THE SAME COMMIT MISCOUNTED THIS LIST. 1af8901's message says "44 entries"; the
+list it shipped holds 43. NO CORRECTED NUMBER IS WRITTEN HERE, and that is the
+point rather than an evasion: a number in prose beside a list that grows is
+wrong at the next commit, and this file already refuses to count its own
+deliberate absences for that reason. `len(MUTANTS)` is the only place the answer
+should be read from, and the run prints it.
 
 Run it with `python tools/tests/mutate_sweep_backticks.py`. Exit 0 means every
 mutant was killed.
@@ -158,13 +172,13 @@ MUTANTS = [
         "        filenames.sort()",
         "        filenames.reverse()",
     ),
-    # THE TWO SORTS DELETED OUTRIGHT, which round 20 wrote down as deliberately
-    # absent on the grounds that NTFS hands entries back in name order anyway.
-    # It does not hand them back in PYTHON's name order: it collates uppercased
-    # and case-insensitively, so os.walk offers ["a.md", "B.md"] where `sorted`
-    # gives ["B.md", "a.md"]. A coverage gap was recorded as a decision on a
-    # false premise. Both die against the mixed-case fixture in the suite; the
-    # single-case fixtures beside it cannot see either.
+    # THE TWO SORTS DELETED OUTRIGHT. Round 20 wrote the filenames one down as
+    # deliberately absent on the grounds that NTFS hands entries back in name
+    # order anyway; it never mentioned the dirnames one at all. NTFS does not
+    # hand them back in PYTHON's name order: it collates uppercased and
+    # case-insensitively, so os.walk offers ["a.md", "B.md"] where `sorted`
+    # gives ["B.md", "a.md"]. Both die against the mixed-case fixture in the
+    # suite; the single-case fixtures beside it cannot see either.
     (
         "walk: stop sorting filenames",
         "        filenames.sort()",
@@ -303,17 +317,23 @@ MUTANTS = [
     ),
     # PRUNE, BROKEN IN BOTH DIRECTIONS AND ONE MEMBER AT A TIME. The
     # three-at-once mutant above dies too easily. Round 19 found that adding
-    # just `docs` left the suite green, because markdown still reaches the
-    # scanner through CLAUDE.md at the root and through the README of each mod,
-    # and that is exactly the regression round 16 found by hand.
+    # just `docs` left the suite green, and that is exactly the regression
+    # round 16 found by hand. WHY IT LEFT THE SUITE GREEN IS BEST STATED AS A
+    # RULE, not as a list: docs/ is not pruned in the fixtures the suite
+    # builds, and it is not the only markdown in the shipping tree either -
+    # every mod README, every file under .claude/, and CLAUDE.md at the root
+    # are all outside docs/ and all swept. NO COUNT OF THEM IS GIVEN, for the
+    # reason this file gives for its absent mutants. 1af8901 named a subset and
+    # read as exhaustive, which is the same partial-survey shape as the
+    # templates/ claim it replaced.
     #
     # THE WIDENING MUTANT NAMES A DIRECTORY THAT DOES NOT EXIST, deliberately.
     # What kills it is the suite pinning the SET, so the name is arbitrary, and
     # a real one invites the reader to think the entry is about that tree.
-    # Round 20 wrote that claim as already true, five lines above an entry that
-    # named `docs` - the largest single contributor to the acceptance count -
-    # and argued for it from templates/ carrying commentable mod script, which
-    # holds no files at all.
+    # Round 20 wrote that claim as already true while an entry named `docs` -
+    # the largest single contributor to the acceptance count - and argued for
+    # it from templates/ carrying commentable mod script, which holds no files
+    # at all.
     (
         "walk: prune one directory more",
         'PRUNE = {".git", "__pycache__"}',
@@ -366,7 +386,10 @@ def main() -> int:
     if not passed:
         print("BASELINE IS RED - fix that before mutating:", sorted(red))
         return 1
-    print("baseline: green\n")
+    # The count is PRINTED AND NOT WRITTEN DOWN. A number in a docstring beside a
+    # list that grows goes wrong at the next commit - 1af8901's message said 44
+    # over a list of 43 - so this is the only place it is stated.
+    print(f"baseline: green - {len(MUTANTS)} mutants\n")
 
     survivors = []
     for name, old, new in MUTANTS:

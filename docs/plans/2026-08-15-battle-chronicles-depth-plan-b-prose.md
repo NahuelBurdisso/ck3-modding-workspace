@@ -169,6 +169,10 @@ Six keys and one definition. It is the smallest of the four classes and it exerc
 **Files:**
 - Modify: `mods/battle_chronicles/common/customizable_localization/bc_flavour.txt`
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
+- Modify: `mods/battle_chronicles/common/scripted_effects/bc_context_effects.txt` — reciprocal note only
+- Modify: `mods/battle_chronicles/events/bc_eve_events.txt` — reciprocal note only
+
+The last two are not optional and were added to this list after the fact. This clause is the **third** carrier of the five bond values, and the mod's convention is that every carrier points at the other two — otherwise a later session reads one of them, finds the orders disagree, and "fixes" the disagreement that is the whole intent. The other two carriers are `bc_write_bond_effect` in `bc_context_effects.txt` and the eve's desc chain in `bc_eve_events.txt`. Both get a paragraph naming this clause; neither gets a script change.
 
 - [ ] **Step 1: Append the definition**
 
@@ -261,11 +265,11 @@ In `bc_l_english.yml`, after the last moment toast desc (`bc_shieldbrother_forge
 
 # --- shared fragments: the bond ---------------------------------------------
 
- bc_frag_bond_nemesis:0 " The man commanding here knew whose colours those were across the field before either host moved."
+ bc_frag_bond_nemesis:0 " The man commanding here does not have to ask whose colours are across the field."
  bc_frag_bond_kin:0 " The man commanding here shares blood with whoever is giving the orders across the field."
- bc_frag_bond_countryman:0 " The men on both sides curse in the same words."
+ bc_frag_bond_countryman:0 " The man commanding here learned the same songs as the men he is killing."
  bc_frag_bond_heathen:0 " Whatever the other side was praying to at dawn, the man commanding here was not."
- bc_frag_bond_stranger:0 " Nobody across the field is anybody to the man commanding here."
+ bc_frag_bond_stranger:0 " The man commanding here has never had cause to learn a name on the other side."
  bc_frag_bond_any:0 ""
 ```
 
@@ -277,7 +281,17 @@ Note the leading space inside each non-empty string, and that `bc_frag_bond_any`
 
 **No fragment may date itself to the start of the battle.** Phase events roll every five days, so these clauses append to toasts arriving on day 20 of a long fight. "at dawn" survives that; "all morning" presumes the battle began this morning.
 
-**A third rule, added in the third review pass.** **No fragment may collide with the sentence it appends to, or with the eve.** A bond clause is appended to a moment toast and read in the same breath as it, and the same battle already showed the player the eve. Two collisions were caught this way: `nemesis` said "banner", which lands directly on `bc_banner_falls_toast_desc`'s falling standard and reads as if the nemesis's banner is the one going down — now "colours"; and `countryman` said "shouting in the same tongue", which is how the eve's `bc_chronicles.0011.desc_countryman` ends — now "curse in the same words". Check a new fragment against the ten toast descs **and** against `bc_chronicles.0011.desc_*` before shipping it.
+**A third rule, added in the third review pass and tightened in the fourth.** **No fragment may collide with the sentence it appends to, or with the eve.** A bond clause is appended to a moment toast and read in the same breath as it, and the same battle already showed the player the eve. Four collisions were caught this way:
+
+- `nemesis` said "banner", which lands on `bc_banner_falls_toast_desc`'s falling standard and reads as if the nemesis's banner is the one going down. Round 3 swapped "banner"→"colours" and kept the demonstrative — `"knew whose colours **those** were"` — which does not fix it, because a bare demonstrative with no antecedent inside the fragment still reaches back to the standard. Round 4 removed the demonstrative outright.
+- `countryman` said "shouting in the same tongue", which is how the eve's `bc_chronicles.0011.desc_countryman` ends. Round 3's replacement, "The men on both sides curse in the same words", kept the skeleton *men … both sides … in the same ⟨X⟩*. Round 4 rewrote it off that skeleton entirely.
+- `stranger` said "Nobody across the field is anybody to the man commanding here", against the eve's `desc_stranger` ending "Nobody over there is anybody [ROOT.Char.GetFirstName] knows" — the same sentence with two substitutions. It survived three rounds because nobody ran the check against it.
+
+**Run the check against every fragment in the set, not only the ones a reviewer names.** Compare each against the ten `*_toast_desc` keys **and** against every `bc_chronicles.0011.desc_*` key. A synonym swap is not a fix; the skeleton is what collides.
+
+**And check ACROSS clause classes, because task 4 makes them share a sentence.** Once wired, a single toast renders the literal, then the ground clause, then the bond clause, one after another. So a bond fragment collides with a *ground* fragment too. One was caught this way: `countryman` as "was **raised** on the same songs" lands immediately after `bc_frag_banner_falls_jungle`'s "as though it had never been **raised**" whenever a banner falls in a jungle — two senses of one word in adjacent sentences. Now "learned the same songs". The check is the whole `bc_frag_*` set, not one class of it.
+
+**A fourth rule, from the same pass.** **No fragment may assume the foe has been the foe since the battle opened.** `bc_battle_open_effect` re-captures the enemy commander at every phase event on purpose, to track a mid-battle replacement on the other side (`bc_ledger_effects.txt:42-44`). So "before either host moved" is false whenever the nemesis took command on day 20. This is the battle-start rule above applied to the foe rather than to the clock, and it is the reason the shipped `nemesis` string is timeless rather than past.
 
 **"The man commanding here", not "he", and this is not a style choice.** The bond is
 computed commander-against-commander in `bc_write_bond_effect`; it is a fact about

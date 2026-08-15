@@ -467,9 +467,11 @@ both hosts, because the size ladder sets `bc_battle_size` by comparing
 itself. Their verbs are agentless for the same reason the subject is shared: a
 clause naming men who could have acted and did not reads as a reproach aimed at
 the man whose portrait is on the toast. A fourth draft closed on a universal —
-"there is not a man who is not in the fighting" — which `bc_knight_shames_himself`
-falsifies in the sentence directly above it, and which put a singular "a man"
-one word away from the bond clause's "The man commanding here". Copy the shipped section
+`" In a fight this small, there is not a man who is not in the fighting."` —
+which `bc_knight_shames_himself`'s literal falsifies: that moment is a man
+leaving the fighting. It also put a singular "a man" in the sentence directly
+after the bond clause's "the man commanding here", which all five bond arms
+carry and which renders immediately before this clause on every toast. Copy the shipped section
 comment and strings from `bc_l_english.yml`, not this block; the shipped
 `bc_scale_clause` header carries the four-row test a replacement axis has to
 pass.

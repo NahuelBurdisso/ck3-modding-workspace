@@ -42,7 +42,10 @@ LOC_EXPECTED = {"common/traits", "common/decisions", "common/character_interacti
 # A missing loc key renders as the raw key; a missing definition renders as
 # nothing at all, which is indistinguishable from an arm that did not match.
 CUSTOM_LOC_DIR = "common/customizable_localization/"
-LOC_ARM_RE = re.compile(r"^\s*localization_key\s*=\s*(\S+)", re.M)
+# `[^\s#]+` and not `\S+`: `localization_key = bc_x# note` is a legal comment
+# with no space before it, and `\S+` would capture `bc_x# note`'s first token
+# as the key and false-error on it.
+LOC_ARM_RE = re.compile(r"^\s*localization_key\s*=\s*([^\s#]+)", re.M)
 CUSTOM_CALL_RE = re.compile(r"\.Custom2?\(\s*'([^']+)'")
 
 
@@ -156,7 +159,7 @@ def _check_loc_file(relpath: str, path: Path, issues: list[Issue]) -> list[str]:
 
 
 def _scan_matches(path: Path, pattern: re.Pattern[str]) -> list[tuple[int, str]]:
-    """Yield (line, capture-group-1) for every match in the file."""
+    """Return (line, capture-group-1) for every match in the file."""
     text = read_text(path)
     return [(text.count("\n", 0, m.start()) + 1, m.group(1)) for m in pattern.finditer(text)]
 

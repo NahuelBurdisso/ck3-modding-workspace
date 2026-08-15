@@ -93,9 +93,17 @@ In `tools/ck3lib/validate.py`, after the `LOC_EXPECTED` line (currently line 37)
 # A missing loc key renders as the raw key; a missing definition renders as
 # nothing at all, which is indistinguishable from an arm that did not match.
 CUSTOM_LOC_DIR = "common/customizable_localization/"
-LOC_ARM_RE = re.compile(r"^\s*localization_key\s*=\s*(\S+)", re.M)
+# `[^\s#]+` and not `\S+`: `localization_key = bc_x# note` is a legal comment
+# with no space before it, and `\S+` would capture `bc_x# note`'s first token
+# as the key and false-error on it.
+LOC_ARM_RE = re.compile(r"^\s*localization_key\s*=\s*([^\s#]+)", re.M)
 CUSTOM_CALL_RE = re.compile(r"\.Custom2?\(\s*'([^']+)'")
 ```
+
+> **RUN CORRECTION, 2026-08-15.** The capture group was `(\S+)` when this task
+> was written and the code-quality review caught it: a trailing `#` comment with
+> no space before it would be captured as part of the key. The block above is
+> what shipped.
 
 - [ ] **Step 3: Add the two scan helpers**
 

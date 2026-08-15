@@ -36,6 +36,15 @@ KNOWN_LANGS = {
 # Categories where every definition is expected to have a matching loc key.
 LOC_EXPECTED = {"common/traits", "common/decisions", "common/character_interactions"}
 
+# Customizable localization: `localization_key = X` inside an arm names a loc
+# key that must exist, and `[scope.Custom('name')]` inside a loc value names a
+# customizable_localization definition that must exist. CK3 reports neither.
+# A missing loc key renders as the raw key; a missing definition renders as
+# nothing at all, which is indistinguishable from an arm that did not match.
+CUSTOM_LOC_DIR = "common/customizable_localization/"
+LOC_ARM_RE = re.compile(r"^\s*localization_key\s*=\s*(\S+)", re.M)
+CUSTOM_CALL_RE = re.compile(r"\.Custom2?\(\s*'([^']+)'")
+
 
 @dataclass(frozen=True)
 class Issue:
@@ -146,6 +155,12 @@ def _check_loc_file(relpath: str, path: Path, issues: list[Issue]) -> list[str]:
     return list(seen)
 
 
+def _scan_matches(path: Path, pattern: re.Pattern[str]) -> list[tuple[int, str]]:
+    """Yield (line, capture-group-1) for every match in the file."""
+    text = read_text(path)
+    return [(text.count("\n", 0, m.start()) + 1, m.group(1)) for m in pattern.finditer(text)]
+
+
 def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issue]:
     issues: list[Issue] = []
     if not mod_root.is_dir():
@@ -158,6 +173,8 @@ def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issu
     def_categories: list[tuple[str, str]] = []
     loc_keys: set[str] = set()
     vanilla_overrides: list[str] = []
+    custom_loc_arms: list[tuple[str, int, str]] = []
+    custom_calls: list[tuple[str, int, str]] = []
 
     for relpath, path in iter_files(mod_root):
         ext = path.suffix.lower()
@@ -165,6 +182,9 @@ def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issu
             vanilla_overrides.append(relpath)
 
         if ext in (".txt", ".gui", ".gfx", ".asset", ".info"):
+            if relpath.startswith(CUSTOM_LOC_DIR):
+                for line, key in _scan_matches(path, LOC_ARM_RE):
+                    custom_loc_arms.append((relpath, line, key))
             for key, line in _check_script_file(relpath, path, issues):
                 if key in defs_by_key:
                     prev_file, prev_line = defs_by_key[key]
@@ -178,6 +198,12 @@ def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issu
                     def_categories.append((category, key))
         elif ext == ".yml" and relpath.startswith("localization/"):
             loc_keys.update(_check_loc_file(relpath, path, issues))
+
+    for relpath, line, key in custom_loc_arms:
+        if key not in loc_keys:
+            issues.append(
+                Issue(ERROR, relpath, line, f"`localization_key = {key}` has no loc entry in this mod")
+            )
 
     if strict:
         for category, key in def_categories:

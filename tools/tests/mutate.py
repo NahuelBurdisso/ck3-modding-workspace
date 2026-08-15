@@ -45,9 +45,23 @@ from pathlib import Path
 
 Mutant = tuple[str, str, str]
 
-# unittest writes progress to stderr at verbosity 2; both streams are searched
-# so a harness cannot be defeated by a suite that reports on the other one.
-FAIL_RE = re.compile(r"^(test_\w+) \(.*\) \.\.\. (?:FAIL|ERROR)", re.M)
+# THE FAILURE SUMMARY IS READ, NOT THE PROGRESS LINE. At verbosity 2 unittest
+# prints `test_x (mod.Cls.test_x) ... FAIL` on one line only while the method
+# has NO DOCSTRING. Give it one and the verdict moves to a second line, behind
+# the docstring, and a pattern anchored on the progress line matches nothing -
+# which a harness reports as CRASHED, i.e. as a survivor, for a mutation the
+# suite in fact caught. No test method in this directory has a docstring today,
+# so the trap was armed and silent. The `FAIL: `/`ERROR: ` headers of the
+# summary block carry the method name in the same place either way.
+#
+# ERROR IS LISTED BESIDE FAIL ON PURPOSE. A mutation that makes a check RAISE
+# produces an errored test, and an errored test is a kill: the suite noticed.
+# Only a break that stops the suite importing - no test runs, none is named -
+# leaves this matching nothing.
+#
+# unittest writes to stderr; both streams are searched so a harness cannot be
+# defeated by a suite that reports on the other one.
+FAIL_RE = re.compile(r"^(?:FAIL|ERROR): (test_\w+) \(", re.M)
 
 
 def run_suite(suite: Path) -> tuple[bool, set[str]]:

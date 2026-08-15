@@ -70,22 +70,32 @@ the missing lines were never going to be read. Both are written up at length in
     python tools/tests/test_validate.py
     python tools/tests/test_citations.py
     python tools/tests/test_sweep_backticks.py
+    python tools/tests/test_mutate.py
 
-All three are stdlib unittest, no pytest, and take about a second each. The
-first two cover `ck3lib.validate` between them — `test_citations.py` the
-citation checker, `test_validate.py` everything else in that module, including
-the BOM and brace checks the loop above is run for. Run them after touching
-anything under `tools/`.
+All four are stdlib unittest, no pytest. The first two cover `ck3lib.validate`
+between them — `test_citations.py` the citation checker, `test_validate.py`
+everything else in that module, including the BOM and brace checks the loop
+above is run for. `test_mutate.py` covers the mutation driver described below
+and is the slow one, because every case of it launches a subprocess. Run them
+after touching anything under `tools/`.
 
     python tools/tests/mutate_validate.py
     python tools/tests/mutate_sweep_backticks.py
+    python tools/tests/mutate_mutate.py
 
 Not part of that set. Each edits its target module in place, one anchor at a
 time, and records which tests go red for each break — a surviving mutant names a
 test that cannot fail. Run one deliberately, never in a batch, and never
 alongside anything else that imports the module it is breaking: while it runs,
-what is on disk is the broken version. `tools/tests/mutate.py` is the shared
-driver and is not run directly.
+what is on disk is the broken version.
+
+`tools/tests/mutate.py` is the shared driver and is not run directly.
+`mutate_mutate.py` is the driver grading itself: its target is `mutate.py` and
+its suite is `test_mutate.py`. That is not circular — the copy of the driver
+doing the grading is the one already imported into the harness process, and the
+broken copy exists only on disk, where the subprocess reads it. It matters
+because a driver that scores a survivor as a kill certifies a vacuous test as a
+good one, and nothing else in the tree can see that.
 
 ## Research before writing
 

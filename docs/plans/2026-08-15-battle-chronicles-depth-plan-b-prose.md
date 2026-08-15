@@ -18,6 +18,8 @@
 
 **This plan is blocked until a human confirms one thing.** Plan A task 7 shipped a single fragment set on The Banner Falls precisely so that this plan is either unblocked or cancelled by one observation. Task 1 is that check. **Do not skip it because the code "looks right".** The premise it tests — that `[scope.Custom('key')]` renders inside a `send_interface_toast` desc with the arms reading the invoking character's variables — is unproven by anything static, and this plan writes about a hundred keys that all rest on it.
 
+**And the gate gets stricter as this plan proceeds, which is why it is first.** Today every toast desc still holds its literal sentence and a failed `Custom()` degrades to that sentence. After tasks 5-14 the ten descs contain *no literal text at all* — they are four calls and nothing else — so the same failure produces a completely empty toast body. Task 1 is the only thing standing between this plan and that.
+
 **Baseline is `0 errors, 2 warnings`,** from `cd /d/ck3 && python tools/ck3.py validate --strict battle_chronicles`. Both warnings are `namespace also defined in` false positives.
 
 **Plan A's three validator checks are live and this plan leans on all of them.** They are the reason a plan that is 90% prose is verifiable at all:
@@ -28,7 +30,7 @@
 | `bc_` `Custom()` calls resolve | a toast calling a definition that does not exist, or a typo either side |
 | ground partition complete | not used by this plan, but a break in it invalidates every ground arm |
 
-Neither of the first two existed when the mod shipped its first custom loc. Without them, a typo in one of 110 keys renders as silence in game and as nothing at all in the toolchain.
+Neither of the first two existed when the mod shipped its first custom loc. Without them, a typo in one of 110 keys shows in game as the raw key printed into the sentence — or, if the typo is on a `Custom()` call rather than a `localization_key`, as nothing at all — and in the toolchain as nothing at all either way.
 
 **Four rules this plan repeats a hundred times, stated once here.**
 
@@ -39,7 +41,7 @@ Neither of the first two existed when the mod shipped its first custom loc. With
 
 **The anchor is `bc_chronicle_subject`,** saved in `bc_battle_open_effect` (Plan A task 5). It is the only scope common to all ten call sites: the seven commander events save `bc_commander`, the three knight events save `bc_knight`, and neither reaches the other's toast.
 
-**Naming rule, from Plan A:** every custom-loc definition ends in a class suffix — `_core`, `_ground`, or, for the two shared classes, `_clause`. `validate.py` records a key in `def_categories` only the first time it sees it, and `common/combat_phase_events` is scanned before `common/customizable_localization`, so a definition named `bc_banner_falls` would collide with the phase event of that name and every call to it would error falsely. The suffix is what prevents that. Do not drop it on a definition that happens not to collide today.
+**Naming rule, from Plan A:** every custom-loc definition ends in a class suffix — `_core`, `_ground`, or, for the two shared classes, `_clause`. `validate.py` records a key in `def_categories` only the first time it sees it, and `common/combat_phase_events` is scanned before `common/customizable_localization`, so a definition named `bc_banner_falls` would collide with the phase event of that name and every call to it would error falsely. The suffix is what prevents that, and a collision would also raise a third `also defined in` WARN, so it breaks the two-warning baseline as well as the call sites. Do not drop the suffix on a definition that happens not to collide today.
 
 The shared classes are `bc_bond_clause` and `bc_scale_clause`, not `bc_bond` and `bc_scale`, for exactly this reason. Plan A stated the rule as `_bond` / `_scale` because at the time the classes were per-moment; they are shared, so the suffix moved to the front of the name and `_clause` carries the collision-proofing instead. Neither name collides in the playset today — `python tools/ck3.py find bc_bond_clause` returns nothing — but the suffix is what keeps that true when a future definition is added.
 
@@ -53,7 +55,7 @@ The shared classes are `bc_bond_clause` and `bc_scale_clause`, not `bc_bond` and
 |---|---|---|
 | `mods/battle_chronicles/common/customizable_localization/bc_flavour.txt` | modify | all 22 definitions. Created by Plan A task 7 with one of them. |
 | `mods/battle_chronicles/localization/english/bc_l_english.yml` | modify | 110 fragment keys — 103 written here, 7 already shipped by Plan A's spike — and the ten rewritten toast descs |
-| `mods/battle_chronicles/README.md` | modify | one "Not yet verified in game" entry, at the end |
+| `mods/battle_chronicles/README.md` | modify | task 1 adds a dated `## Spike gate run` section and removes the spike's pending entry; task 14 adds one "Not yet verified in game" entry |
 
 **One file for all 22 definitions, not one per moment.** They share a shape and a set of rules, and a reader checking "does every keyed class end in a fallback" wants one file to check. The file will run to roughly 950 lines — a ground class is 67 of them and there are ten — which is acceptable for a file that is a table and is read one definition at a time.
 
@@ -99,7 +101,7 @@ heading per run, in chronological order, with `## Not yet verified in game`
 always **last** (`README.md:558`). Follow it: insert a new
 
 ```
-## Spike gate, 2026-08-15 (Plan B task 1)
+## Spike gate run, 2026-08-15 (Plan B task 1)
 ```
 
 section immediately **above** `## Not yet verified in game`, naming which row of
@@ -228,15 +230,27 @@ In `bc_l_english.yml`, after the last moment toast desc (`bc_shieldbrother_forge
 
 # --- shared fragments: the bond ---------------------------------------------
 
- bc_frag_bond_nemesis:0 " He knows whose banner that is on the other side, and he has known all morning."
- bc_frag_bond_kin:0 " There are men over there he has eaten at a table with."
+ bc_frag_bond_nemesis:0 " The man commanding here knows whose banner that is across the field, and has known all morning."
+ bc_frag_bond_kin:0 " The man commanding here has eaten at a table with men on the other side."
  bc_frag_bond_countryman:0 " Both sides are shouting in the same tongue."
- bc_frag_bond_heathen:0 " Whatever they were praying to at dawn, it was not his."
- bc_frag_bond_stranger:0 " Nobody on that side is anybody to him."
+ bc_frag_bond_heathen:0 " Whatever the other side was praying to at dawn, the man commanding here does not."
+ bc_frag_bond_stranger:0 " Nobody across the field is anybody to the man commanding here."
  bc_frag_bond_any:0 ""
 ```
 
 Note the leading space inside each non-empty string, and that `bc_frag_bond_any` is empty rather than absent — the key must exist or Plan A's task 1 check errors on the arm that names it.
+
+**"The man commanding here", not "he", and this is not a style choice.** The bond is
+computed commander-against-commander in `bc_write_bond_effect`; it is a fact about
+the commander and about nobody else. But this clause is shared by all ten moments,
+and three of them — tasks 12, 13 and 14 — are knight moments whose core and ground
+clauses have already bound "he" to the **knight**. A bare pronoun there hands the
+commander's kin and the commander's faith to a man who may share neither. Naming
+the role costs four words and makes the clause true in both families, which is the
+whole reason it can be one definition instead of two.
+
+The same rule applies to any clause class added later that reads a
+commander-scoped variable: **if it is shared, it may not say "he".**
 
 - [ ] **Step 3: Validate**
 
@@ -491,7 +505,7 @@ EOF
 
 Each moment gains **two** definitions:
 
-- **`<moment>_core`** — three arms, no triggers, `random_valid = yes`. A repetition-killer that needs no inputs at all: the same moment reads differently on consecutive firings. Vanilla uses this at `00_servants.txt:3`.
+- **`<moment>_core`** — three arms, no triggers, `random_valid = yes`. A repetition-killer that needs no inputs at all: the same moment reads differently on consecutive firings. Vanilla ships this exact shape — `type = character`, `random_valid = yes`, every arm trigger-less — in `00_appropriate_generic_words.txt:1` (`GetSmallFood`), which is a two-arm match for the template below.
 - **`<moment>_ground`** — six band arms plus a fallback, keyed on `var:bc_battle_ground`.
 
 The core class **replaces** the fixed sentence in the toast desc rather than adding to it. After task 5 the assembled line is:
@@ -559,7 +573,15 @@ bc_<moment>_ground = {
 cd /d/ck3/mods/battle_chronicles && git add common/customizable_localization/bc_flavour.txt localization/english/bc_l_english.yml && git commit -m "<subject>"
 ```
 
-**`_core` showing anything other than `[0, 1, 2]`** means a trigger got copied into a core arm, and a trigger in a `random_valid` class quietly biases the randomiser. **`_core` showing `arms 0`** means the arms were written on one line each; see the warning under task 5 step 1.
+**Step 4's counts are the only thing that catches three separate mistakes, so do not skip them because `validate` was clean.**
+
+| what you see | what happened |
+|---|---|
+| `_core arms 3 unguarded at [0, 1, 2]` | correct |
+| `_core` unguarded at anything else | a trigger got copied into a core arm, and a trigger in a `random_valid` class quietly biases the randomiser |
+| `_core arms 0` | all three arms were written on one line each — see the warning under task 5 step 1 |
+| `_core arms 2` or `arms 1` | *some* arms were collapsed to one line. This one is nastier: the whole-file check in task 14 scores it as **passing**, and task 14's `arms 110` key count does not see it either, because that count scans `localization_key = X` regardless of line shape. The per-task `arms 3` is the only thing that catches a partial collapse. |
+| `_ground arms 2 unguarded at [1]` | the template's `# ... identical arms for open, rough, forest, jungle, winter ...` placeholder line was left in place and the five middle arms were never written. Task 14 scores this as passing too — a two-arm keyed class with its fallback last is well-formed. Only `arms 7` here, and `arms 110` at the end, catch it. |
 
 ---
 
@@ -708,7 +730,7 @@ Follow the five steps. Both definitions are new.
 - [ ] **Step 2: Add the ten keys:**
 
 ```
- bc_frag_horse_killed_core1:0 "The horse goes down screaming. He comes up out of the mud on foot, and is seen to come up."
+ bc_frag_horse_killed_core1:0 "The horse goes down screaming. He comes up off the ground on foot, and is seen to come up."
  bc_frag_horse_killed_core2:0 "The animal folds under him. He is on his feet before anyone can reach him."
  bc_frag_horse_killed_core3:0 "He loses the horse and does not lose the ground, which the men nearest him notice."
  bc_frag_horse_killed_desert:0 " He comes up out of the sand with half of it on him."
@@ -716,7 +738,7 @@ Follow the five steps. Both definitions are new.
  bc_frag_horse_killed_rough:0 " On this ground the horse was becoming a liability anyway."
  bc_frag_horse_killed_forest:0 " Among the trees he is no worse off on foot than he was mounted."
  bc_frag_horse_killed_jungle:0 " Nothing in this green was ever going to be crossed at a gallop."
- bc_frag_horse_killed_winter:0 " He comes up out of the frozen mud, and the cold gets into him at once."
+ bc_frag_horse_killed_winter:0 " The cold gets into him the moment he is out of the saddle, and does not leave."
  bc_frag_horse_killed_any:0 ""
 ```
 
@@ -776,7 +798,11 @@ Follow the five steps. Both definitions are new.
 
 ### Task 10: The Ground Favours Us
 
-**This moment's fixed sentence already names the ground** — *"The slope, the trees, the narrow way in."* — and it is the one place in the mod where the prose asserts terrain that the battle may not have. Fixing that is most of the point of this task.
+**This moment's fixed sentence already names the ground** — *"The slope, the trees, the narrow way in."* — and it names two things at once. The moment's own gate guarantees one of them, not both.
+
+**Two of the six bands are reachable here and four are not.** `bc_ground_favours_us` carries `bc_terrain_favours_us_trigger` in its `is_valid` (`bc_commander_phase_events.txt`), and that trigger (`bc_scripted_triggers.txt:65-74`) is `OR = { agot_is_hills_terrain agot_is_forest_terrain agot_is_highlands_terrain agot_is_terraced_hills_terrain }`. Through Plan A task 3's bands that is **rough** (hills, highlands, terraced_hills) and **forest**, and nothing else. The moment cannot fire on sand, plains, jungle or ice.
+
+**Write all six bands anyway.** The four dead arms cost four loc lines and they are the difference between "this is safe if the gate changes" and "this silently renders the fallback the day someone widens the trigger". Do not treat their absence from a run as a bug — and do not count this moment as 3 × 7; it is 3 × 3, three core arms times rough, forest and the fallback.
 
 - [ ] **Step 1: Append both definitions** — template, `<moment>` = `ground_favours_us`.
 
@@ -803,10 +829,12 @@ Follow the five steps. Both definitions are new.
 
 - [ ] **Step 1: Append both definitions** — template, `<moment>` = `lines_bogged_down`.
 
+**Two of the six bands are reachable here too, and they are not the same two.** `bc_terrain_bogs_us_down_trigger` (`bc_scripted_triggers.txt:76-86`) is `OR = { agot_is_wetlands_terrain agot_is_jungle_terrain agot_is_mountains_terrain agot_is_the_bog_terrain agot_is_taiga_bog_terrain }` — bands **rough** (wetlands, mountains, the_bog, taiga_bog) and **jungle**. The `_forest` arm below is dead: forest terrain does not bog anyone down under this trigger. Write all six for the same reason as task 10.
+
 - [ ] **Step 2: Add the ten keys.** As with task 10, the core sentence currently names mud; the rewritten arms let the ground class decide what the men are standing in:
 
 ```
- bc_frag_lines_bogged_down_core1:0 "Neither host can move. The battle becomes a matter of who tires of it last."
+ bc_frag_lines_bogged_down_core1:0 "Neither host can move. The battle becomes a matter of which host tires first."
  bc_frag_lines_bogged_down_core2:0 "The two lines have found each other and neither can get past."
  bc_frag_lines_bogged_down_core3:0 "Nothing is happening except that men are dying, which is the worst kind of battle to be in."
  bc_frag_lines_bogged_down_desert:0 " They are standing in the sand long enough that the water is running out."
@@ -1004,9 +1032,10 @@ Append to `mods/battle_chronicles/README.md`, under "Not yet verified in game":
   |---|---|---|
   | any moment toast | one sentence, then up to three clauses, no double spaces and no run-together words | a missing leading space in a fragment, or a stray one before a `[` |
   | the same moment three or more times across a session | not always the same opening sentence | `random_valid` is not picking, or a trigger got into a core arm |
-  | a moment in a battle whose `probe 'BC: bond'` says `nofoe` | the **stranger** clause — "Nobody on that side is anybody to him." | anything else, including silence |
+  | a moment in a battle whose `probe 'BC: bond'` says `nofoe` | the **stranger** clause — "Nobody across the field is anybody to the man commanding here." | anything else, including silence |
   | a moment whose `BC: ground` band is known | a clause matching that band | the flag names in the arms do not match what bc_write_ground_effect writes |
-  | The Ground Favours Us on flat ground | no claim about slopes or trees | the core arms were not rewritten |
+  | The Ground Favours Us, any firing | a clause naming slope-and-rocks or a treeline — never sand, snow or jungle | the core arms were not rewritten, or the ground band disagrees with the moment's own gate |
+  | any knight moment with a bond clause | the clause says "the man commanding here", not "he" | a shared clause is attributing the commander's kin or faith to the knight |
 ```
 
 **`nofoe` renders the stranger clause, not silence,** and that row is easy to get
@@ -1040,6 +1069,7 @@ EOF
 - **New moments.** Still deferred, and now more clearly so: with three core arms each, ten moments already read as thirty openings. Whether the mod needs an eleventh moment is a question to ask *after* a run measures how repetitive thirty feels, not before.
 - **Season, war type, troop composition.** Designed as inputs in the spec, written by nothing. Adding one is now a small job — a writer effect beside `bc_write_ground_effect`, a flag, and one more clause class — and that is the point of having done it this way.
 - **Anything on the eve.** Plan A task 10 finished the eve. It uses `first_valid` in an event `desc`, not `Custom()`, and the two mechanisms stay separate on purpose: the eve is read once and carefully, a toast is read in passing.
+- **`bc_battle_creed`.** Plan A task 6 writes it — `same` or `heathen`, on an independent chain from the bond ladder — and nothing here reads it. The bond class's `heathen` arm is the *ladder* value, which is a narrower thing: it only reaches a foe who is neither nemesis, nor kin, nor countryman. A clause class on the creed is the cheapest possible next increment, and it is deliberately not in this plan, because thirteen prose tasks in one plan is already the limit of what can be reviewed at once.
 - **Localisation beyond English.** The mod ships English only.
 
 ## Where this plan departs from the spec

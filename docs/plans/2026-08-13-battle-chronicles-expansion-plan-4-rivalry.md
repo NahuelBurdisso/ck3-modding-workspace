@@ -174,7 +174,7 @@ expected to reuse.
 - Modify: `mods/battle_chronicles/common/game_rules/bc_game_rules.txt`
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
 
-- [ ] **Step 1: Read the existing rules and the loc convention**
+- [x] **Step 1: Read the existing rules and the loc convention**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -198,7 +198,7 @@ three-option rule is therefore **eight** keys, which is what the three shipped r
 **Write the key count down.** Task 6 step 4 checks the total rose by exactly 15 across both
 localization tasks, and that is not a check you can run without the number from before.
 
-- [ ] **Step 2: Append the rule**
+- [x] **Step 2: Append the rule**
 
 Append to `common/game_rules/bc_game_rules.txt`, after `bc_aftermath`:
 
@@ -241,7 +241,7 @@ rung and is what a single loss produces under every setting that is not `off`, s
 `grudge` and a cap at `off` would differ only in whether a one-directional -60 opinion is
 applied. Not worth a setting.
 
-- [ ] **Step 3: Add the eight localization keys**
+- [x] **Step 3: Add the eight localization keys**
 
 Append to the game-rules block of `localization/english/bc_l_english.yml`, **after the last
 existing `setting_bc_` line**. **One leading space per line**, matching the file:
@@ -261,7 +261,7 @@ independent of each other — anchoring on a specific rule's last key would inte
  setting_bc_rivalry_nemesis_desc:0 "The full ladder. Three losses to one man makes him a nemesis — which in A Game of Thrones is a man you may find yourself planning to kill."
 ```
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -295,6 +295,12 @@ mention of the name in a `_desc` body.
 The rule only truly renders correctly when someone opens the game-rule screen. Plan 6 task 6
 step 2 does that; if plan 6 is not being run, do it once by hand.
 
+**RUN CORRECTION (executed):** the third grep returns **8**, not 5. The shipped header comment
+names `bc_rivalry_rival`, `bc_rivalry_off` and `bc_rivalry_clear_effect` in prose. Filter with
+`grep -v "#"` and the count is the expected 5 (lines 69, 72, 74, 75, 76). Same shape of defect
+as plans 2 and 3 hit three times: any verification grep whose pattern appears in the comment
+being shipped must be filtered or anchored on call syntax.
+
 ```bash
 cd /d/ck3/mods/battle_chronicles
 git add common/game_rules/bc_game_rules.txt localization/english/bc_l_english.yml
@@ -313,7 +319,7 @@ read-back keep working."
 **Files:**
 - Modify: `mods/battle_chronicles/common/script_values/bc_script_values.txt`
 
-- [ ] **Step 1: Read the file's existing conventions**
+- [x] **Step 1: Read the file's existing conventions**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && cat common/script_values/bc_script_values.txt
@@ -322,7 +328,7 @@ cd /d/ck3/mods/battle_chronicles && cat common/script_values/bc_script_values.tx
 Note the comment at `:15-16` recording that the engine scales `side_strength` down by 1000 —
 that is the kind of measured note this file carries. Match the style.
 
-- [ ] **Step 2: Append the value**
+- [x] **Step 2: Append the value**
 
 ```
 # --- rivalry step size ------------------------------------------------------
@@ -376,7 +382,7 @@ holds a bare `exists = county.holder` next to a `trigger_if` whose own `limit` r
 `exists = county.holder.liege` before comparing against it: a sibling existence row plus a
 nested guarded comparison, which is what the block above is. Verified by reading the file.
 
-- [ ] **Step 3: Verify the conjunction landed whole, then validate and commit**
+- [x] **Step 3: Verify the conjunction landed whole, then validate and commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -429,7 +435,7 @@ carrying no."
 **Files:**
 - Create: `mods/battle_chronicles/common/scripted_effects/bc_rivalry_effects.txt`
 
-- [ ] **Step 1: Confirm the markers do not exist**
+- [x] **Step 1: Confirm the markers do not exist**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "BC: nemesis"
@@ -438,10 +444,17 @@ cd /d/ck3/tools && python ck3.py probe "BC: nemesis"
 Expected: **exit 1** — `probe` exits 1 when nothing matches. A match here means a previous
 attempt left code behind; find it before continuing.
 
-- [ ] **Step 2: Write the header and the rung ladder**
+- [x] **Step 2: Write the header and the rung ladder**
 
 Create the file. **UTF-8, no BOM** — script files in this mod carry no BOM; only the
 localization file does.
+
+**RUN CORRECTION (executed): that is false and the file was written WITH a BOM.** Every
+script `.txt` already in the mod starts `ef bb bf` — `bc_ledger_effects.txt`,
+`bc_reputation_effects.txt`, `bc_reward_effects.txt`, `bc_scripted_effects.txt`,
+`bc_script_values.txt`, checked with `head -c3 | xxd -p`. The Write tool does not add one,
+so it was added afterwards with a short python post-write, the same way every other file in
+this mod was created.
 
 ```
 # Battle Chronicles - the man across the field.
@@ -554,7 +567,7 @@ evaluation order. CK3 does not short-circuit and guarantees no order among sibli
 safety here comes from the invariant, and the header states it. **If you ever call this
 effect from a site that has not just written `bc_nemesis_losses`, this breaks silently.**
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -580,7 +593,7 @@ in the top arm's limit so the cap clamps the rung instead of skipping the award.
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_rivalry_effects.txt`
 
-- [ ] **Step 1: Write the escalation**
+- [x] **Step 1: Write the escalation**
 
 ```
 # --- escalation -------------------------------------------------------------
@@ -631,7 +644,7 @@ forms against named `_value` script values. Verified this session across vanilla
 unit until then** — but `validate` is syntax-only and does not resolve effect names, so it
 will still exit 0. That is not evidence the call works; task 10 step 2 is.
 
-- [ ] **Step 2: Validate and commit**
+- [x] **Step 2: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -658,7 +671,7 @@ per commander."
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_rivalry_effects.txt`
 
-- [ ] **Step 1: Understand why the floor guard cannot be a constant**
+- [x] **Step 1: Understand why the floor guard cannot be a constant**
 
 This is the sharpest thing in plan 4 and it is worth reading twice.
 
@@ -685,7 +698,7 @@ Only `<= N` is right in both directions, and it stays right for any future step 
 **The clear condition is written `<= 0` regardless**, belt and braces, so that a negative
 counter arriving by any route this plan did not foresee still clears instead of jamming.
 
-- [ ] **Step 2: Write the decrement**
+- [x] **Step 2: Write the decrement**
 
 ```
 # --- decrement --------------------------------------------------------------
@@ -733,7 +746,7 @@ bc_rivalry_win_effect = {
 **`subtract = <script value>` is shipped** — `chariot_race_base_cost_value` and three
 `_static_max` values are used exactly this way in vanilla. Verified this session.
 
-- [ ] **Step 3: Write the clear**
+- [x] **Step 3: Write the clear**
 
 ```
 # --- the clear --------------------------------------------------------------
@@ -780,7 +793,7 @@ bc_rivalry_clear_effect = {
 }
 ```
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -807,7 +820,7 @@ testing rival first would strip the alias and strand the real relation."
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_rivalry_effects.txt`
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
 
-- [ ] **Step 1: Write the entry point**
+- [x] **Step 1: Write the entry point**
 
 ```
 # --- the entry point --------------------------------------------------------
@@ -862,7 +875,7 @@ has no running grudge — which is nearly every win in the game.
 **There is no `else` on the inner `if`.** Winning against a man who is not your nemesis is
 not an event; it is the overwhelmingly common case and logging it would flood `debug.log`.
 
-- [ ] **Step 2: Write the toast**
+- [x] **Step 2: Write the toast**
 
 ```
 # --- the toast --------------------------------------------------------------
@@ -936,7 +949,7 @@ bc_rivalry_toast_effect = {
 one negation further from the rule name. Both are correct; if the empty body offends, invert
 it, but do not delete the gate.
 
-- [ ] **Step 3: Write the seven localization keys**
+- [x] **Step 3: Write the seven localization keys**
 
 Append to `localization/english/bc_l_english.yml`, in a new section after the reputation
 keys. **One leading space per line.**
@@ -970,7 +983,7 @@ grep -oh "bc_reason_battle_[a-z]*" common/scripted_effects/bc_rivalry_effects.tx
 Expected: exactly three lines, each with a count of **2** — one use, one definition. A
 count of 1 on any line is a typo on one side or the other.
 
-- [ ] **Step 4: Verify the total key count**
+- [x] **Step 4: Verify the total key count**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -982,7 +995,7 @@ Against the baseline recorded in task 1 step 1, the count must have risen by exa
 — 8 from task 1, 7 from here. The BOM must still be present (`M-oM-;M-?`); editors strip it
 silently, which is why it is checked after the edits as well as before.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1013,7 +1026,7 @@ switch could leak."
 **Files:**
 - Modify: `mods/battle_chronicles/events/bc_aftermath_events.txt`
 
-- [ ] **Step 1: Add the call to `bc_chronicles.0091` (the winner)**
+- [x] **Step 1: Add the call to `bc_chronicles.0091` (the winner)**
 
 Inside `side_commander ?= { if = { limit = { is_alive = yes } } }`, after whatever else that
 block contains, add:
@@ -1030,7 +1043,7 @@ about later.
 **If plan 3 has not shipped**, the block contains the counter and the nickname `if`. Put C
 after them.
 
-- [ ] **Step 2: Add the call to `bc_chronicles.0092` (the loser)**
+- [x] **Step 2: Add the call to `bc_chronicles.0092` (the loser)**
 
 The loser grader has no `side_commander ?=` block in plan 1's version. **If plan 3 shipped
 first it added one**; add C inside it:
@@ -1054,7 +1067,7 @@ knight memory block:
 **Do not add `bc_notable_battle_counter_effect` here.** That counter is wins only and the
 loser grader's header says so.
 
-- [ ] **Step 3: Confirm placement against the load-bearing body order**
+- [x] **Step 3: Confirm placement against the load-bearing body order**
 
 Plan 1's grader header states the order: cleanup outside the gate, grading inside, scratch
 clearing outside and last. **C is grading.**
@@ -1073,7 +1086,7 @@ dead** — `bc_battle_foe` would already be gone, the entry point's first guard 
 it silently, and no marker would fire. That silence is why this is checked by eye rather
 than left to the runtime pass.
 
-- [ ] **Step 4: Verify the call count and the outcome spelling**
+- [x] **Step 4: Verify the call count and the outcome spelling**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1085,7 +1098,7 @@ Expected: **2**, and one must read `OUTCOME = win` and the other `OUTCOME = lose
 `win`s would mean no commander in the world ever acquires a nemesis, and nothing else in
 this plan would report it.
 
-- [ ] **Step 5: Validate, index, conflicts, deploy**
+- [x] **Step 5: Validate, index, conflicts, deploy**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy
@@ -1094,7 +1107,7 @@ cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && pyt
 Expected: all exit 0. **`conflicts` reads a sqlite index that only `index` rebuilds** — never
 run it alone.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1113,7 +1126,13 @@ or on_combat_end_loser invoked it."
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt`
 
-- [ ] **Step 1: Understand what this is and what it is not**
+**RUN CORRECTION (executed): the file is `bc_ledger_effects.txt`, not `bc_scripted_effects.txt`.**
+`bc_battle_open_effect` is defined at `common/scripted_effects/bc_ledger_effects.txt:52`;
+`bc_scripted_effects.txt` only mentions the name in a comment at :153. Step 2's grep against
+the wrong file returns that single comment line and nothing else, which reads like the effect
+exists there. The wipe was appended after the 1/2/3 size ladder inside the ledger file.
+
+- [x] **Step 1: Understand what this is and what it is not**
 
 **This is housekeeping, not safety.** Every read of `bc_nemesis` in this mod is already
 guarded by `exists` plus `is_alive = yes`, and CK3 keeps dead characters as real objects, so
@@ -1145,7 +1164,7 @@ before its `effect` block, so the first roll of the first battle after the man d
 dangling variable and only the roll after that sees it gone. The guard handles that read
 cleanly. The lag is not worth engineering away.
 
-- [ ] **Step 2: Find `bc_battle_open_effect` and read its closing lines**
+- [x] **Step 2: Find `bc_battle_open_effect` and read its closing lines**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1158,7 +1177,7 @@ It ends with the 1/2/3 size ladder — `else = { set_variable = { name = bc_batt
 If plan 2 has shipped, the ladder's boundaries may read 10000 / `<Q3's measured value>`
 instead of 10000 / 2000. Either way the ladder is the last thing in the effect.
 
-- [ ] **Step 3: Append the wipe**
+- [x] **Step 3: Append the wipe**
 
 ```
 	# --- housekeeping: drop a dead nemesis ----------------------------------
@@ -1200,7 +1219,7 @@ it handles it; removing it here would need the ladder, the ladder needs the scop
 scope needs a character the game considers gone. The variables are the mod's; the relation is
 not.
 
-- [ ] **Step 4: Verify the wipe landed inside the right effect**
+- [x] **Step 4: Verify the wipe landed inside the right effect**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1216,7 +1235,7 @@ cd /d/ck3/tools && python ck3.py validate --strict
 
 Expected: exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1236,7 +1255,7 @@ and a commander whose nemesis died could never acquire another one."
 - Modify: `mods/battle_chronicles/common/scripted_triggers/bc_scripted_triggers.txt`
 - Modify: `mods/battle_chronicles/common/combat_phase_events/bc_commander_phase_events.txt`
 
-- [ ] **Step 1: Understand what the read-back can and cannot see**
+- [x] **Step 1: Understand what the read-back can and cannot see**
 
 Section 4 calls the read-back "the only thing in the design that makes a commander feel like
 the same man twice." It is also the part of C most easily written wrong, because of **when**
@@ -1256,7 +1275,7 @@ several times — and it is stated here so that a later reader does not mistake 
 **Do not try to fix it by reading the combat scope directly in the trigger**; that path is
 unverified and the failure mode is an error log on every roll of every battle in the world.
 
-- [ ] **Step 2: Add the trigger**
+- [x] **Step 2: Add the trigger**
 
 Append to `common/scripted_triggers/bc_scripted_triggers.txt`:
 
@@ -1297,7 +1316,7 @@ file. It counts `calc_true_if` rows inside `bc_battle_is_notable_trigger` — no
 triggers in the file — and the number is load-bearing for that trigger's threshold. Changing
 it would change what "notable" means.
 
-- [ ] **Step 3: Wire the read-back into every commander phase event**
+- [x] **Step 3: Wire the read-back into every commander phase event**
 
 The block is called `chance`, not `weight` — every commander phase event has
 `chance = { base = <n>  modifier = { ... } }` and the modifiers already there are the two
@@ -1324,7 +1343,7 @@ fire, gate any event on the nemesis, or add nemesis-specific text — all three 
 designs and all three belong to a later plan, because each needs its own localization and its
 own runtime measurement. **C is complete without them**; this makes it felt.
 
-- [ ] **Step 4: Verify the wiring**
+- [x] **Step 4: Verify the wiring**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1351,7 +1370,7 @@ cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && pyt
 
 Expected: all exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1371,7 +1390,7 @@ that at the cost of an unverified path evaluated on every roll in the world."
 
 **Files:** none — this task only reads.
 
-- [ ] **Step 1: No relation effect targets a variable**
+- [x] **Step 1: No relation effect targets a variable**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1402,7 +1421,14 @@ first pattern and must be counted separately.
 
 A first count below 9 means one site still targets the variable.
 
-- [ ] **Step 2: Every effect C calls actually exists**
+**RUN CORRECTION (executed):** the first grep returns **11**, not 9. Two of the hits are
+shipped comment lines that name `scope:bc_rivalry_foe` in prose — the file header's "EVERY
+RELATION EFFECT TARGETS scope:bc_rivalry_foe" and the clear's "the ladder reads
+scope:bc_rivalry_foe". Anchored on call syntax
+(`grep -c "target = \|has_relation\|remove_relation"` over the same hits) the count is
+exactly 9: 3 targets, 3 `has_relation_*`, 3 `remove_relation_*`. The saves are 3 as written.
+
+- [x] **Step 2: Every effect C calls actually exists**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1418,7 +1444,7 @@ misspelled effect passes cleanly and does nothing forever. `bc_addressed_toast_e
 resolve into `bc_reward_effects.txt`; if it does not, plan 1 task 4 left it in
 `bc_scripted_effects.txt` and the grep above still finds it.
 
-- [ ] **Step 3: No parameter is compared without `flag:`**
+- [x] **Step 3: No parameter is compared without `flag:`**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1442,7 +1468,13 @@ so it survives the filter.
 `[A-Z_]`, not `[A-Z]`: a parameter named `$SOME_PARAM$` would slip through the narrower
 class.
 
-- [ ] **Step 4: No missing-variable read**
+**RUN CORRECTION (executed):** as written this prints **two lines**, both pre-existing
+comments in `bc_ledger_effects.txt` — `:243` (`# \`$TIER$ = decisive\` substitutes textually
+to...`) and `:380` (`# \`$KIND$ = bloodied\` substitutes textually to...`), the plan-1 prose
+documenting this exact trap. Add `| grep -v ":#" | grep -v ":\s*#"` and the output is empty.
+The check itself is right; its expectation was written before those comments shipped.
+
+- [x] **Step 4: No missing-variable read**
 
 Read `bc_rivalry_effects.txt` end to end and check every `limit` containing a `var:`
 **comparison**. A bare `exists = var:X` row is not a comparison and needs no guard. There are
@@ -1480,7 +1512,7 @@ escalation branches (which wrote `bc_nemesis` on the line above) or from
 `exists = var:bc_nemesis`). **If you add a fourth caller to any of those three effects, check
 this before anything else.**
 
-- [ ] **Step 5: The ledger variables are not cleared**
+- [x] **Step 5: The ledger variables are not cleared**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1490,7 +1522,19 @@ grep -rn "bc_nemesis" common/scripted_effects/bc_ledger_effects.txt
 Expected: **no output**. If `bc_clear_scratch_effect` learned about either variable, every
 grudge would evaporate at every combat end and C could never escalate past a first loss.
 
-- [ ] **Step 6: The step value is never inlined**
+**RUN CORRECTION (executed): this check must be scoped to `bc_clear_scratch_effect`'s body,
+not to the whole file.** Task 8's dead-foe wipe lives in `bc_ledger_effects.txt` — that is
+where `bc_battle_open_effect` is defined — so a file-wide grep now returns nine lines by
+design and would read as a failure forever. The real check is:
+
+```bash
+awk '/^bc_clear_scratch_effect = \{/,/^\}/' common/scripted_effects/bc_ledger_effects.txt | grep -c "nemesis"
+```
+
+Expected **0**. It returns 0; the effect removes `bc_battle_moments`, `bc_battle_tier`,
+`bc_battle_style`, `bc_battle_size`, `bc_battle_wounded` and `bc_battle_foe`, and nothing else.
+
+- [x] **Step 6: The step value is never inlined**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1506,7 +1550,7 @@ Section 4 records an earlier draft making.
 Unfiltered, this check reports the correct count as five and fails on correct code — the
 same shape of defect as the parameter grep in step 3.
 
-- [ ] **Step 7: Every toast call names a TYPE**
+- [x] **Step 7: Every toast call names a TYPE**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1527,7 +1571,7 @@ An omitted `TYPE` produces no error anywhere: CK3 substitutes parameters textual
 literal string `type = $TYPE$` reaches `send_interface_toast`, and `validate` sees balanced
 braces. **Only this count catches it.**
 
-- [ ] **Step 8: Full static pass**
+- [x] **Step 8: Full static pass**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy

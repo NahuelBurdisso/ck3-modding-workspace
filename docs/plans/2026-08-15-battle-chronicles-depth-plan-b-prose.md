@@ -388,10 +388,10 @@ Append to `bc_flavour.txt`:
 #
 # [DRAFT, SUPERSEDED. Read the shipped header in bc_flavour.txt instead; it is
 # the one to copy. Do not count the differences, read them - the shipped header
-# adds the citation for the ladder (bc_ledger_effects.txt:112-125) and for the
-# bucket derivation (:97-105); the pointer to step 4's mechanical check; the
-# correction that a silent no-match IS distinguishable in the log even though it
-# is not on the toast, via the `BC: size` markers at :115, :120 and :124; the
+# adds the citation for the size ladder inside bc_battle_open_effect and for the
+# bucket derivation under `A BUCKET, 1/2/3`; the pointer to step 4's mechanical
+# check; the correction that a silent no-match IS distinguishable in the log even
+# though it is not on the toast, via the three `BC: size` markers in the ladder; the
 # note that these arms compare for equality where the rest of the mod uses `>=`;
 # the monotonicity rule for the three strings; the axis itself, the record of
 # why the first two axes were abandoned and by what, and the four-row test a

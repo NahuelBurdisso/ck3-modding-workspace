@@ -872,7 +872,7 @@ straight to task 10, and skip its eve-specific steps.
 - Modify: `mods/battle_chronicles/common/scripted_effects/bc_scripted_effects.txt`
 - Modify: `mods/battle_chronicles/common/scripted_triggers/bc_scripted_triggers.txt`
 
-- [ ] **Step 1: Add the cooldown effect**
+- [x] **Step 1: Add the cooldown effect**
 
 Append to `common/scripted_effects/bc_scripted_effects.txt`, immediately after
 `bc_start_popup_cooldown_effect`:
@@ -901,7 +901,7 @@ bc_start_eve_cooldown_effect = {
 }
 ```
 
-- [ ] **Step 2: Add the read-back trigger**
+- [x] **Step 2: Add the read-back trigger**
 
 Append to `common/scripted_triggers/bc_scripted_triggers.txt`:
 
@@ -948,7 +948,7 @@ subject.
 `no`. That is safe and the eve simply always shows the stranger text. It is not a reason to
 delay the eve.
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -977,7 +977,7 @@ on_combat_start."
 - Modify: `mods/battle_chronicles/events/bc_combat_start_events.txt`
 - Create: `mods/battle_chronicles/common/scripted_effects/bc_eve_effects.txt`
 
-- [ ] **Step 1: Read what plan 1 left behind**
+- [x] **Step 1: Read what plan 1 left behind**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -988,7 +988,7 @@ Plan 1 task 16 step 2 renamed `bc_diag_events.txt` to this and stripped `bc_chro
 to a shell that logs `BC: DIAG Q2 combat-scoped event fired` and nothing else. **The shell is
 the proof that this event shape works**; task 7 replaces it rather than adding beside it.
 
-- [ ] **Step 2: Write the offer effect**
+- [x] **Step 2: Write the offer effect**
 
 Create `common/scripted_effects/bc_eve_effects.txt`. **UTF-8, no BOM** — script files in this
 mod carry no BOM; only the localization file does.
@@ -1046,7 +1046,7 @@ belongs to that event chain and the pop-up's `desc` can read it. It is saved bef
 `trigger_event`, not after, because a scope saved after the raise is not in the raised
 event's chain.
 
-- [ ] **Step 3: Replace the shell with the real hidden event**
+- [x] **Step 3: Replace the shell with the real hidden event**
 
 In `events/bc_combat_start_events.txt`, replace `bc_chronicles.0900` entirely:
 
@@ -1129,7 +1129,7 @@ the size gate.
 **`scope:bc_eve_attacker` and `scope:bc_eve_defender` are saved on the commanders but live in
 the event's chain**, which is why the second pass can read the one saved in the first.
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts
@@ -1157,7 +1157,7 @@ true."
 - Modify: `mods/battle_chronicles/events/bc_combat_start_events.txt`
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
 
-- [ ] **Step 1: Write the event**
+- [x] **Step 1: Write the event**
 
 Append to `events/bc_combat_start_events.txt`:
 
@@ -1235,7 +1235,7 @@ bc_chronicles.0011 = {
 — re-testing them here would let a commander who passed the gate lose the event to a race
 and take the cooldown for nothing.
 
-- [ ] **Step 2: Write the seven localization keys**
+- [x] **Step 2: Write the seven localization keys**
 
 Append to `localization/english/bc_l_english.yml`. **One leading space per line.**
 
@@ -1257,7 +1257,7 @@ scope which was never saved renders as an empty string with no error, so this is
 presentation bug rather than a crash — but the trigger already prevents it and the two must
 stay in step.
 
-- [ ] **Step 3: Verify the desc branches resolve**
+- [x] **Step 3: Verify the desc branches resolve**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1285,7 +1285,7 @@ lives in `bc_eve_effects.txt` and is a ninth reference in a different file, and
 
 A `bc_eve_foe` in a desc the trigger does not guard is the bug this step exists to catch.
 
-- [ ] **Step 4: Verify the total key count**
+- [x] **Step 4: Verify the total key count**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1297,7 +1297,7 @@ Against the baseline recorded in task 5 step 1, the count must have risen by exa
 2 from task 5, 7 from here. The BOM must still be present (`M-oM-;M-?`); editors strip it
 silently, which is why it is checked after the edits as well as before.
 
-- [ ] **Step 5: Validate and commit**
+- [x] **Step 5: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -1328,7 +1328,7 @@ honest out and costs prestige, because declining to commit is a choice."
 **Files:**
 - Modify: `mods/battle_chronicles/common/on_action/bc_on_actions.txt`
 
-- [ ] **Step 1: Add the hook**
+- [x] **Step 1: Add the hook**
 
 Append to `common/on_action/bc_on_actions.txt`, after `on_combat_end_loser`:
 
@@ -1351,7 +1351,7 @@ on_combat_start = {
 than adding a second one.** Two entries would raise both events on every combat, and
 `bc_chronicles.0900` no longer exists.
 
-- [ ] **Step 2: Verify the hook and the event agree**
+- [x] **Step 2: Verify the hook and the event agree**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1362,6 +1362,14 @@ grep -n "effect = {" common/on_action/bc_on_actions.txt | grep -v "#"
 
 Expected: one `on_combat_start` block naming exactly `bc_chronicles.0010`; **no output** for
 `.0900`; and **no output** for the third.
+
+**RUN CORRECTION — the `.0900` grep is not silent, and must not be.** It returns one line,
+`README.md:229`, inside the permanent DIAG Q2 record. That paragraph reports a *measurement* —
+"`bc_chronicles.0900` fired 151 times" — and editing the name out of it would falsify what was
+measured. The line was kept and the sentence amended to say the probe is retired and replaced
+on the same hook by `bc_chronicles.0010`, so a future reader is not sent hunting for an event
+that no longer exists. **One README hit is the pass condition; a hit under `common/` or
+`events/` is the failure this step is actually looking for.**
 
 **`--exclude-dir=.git` on the second.** It searches from the mod root, and this plan's own
 commit messages discuss `.0900` — without the flag the check would report `.git` objects
@@ -1379,7 +1387,7 @@ on_action does not merge — the engine keeps exactly one and logs
 and "most recent" is decided alphabetically inside `common/on_action`, so
 `bc_on_actions.txt` loses to `combat_on_actions.txt`.
 
-- [ ] **Step 3: Validate, deploy and commit**
+- [x] **Step 3: Validate, deploy and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy
@@ -1403,7 +1411,7 @@ common/on_action is alphabetical rather than playset load order."
 
 **Files:** none — this task only reads.
 
-- [ ] **Step 1: The wipe has exactly one reader**
+- [x] **Step 1: The wipe has exactly one reader**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1415,6 +1423,14 @@ The first must show **exactly three** lines, all inside `bc_was_wipe_trigger` �
 `limit`'s copy, and the comparison. The second must show **four** — the definition, the
 notability row, `bc_style_step_value`, and `bc_rivalry_step_value`.
 
+**RUN CORRECTION — the second grep returns SIX, not four, and six is correct.** The plan's
+count was written before task 5 existed in this form. The two extra lines are task 5's own
+`BC: wipe` markers, `events/bc_aftermath_events.txt:67` and `:222`, one per grader. The full
+correct census is: the definition (`bc_scripted_triggers.txt:282`), the notability row
+(`:222`), `bc_style_step_value` (`bc_script_values.txt:187`), `bc_rivalry_step_value`
+(`:160`), and the two markers. **Five would mean a grader lost its marker; four would mean
+both did.**
+
 **Both greps need the `grep -v "#"`.** Task 1's comment block names `scope:wipe` on three
 lines, and task 2 step 3's replacement header names `bc_was_wipe_trigger` outright as the
 sixth row. Unfiltered, this step fails on correct code.
@@ -1423,7 +1439,7 @@ sixth row. Unfiltered, this step fails on correct code.
 script uses both the `exists` and the `= yes` idiom and it is not known which reading is
 correct; the whole point of the trigger is that the mod commits to one place.
 
-- [ ] **Step 2: The three step rules did not converge**
+- [x] **Step 2: The three step rules did not converge**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1445,7 +1461,7 @@ zero while every reference is indented, and plan 4's decrement carries a comment
 `# THE FLOOR GUARD IS \`<= bc_rivalry_step_value\`, NOT A CONSTANT` inside
 `bc_rivalry_effects.txt` — unfiltered, that comment makes the correct count read five.
 
-- [ ] **Step 3: The notability trigger has six substantive rows and says so**
+- [x] **Step 3: The notability trigger has six substantive rows and says so**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1462,7 +1478,7 @@ did not land as a direct child.
 calibration silently becomes uncalibrated — the sample behind the four ladders was measured
 against `amount >= 2` on five rows.
 
-- [ ] **Step 4: Every toast call names a TYPE**
+- [x] **Step 4: Every toast call names a TYPE**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1484,7 +1500,7 @@ An omitted `TYPE` produces no error anywhere: CK3 substitutes parameters textual
 literal string `type = $TYPE$` reaches `send_interface_toast`, and `validate` sees balanced
 braces. **Only this count catches it.**
 
-- [ ] **Step 5: The eve's two throttles did not merge**
+- [x] **Step 5: The eve's two throttles did not merge**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1496,10 +1512,18 @@ grep -rn "bc_can_interrupt_player_trigger" common/scripted_effects/bc_eve_effect
 `bc_eve_offer_effect`. `bc_popup_cooldown` must appear nowhere in the eve's files. The second
 grep must produce **no output**.
 
+**RUN CORRECTION — both greps in this step need `grep -v "#"`.** `bc_eve_effects.txt:32`
+opens a comment paragraph with the words `NOT bc_can_interrupt_player_trigger. That trigger
+tests bc_popup_cooldown, which is the mid-battle budget the eve must not spend.` — a header
+written for exactly the reason this step exists. Unfiltered, the file that documents the rule
+hardest is the file that fails the check. Filtered, the run is clean: `bc_eve_cooldown` on two
+code lines (`bc_eve_effects.txt:39` gate, `bc_scripted_effects.txt:208` setter) and
+`bc_popup_cooldown` on none in the eve's files.
+
 **If the eve ever tests `bc_can_interrupt_player_trigger`, it is spending the mid-battle
 budget** — the eve fires first, every time, and would consume it before the battle began.
 
-- [ ] **Step 6: Every effect the eve calls actually exists**
+- [x] **Step 6: Every effect the eve calls actually exists**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -1515,7 +1539,7 @@ Expected: **no output.** `validate` does not resolve effect or modifier names, s
 misspelled one passes cleanly and does nothing forever. Two `MISSING MODIFIER` lines mean
 plan 2 has not shipped and the eve's first two options are silent no-ops.
 
-- [ ] **Step 7: No missing-variable or missing-scope read**
+- [x] **Step 7: No missing-variable or missing-scope read**
 
 Read `bc_eve_effects.txt` and the two new triggers end to end. Every read must be nested:
 
@@ -1535,7 +1559,7 @@ empty string and logs nothing. Its guard is structural: the key is only ever sel
 the scope exists. **If that token ever moves into `desc_intro` or `desc_stranger` the guard is
 gone**, silently, and the eve renders a sentence with a hole in it.
 
-- [ ] **Step 8: Full static pass**
+- [x] **Step 8: Full static pass**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict && python ck3.py index && python ck3.py conflicts && python ck3.py deploy

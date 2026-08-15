@@ -184,7 +184,7 @@ the file that holds it can carry that warning in its header instead of burying i
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_triggers/bc_scripted_triggers.txt`
 
-- [ ] **Step 1: Confirm the marker does not exist**
+- [x] **Step 1: Confirm the marker does not exist**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "BC: wipe"
@@ -197,7 +197,7 @@ left code behind; find it before continuing.
 trigger and cannot hold a `debug_log`, and so are all three of its consumers, so the only
 place in the mod that can emit `BC: wipe` is an `if` inside the graders' `immediate`.
 
-- [ ] **Step 2: Write the trigger**
+- [x] **Step 2: Write the trigger**
 
 Append to `common/scripted_triggers/bc_scripted_triggers.txt`, in a new section after the
 notability trigger:
@@ -240,7 +240,7 @@ bc_was_wipe_trigger = {
 **Do not touch the "Five substantive rows plus the game rule" comment in this step.** Task 2
 changes it, deliberately and with the row it describes.
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
@@ -267,7 +267,7 @@ the world."
 **Files:**
 - Modify: `mods/battle_chronicles/common/scripted_triggers/bc_scripted_triggers.txt`
 
-- [ ] **Step 1: Read the trigger and count its rows**
+- [x] **Step 1: Read the trigger and count its rows**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -296,7 +296,7 @@ must be a letter.
 **If you count seven children, or the grep prints 8, plan 5 has already run.** Stop and check
 git log.
 
-- [ ] **Step 2: Add the row**
+- [x] **Step 2: Add the row**
 
 Add `bc_was_wipe_trigger = yes` as a direct child of `calc_true_if`, **after the warscore row
 and before the game rule**:
@@ -336,7 +336,7 @@ plan's preamble before you decide the header forbids this.
 it does not order. It is placed with the substantive rows and above the game rule because the
 game rule is the off-ramp and reads last.
 
-- [ ] **Step 3: Update the header comment**
+- [x] **Step 3: Update the header comment**
 
 Find the line beginning `# Five substantive rows plus the game rule.` and replace that
 sentence with:
@@ -366,7 +366,7 @@ this file and changes no rows; plan 5 adds a row. If plan 4 has not shipped yet,
 instruction will still be correct when it does — it refers to the count, and the count is
 now six.
 
-- [ ] **Step 4: Verify the row count changed and nothing else did**
+- [x] **Step 4: Verify the row count changed and nothing else did**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -388,7 +388,7 @@ cd /d/ck3/tools && python ck3.py validate --strict
 
 Expected: exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -412,7 +412,7 @@ and recorded that the sixth row postdates the 39-battle calibration."
 **Depends on plan 3.** If `bc_reputation_effects.txt` does not exist, plan 3 has not shipped
 and this task cannot run. Skip to task 4 and come back.
 
-- [ ] **Step 1: Write the script value**
+- [x] **Step 1: Write the script value**
 
 Append to `common/script_values/bc_script_values.txt`:
 
@@ -448,7 +448,7 @@ bc_style_step_value = {
 **A full if/else of bare `value = X` with no base value outside is shipped vanilla** —
 `swing_scales_discounts_multiplier_value`, `00_diarchy_values.txt:3224-3237`. Verified.
 
-- [ ] **Step 2: Wire it into the match branch, and only the match branch**
+- [x] **Step 2: Wire it into the match branch, and only the match branch**
 
 In `common/scripted_effects/bc_reputation_effects.txt`, find `bc_style_streak_effect` and
 change **one line**:
@@ -469,7 +469,7 @@ exist.
 
 **`change_variable = { add = <script value> }` is shipped vanilla.** Verified.
 
-- [ ] **Step 3: Verify the step lands in exactly one place**
+- [x] **Step 3: Verify the step lands in exactly one place**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -485,13 +485,19 @@ Expected, in order:
 - every `bc_terrain_streak` line still reading `1`. **A `bc_style_step_value` anywhere near
   a terrain line is the bug this step exists to catch.**
 
+> **RUN CORRECTION (2026-08-14).** The bare count on the first grep is **three**. Task 1's own
+> comment block names `bc_style_step_value` while explaining that the wipe trigger is
+> scope-independent. Filter it — `grep -rn "bc_style_step_value" common/ | grep -v "#"` returns
+> two. Same house rule plans 2, 3 and 4 each hit: any verification grep whose pattern appears
+> in the shipped comment must be filtered, or anchored on call syntax.
+
 ```bash
 cd /d/ck3/tools && python ck3.py validate --strict
 ```
 
 Expected: exit 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -516,7 +522,7 @@ single battle."
 **Depends on plan 4.** If `bc_rivalry_step_value` does not exist, plan 4 has not shipped;
 skip to task 5 and come back.
 
-- [ ] **Step 1: Understand that this changes no behaviour, and that that is the point**
+- [x] **Step 1: Understand that this changes no behaviour, and that that is the point**
 
 **This task does not turn anything on.** `scope:wipe` is engine-provided on both combat-end
 hooks — AGOT documents it at `common/on_action/combat_on_actions.txt:12` and `:527` — so
@@ -555,7 +561,7 @@ value does **not** look like the block above — if it is a bare `limit = { exis
 scope:wipe }` — you are looking at the pre-correction draft, and swapping it to the trigger
 **does** change behaviour, in the direction of correctness. Say so in the commit message.
 
-- [ ] **Step 2: Replace the test**
+- [x] **Step 2: Replace the test**
 
 ```
 bc_rivalry_step_value = {
@@ -572,7 +578,7 @@ bc_rivalry_step_value = {
 Update plan 4's comment above it if it names `exists = scope:wipe`; the trigger is now the
 single place the reading is decided, and both step values go through it.
 
-- [ ] **Step 3: Verify nothing else tests the scope directly**
+- [x] **Step 3: Verify nothing else tests the scope directly**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -593,7 +599,7 @@ cd /d/ck3/tools && python ck3.py validate --strict
 
 Expected: exit 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -618,7 +624,7 @@ learned the answer."
 - Modify: `mods/battle_chronicles/events/bc_aftermath_events.txt`
 - Modify: `mods/battle_chronicles/localization/english/bc_l_english.yml`
 
-- [ ] **Step 1: Record the localization baseline**
+- [x] **Step 1: Record the localization baseline**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -629,7 +635,7 @@ grep -c "^ bc_\|^ rule_bc_\|^ setting_bc_" localization/english/bc_l_english.yml
 localization tasks in this plan, and that is not a check you can run without the number from
 before.
 
-- [ ] **Step 2: Understand why this is a presence test and not an iteration**
+- [x] **Step 2: Understand why this is a presence test and not an iteration**
 
 The graders filter `every_side_knight` with `is_alive = yes`, which silently drops exactly
 the knights whose deaths were worth telling.
@@ -647,7 +653,7 @@ localization budget is two keys rather than one per name.
 **A side whose commander is absent gets no toast**, which is correct: there is nobody to
 tell. That is what the `?=` expresses.
 
-- [ ] **Step 3: Add the block to both graders**
+- [x] **Step 3: Add the block to both graders**
 
 In `events/bc_aftermath_events.txt`, add to **both** `bc_chronicles.0091` and
 `bc_chronicles.0092`, **inside the notability gate** and **outside the
@@ -704,7 +710,7 @@ In `events/bc_aftermath_events.txt`, add to **both** `bc_chronicles.0091` and
 **Both graders get it, with identical text.** The winner also loses knights, and a winner
 told nothing about his dead is the same gap on the other side.
 
-- [ ] **Step 3b: Add the wipe marker to both graders**
+- [x] **Step 3b: Add the wipe marker to both graders**
 
 **Nothing else in this plan can write `BC: wipe`.** `bc_was_wipe_trigger` is a trigger, and a
 trigger cannot hold a `debug_log`; its three consumers are a `calc_true_if` row and two script
@@ -738,7 +744,7 @@ and would falsify the one thing task 11 step 5 is checking for.
 
 **Two tabs**, matching the sibling `if` below it — `immediate` is at one tab inside the event.
 
-- [ ] **Step 4: Add the two localization keys**
+- [x] **Step 4: Add the two localization keys**
 
 Append to `localization/english/bc_l_english.yml`. **One leading space per line.**
 
@@ -753,7 +759,7 @@ Append to `localization/english/bc_l_english.yml`. **One leading space per line.
 "the heralds will have their names by morning" is the sentence that makes the absence read
 as restraint rather than as a gap.
 
-- [ ] **Step 5: Verify the placement**
+- [x] **Step 5: Verify the placement**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -798,7 +804,7 @@ categories at `:37` — `common/traits`, `common/decisions`,
 so `--strict` is silent about `bc_dead_knights_toast` whether it exists or not. The four
 counts at the top of this step are the check.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles
@@ -822,6 +828,41 @@ trigger and all three of its consumers are trigger or script-value context."
 that `BC: DIAG Q2 combat-scoped event fired` never appeared, `events/bc_combat_start_events.txt`
 does not exist, `on_combat_start` was never claimed, and there is nothing to build on. Go
 straight to task 10, and skip its eve-specific steps.
+
+> **RUN CORRECTION (2026-08-14) — STOPPED HERE. THE GATE ABOVE IS THE WRONG GATE.**
+>
+> Q2 has **two** halves and this plan only checks one of them. The half it checks passed: the
+> `scope = combat` event fired 152 times. The half it does not check **failed**, and it is the
+> half tasks 6-9 are built on.
+>
+> `combat_attacker.side_commander` and `combat_defender.side_commander` were both probed as
+> `combat_<side>.side_commander ?= { debug_log = ... }` across those same 152 fires and **both
+> logged zero**. The `?=` swallowed it in silence. The mod file this plan proposes to overwrite
+> records the finding in its own header and states the conclusion outright: *"an eve pop-up
+> CANNOT reach the two sides through those links."*
+>
+> **Task 7 step 3 is written entirely on those two links.** As drafted the eve would log
+> `BC: eve fired` on every large battle and then do nothing — no saves, no offers, no pop-up —
+> and task 11 step 4's table would read that as the second row, "inconclusive, fight another
+> one", forever.
+>
+> Two further drift items in the same tasks, both minor next to the above:
+> - The shell logs **`BC: combat start`**, not `BC: DIAG Q2 combat-scoped event fired`. Task 11
+>   step 2's `probe "eve"` is unaffected; the gate wording above is what is stale.
+> - The shell event is still **`bc_chronicles.0900`** and `on_combat_start` still names it, so
+>   task 9 step 2's `grep -rn "bc_chronicles.0900"` expecting no output requires task 7 to have
+>   actually replaced it.
+>
+> **A route the plan did not consider: `every_combat_side`** — supported scope `combat`,
+> target `combat_side`, confirmed in the 1.19.0.6 API dump. Paired with `enemy_side`, which
+> `bc_battle_is_notable_trigger` already uses, it reaches both commanders and each one's foe
+> without the two-pass ordering the plan needs. **It is unproven from a `scope = combat` event
+> in exactly the way the failed links were**, so it must ship behind its own marker and be
+> measured, per the mod file's own instruction: *"whichever route is chosen must be proven with
+> its own marker before anything is built on it."*
+>
+> Tasks 1-5 are complete and committed. Tasks 6-9 need this decision before they can be
+> written.
 
 ---
 

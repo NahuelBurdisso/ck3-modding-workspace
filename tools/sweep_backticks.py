@@ -121,7 +121,13 @@ not, it recorded this instead, which is the failure this file exists to make
 harder.
 
 EXTENSIONS ARE MATCHED CASE-INSENSITIVELY, because the rule the sweep enforces
-is casing-blind and a `README.MD` would otherwise be skipped in silence.
+is casing-blind and a `README.MD` would otherwise be skipped in silence. THE
+DOTFILE NAMES BESIDE THEM ARE NOT, and the asymmetry is deliberate: a mis-cased
+extension is something a person types, while a dotfile name is fixed by git,
+which does not read a `.GITIGNORE` either. That list exists at all because a
+name with no second dot has NO SUFFIX for `EXTS` to match - which is how
+`mods/battle_chronicles/.gitattributes` came to hold two paragraphs of prose
+that this tool could not see.
 
 AN UNREADABLE FILE IS NOT SKIPPED. Only `UnicodeDecodeError` is caught, so a
 file this process cannot open raises out of the sweep, and a sweep that quietly
@@ -156,6 +162,16 @@ from pathlib import Path
 # its gui, its descriptor, the tooling's Python, and the docs.
 EXTS = {".txt", ".yml", ".gui", ".info", ".md", ".mod", ".py"}
 
+# EXTENSIONS ARE NOT ENOUGH, because a dotfile with no second dot has no
+# suffix at all: `Path(".gitattributes").suffix` is the empty string, so no
+# entry in EXTS can ever reach one. mods/battle_chronicles/.gitattributes
+# carries two paragraphs of prose naming `has_bom` and `_check_loc_file` in
+# backticks, which is exactly the kind of line the sweep exists to catch
+# wrapping, and it was invisible to this tool while that was true. Matched on
+# the WHOLE NAME and case-sensitively: unlike an extension, a dotfile name is
+# fixed by git and by convention, and `.GITATTRIBUTES` is not a thing.
+NAMES = {".gitattributes", ".gitignore"}
+
 # A fence may be indented, and may sit inside one or more blockquote markers.
 # `> ` followed by three backticks is a real line of
 # docs/plans/2026-08-13-battle-chronicles-expansion-plan-3-reputation.md. What
@@ -185,7 +201,7 @@ def sweep(root: Path) -> list[tuple[str, int, str]]:
         filenames.sort()
         for name in filenames:
             path = Path(dirpath) / name
-            if path.suffix.lower() not in EXTS or not path.is_file():
+            if (path.suffix.lower() not in EXTS and name not in NAMES) or not path.is_file():
                 continue
             try:
                 lines = path.read_text(encoding="utf-8-sig").splitlines()

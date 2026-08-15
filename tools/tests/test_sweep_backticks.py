@@ -462,6 +462,44 @@ class TestWalkCoverage(SweepTestCase):
         # test and no mutant in the harness reaches.
         self.assertEqual(S.EXTS, set(self.LISTED_EXTS))
 
+    # THE SAME PAIR AGAIN, FOR THE NAMES NO EXTENSION CAN REACH. A dotfile
+    # with no second dot has an EMPTY suffix - `Path(".gitattributes").suffix`
+    # is "" - so no entry in EXTS can ever match one, however the set is
+    # spelled. Written out here rather than derived from `S.NAMES` for the
+    # reason recorded above the extension list: a set on both sides of the
+    # assertion cannot see itself being narrowed.
+    LISTED_NAMES = (".gitattributes", ".gitignore")
+
+    def test_every_listed_dotfile_name_is_actually_scanned(self) -> None:
+        for name in self.LISTED_NAMES:
+            self.write(name, ODD_LINE)
+        self.assertEqual(
+            self.hits(), [(name, 1) for name in sorted(self.LISTED_NAMES)]
+        )
+
+    def test_an_unlisted_dotfile_is_skipped(self) -> None:
+        # The set is an allowlist and not "anything beginning with a dot".
+        # .gitmodules and .editorconfig carry no prose this rule governs, and
+        # a walk that opened every dotfile would start reporting whatever a
+        # tool dropped in the tree next.
+        self.write(".gitmodules", ODD_LINE)
+        self.write(".editorconfig", ODD_LINE)
+        self.assertClean()
+
+    def test_the_literal_dotfile_list_is_the_one_the_sweep_declares(self) -> None:
+        # Sole killer of a WIDENING of NAMES, exactly as its counterpart above
+        # is for EXTS.
+        self.assertEqual(S.NAMES, set(self.LISTED_NAMES))
+
+    def test_a_dotfile_name_is_matched_case_sensitively(self) -> None:
+        # DELIBERATELY UNLIKE THE EXTENSIONS. A mis-cased extension is a real
+        # thing a person types; a dotfile name is fixed by git, and .GITIGNORE
+        # is not a file git reads either. Lowercasing the comparison would let
+        # an unrelated file called .GITIGNORE into the sweep and would say
+        # nothing true about the tree.
+        self.write(".GITIGNORE", ODD_LINE)
+        self.assertClean()
+
     def test_a_bom_is_not_reported_as_part_of_the_line(self) -> None:
         # Every mod script file carries a UTF-8 BOM, so `utf-8-sig` is not
         # decoration. THE ASSERTION IS ON THE REPORTED TEXT, not on the line

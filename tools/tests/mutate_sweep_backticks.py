@@ -146,13 +146,27 @@ MUTANTS = [
     ),
     (
         "walk: match extensions case-sensitively",
-        "if path.suffix.lower() not in EXTS or not path.is_file():",
-        "if path.suffix not in EXTS or not path.is_file():",
+        "if (path.suffix.lower() not in EXTS and name not in NAMES) or not path.is_file():",
+        "if (path.suffix not in EXTS and name not in NAMES) or not path.is_file():",
     ),
     (
         "walk: accept every extension",
-        "if path.suffix.lower() not in EXTS or not path.is_file():",
+        "if (path.suffix.lower() not in EXTS and name not in NAMES) or not path.is_file():",
         "if not path.is_file():",
+    ),
+    # THE NAMES ARM, BOTH WAYS. Dropping it puts the extensionless dotfiles
+    # back out of reach - `Path(".gitattributes").suffix` is "", so no spelling
+    # of EXTS substitutes for it - and lowercasing it widens an allowlist whose
+    # members are fixed by git and never appear mis-cased.
+    (
+        "walk: stop reading the dotfiles no extension can reach",
+        "if (path.suffix.lower() not in EXTS and name not in NAMES) or not path.is_file():",
+        "if path.suffix.lower() not in EXTS or not path.is_file():",
+    ),
+    (
+        "walk: match a dotfile name case-insensitively",
+        "and name not in NAMES) or not path.is_file():",
+        "and name.lower() not in NAMES) or not path.is_file():",
     ),
     (
         "walk: filter nothing, prune nothing",
@@ -234,8 +248,8 @@ MUTANTS = [
     ),
     (
         "walk: drop the is_file guard",
-        "if path.suffix.lower() not in EXTS or not path.is_file():",
-        "if path.suffix.lower() not in EXTS:",
+        "if (path.suffix.lower() not in EXTS and name not in NAMES) or not path.is_file():",
+        "if (path.suffix.lower() not in EXTS and name not in NAMES):",
     ),
     (
         "decode: stop stripping the BOM",
@@ -254,6 +268,26 @@ MUTANTS = [
         "walk: stop reading Python",
         '".md", ".mod", ".py"}',
         '".md", ".mod"}',
+    ),
+    # ONE MUTANT PER LISTED NAME, dropped singly, for the reason the extension
+    # block above records: a wholesale empty set dies to almost anything, and
+    # it is the single drop that finds a test taking its fixtures from the set
+    # it is checking. The widening is here too, because an allowlist has no
+    # other way to go wrong.
+    (
+        "walk: stop reading .gitattributes",
+        '{".gitattributes", ',
+        "{",
+    ),
+    (
+        "walk: stop reading .gitignore",
+        ', ".gitignore"}',
+        "}",
+    ),
+    (
+        "walk: read any dotfile git happens to own",
+        'NAMES = {".gitattributes", ".gitignore"}',
+        'NAMES = {".gitattributes", ".gitignore", ".gitmodules"}',
     ),
     (
         "walk: prune the three directories the real tree keeps its prose in",

@@ -129,7 +129,7 @@ If the user has no such run, **stop here.** This plan is blocked on a run, not o
 
 The README has no "run log" section. Its convention is one `## <Kind> run, <date>`
 heading per run, in chronological order, with `## Not yet verified in game`
-always **last** (`README.md:558`). Follow it: insert a new
+always **last** (`README.md:560`). Follow it: insert a new
 
 ```
 ## Spike gate run, <date of the run> (Plan B task 1)
@@ -178,7 +178,7 @@ The last two are not optional and were added to this list after the fact. This c
 
 Append to `bc_flavour.txt`:
 
-**The header comment below is the DRAFT, and it was wrong in three ways that four review rounds corrected.** It is left here only so the diff is legible; **the shipped header is the one in `bc_flavour.txt` and it is the one to copy from.** The draft's errors, in the order they were found: (1) it says the fallback covers "there may not have been one", which is false — `bc_write_bond_effect`'s leaderless `else` deliberately writes `flag:stranger`, so a foeless battle takes the `stranger` arm, and the fallback covers a path that left the variable unwritten; (2) it justifies `stranger` by "a man he has never heard of" against "the case where NOTHING is known", a distinction the writer does not make; (3) it says nothing about which call sites can reach the fallback, which is the question a reader actually has. Do not paste this block.
+**The header comment below is a TRUNCATED DRAFT. Do not paste it — copy the shipped header from `bc_flavour.txt`.** The draft carried three errors that five review rounds corrected. Two of them have been cut out of the block below rather than left standing, so the block no longer shows them: (1) it claimed the fallback covers the case where "there may not have been one" foe, which is false — `bc_write_bond_effect`'s leaderless `else` deliberately writes `flag:stranger`, so a foeless battle takes the `stranger` arm, and the fallback covers a path that left the variable unwritten; (2) it justified `stranger` by "a man he has never heard of" against "the case where NOTHING is known", a distinction the writer does not make. The third is still visible in what remains: (3) it says nothing about which call sites can reach the fallback, which is the question a reader actually has, and the answer differs between the ten moment toasts and a pop-up option's toast.
 
 ```
 
@@ -263,7 +263,7 @@ In `bc_l_english.yml`, after the last moment toast desc (`bc_shieldbrother_forge
 
  bc_frag_bond_nemesis:0 " The man commanding here does not have to ask whose colours are across the field."
  bc_frag_bond_kin:0 " The man commanding here shares blood with whoever is giving the orders across the field."
- bc_frag_bond_countryman:0 " The man commanding here and the one commanding against him were born to the same people."
+ bc_frag_bond_countryman:0 " The man commanding here and the one commanding against him are of the same people."
  bc_frag_bond_heathen:0 " Whatever the other side was praying to at dawn, the man commanding here was not."
  bc_frag_bond_stranger:0 " The man commanding here has never had cause to learn a name on the other side."
  bc_frag_bond_any:0 ""

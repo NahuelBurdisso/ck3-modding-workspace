@@ -261,15 +261,23 @@ In `bc_l_english.yml`, after the last moment toast desc (`bc_shieldbrother_forge
 
 # --- shared fragments: the bond ---------------------------------------------
 
- bc_frag_bond_nemesis:0 " The man commanding here knows whose banner that is across the field, and has known all morning."
- bc_frag_bond_kin:0 " The man commanding here has eaten at a table with men on the other side."
- bc_frag_bond_countryman:0 " Both sides are shouting in the same tongue."
+ bc_frag_bond_nemesis:0 " The man commanding here knew whose colours those were across the field before either host moved."
+ bc_frag_bond_kin:0 " The man commanding here shares blood with whoever is giving the orders across the field."
+ bc_frag_bond_countryman:0 " The men on both sides curse in the same words."
  bc_frag_bond_heathen:0 " Whatever the other side was praying to at dawn, the man commanding here was not."
  bc_frag_bond_stranger:0 " Nobody across the field is anybody to the man commanding here."
  bc_frag_bond_any:0 ""
 ```
 
 Note the leading space inside each non-empty string, and that `bc_frag_bond_any` is empty rather than absent — the key must exist or Plan A's task 1 check errors on the arm that names it.
+
+**Two prose rules the first draft of these strings broke, corrected in review 2026-08-15.**
+
+**The foe is ONE character and may be a woman.** `bc_battle_bond` is computed against `var:bc_battle_foe`, a single enemy side commander, and the `kin` arm's test is `is_close_family_of`, whose members per the API dump are parents, children, siblings, grandparents and grandchildren — mothers, daughters, sisters and grandmothers all match. So no fragment may say "men on the other side" (plural against a single foe) or assume the foe's sex. The other four arms stay neutral by saying "the other side" or "nobody across the field"; the `kin` arm must too. It also has to be *about blood*, or it does not distinguish itself from `countryman`, which is the only reason the two arms are separate.
+
+**No fragment may date itself to the start of the battle.** Phase events roll every five days, so these clauses append to toasts arriving on day 20 of a long fight. "at dawn" survives that; "all morning" presumes the battle began this morning.
+
+**A third rule, added in the third review pass.** **No fragment may collide with the sentence it appends to, or with the eve.** A bond clause is appended to a moment toast and read in the same breath as it, and the same battle already showed the player the eve. Two collisions were caught this way: `nemesis` said "banner", which lands directly on `bc_banner_falls_toast_desc`'s falling standard and reads as if the nemesis's banner is the one going down — now "colours"; and `countryman` said "shouting in the same tongue", which is how the eve's `bc_chronicles.0011.desc_countryman` ends — now "curse in the same words". Check a new fragment against the ten toast descs **and** against `bc_chronicles.0011.desc_*` before shipping it.
 
 **"The man commanding here", not "he", and this is not a style choice.** The bond is
 computed commander-against-commander in `bc_write_bond_effect`; it is a fact about

@@ -1051,6 +1051,36 @@ the whole task before launching.
 > with a losing swing — `decisive` needs `var:bc_battle_moments >= 5`, which is a long
 > battle, and none occurred.
 
+> **RUN RESULT (2026-08-15) — THE ZERO IS EXPLAINED. TASK STAYS OPEN, BUT IT IS NO
+> LONGER BLIND.** Clean log, 44 combat ends, 233 moments. `BC: moment decisive` **1**,
+> at `bc_ledger_effects.txt:285` — verified against the current build, so a genuine
+> clear of the new `>= 4` floor. `BC: wound` **0**.
+>
+> **`bc_wound_effect` had exactly one call site: the last line of the decisive arm.**
+> Decisive resolved once, so **family 3 had one opportunity all run**. Every previous
+> zero was starvation from the rung above, not a fault in the wound's own gates. The
+> "reach a 5+ moment battle" instruction above was chasing the wrong constraint.
+>
+> **The upstream number is the real finding.** `BC: fired bc_flank_collapses` **10**,
+> and both `TIER = decisive` sites pass identical arguments so they share one arg-hash,
+> which also totals 10 — meaning `bc_chronicles.0001.c` was picked zero times and all
+> ten decisive *requests* came from the flank-collapse phase event. Of those ten: 7
+> demoted to minor (ledger held 1-2), 2 to major (held 3), 1 resolved decisive (held
+> 4+). **Only 10 of 233 moments ever ask for `decisive`, and 7 ask too early**, because
+> `bc_flank_collapses` fires near the start of a battle. The floor was never the
+> dominant limit; it stays at 4.
+>
+> **Fix applied:** `bc_wound_effect` is now called from the **major arm too**, which
+> resolved 45 times on the same run. Its `var:bc_battle_wounded` guard still caps one
+> wound per battle, so the sample widens and the outcome does not. A
+> `BC: wound gates passed` marker now sits between the five-row outer limit and the
+> nested `var:bc_battle_size >= 3` read, so the next zero names its own gate.
+>
+> **What the next run must show:** `BC: wound gates passed` non-zero. If it counts and
+> `BC: wound` stays 0, the size read is the rejector; if both are 0 while
+> `BC: moment major` counts, the outer limit is — most likely `bc_wounds_off` or a
+> `wounded` trait already present.
+
 - [ ] **Step 1: Clear the logs, with the game NOT running**
 
 ```bash

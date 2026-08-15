@@ -1690,6 +1690,29 @@ cd /d/ck3/tools && python ck3.py probe "BC: wipe"
 >
 > The `BC: wipe` rows of the table are unaffected and passed: 38 on each side.
 
+> **SECOND RUN CORRECTION (2026-08-15) — THE `zz_` RENAME DID NOT WORK, AND CANNOT.**
+> Per-step markers on a clean log: `BC: dk reached enemy side` **33**,
+> `BC: dk found dead` **0**, `BC: dead knights` **0**. That is the "reached, not found"
+> row: `enemy_side` steps correctly, `combat_event.1001` simply has not killed anyone
+> yet when `.0091` looks.
+>
+> **Alphabetical filename order does not order the merged `events = { }` list.** It
+> decides which `effect` block wins when two files claim the same on_action, and that is
+> the whole of it. `zz_bc_on_actions.txt` sorts last among filenames and still ran
+> before AGOT's 1001. **Do not try another prefix.** The file keeps the name — it is
+> harmless and the header now records why it is not load-bearing.
+>
+> The read is **deferred one day** into `bc_chronicles.0093`, raised from `.0091` inside
+> the same notability gate, so it no longer competes in the dispatch at all. The pass
+> shape from the previous correction is unchanged — once per notable battle, addressed
+> to the loser's commander — it just arrives a day later.
+>
+> **New failure mode to watch, and it is the only one left:** a combat side is a
+> transient object and may not survive the day. `BC: dk deferred` is written at the call
+> site, `BC: dk deferred fired` inside `.0093`. **First counting while the second is
+> absent means the side object was freed**, and the fix is to re-hang the read on the
+> commander character rather than the side. Both markers come out once that is settled.
+
 **If the dead-knight toast fired, confirm the toast was actually seen.** A marker proves the
 block ran; it does not prove `bc_addressed_toast_effect` routed anywhere. The toast should be
 red rather than green — that is what `TYPE` was made a parameter for.

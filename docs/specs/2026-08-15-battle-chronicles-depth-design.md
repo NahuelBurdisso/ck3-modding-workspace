@@ -450,7 +450,7 @@ confirms it rendered.
 | `BC: bond nemesis\|kin\|countryman\|heathen` | 4 | the bond distribution |
 | `BC: bond stranger` | 1 | a foe who matched none of the four |
 | `BC: bond nofoe` | 1 | no enemy commander at all |
-| `BC: creed same\|heathen` | 2 | the currency split §6 pays on |
+| `BC: creed same\|heathen` | 2 | which currency §6 would pay in |
 | `BC: eve ground missing` | 1 | the §5 hole, if it is real |
 | `BC: award no creed` | 1 | a notable win graded with no creed flag — see §6 |
 
@@ -459,6 +459,15 @@ between them they cover **every** classification arm and every failure path this
 design introduces — which is the whole argument for classifying in script.
 Nothing here needs a dedicated run; they accumulate in ordinary play and
 `probe 'BC:'` reads them whenever someone next looks.
+
+**They count different things and the decision table must say so.** Everything
+written by `bc_battle_open_effect` — ground, bond, creed — fires **once per
+moment**, so those counts share the 233-per-44-battles denominator. `BC: eve
+ground missing` counts **eves offered**, and `BC: award no creed` counts
+**notable wins graded**. Comparing a creed count against an award count directly
+would be an error of exactly the kind handoff §2.4 was written about, so the
+denominator goes into the source-comment decision table that handoff §2.1
+requires beside every marker anyway.
 
 ## 5. The eve
 

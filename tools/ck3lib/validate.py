@@ -347,12 +347,24 @@ def _citation_files(
     # entries, and it grows with the object count, not with the mod. Pruning
     # dirnames in place stops the descent instead.
     for dirpath, dirnames, filenames in os.walk(mod_root):
-        # Sorted as well as pruned: the walk order decides which file of a
-        # colliding pair becomes the target, and which issues come out first.
+        # Sorted as well as pruned, so issue order is stable across runs and
+        # filesystems. Only that: which file of a colliding pair wins the
+        # `texts` slot is NOT observable, because `_check_citations` tests
+        # `target in ambiguous` before it reads `texts` and returns there.
+        # Note the order is stable but NOT the order `sorted(rglob("*"))` gave:
+        # os.walk emits a directory's own files before descending, so
+        # root-level README.md now leads the report instead of trailing it.
         dirnames[:] = sorted(name for name in dirnames if name != ".git")
         for filename in sorted(filenames):
             path = Path(dirpath) / filename
-            if path.suffix.lower() not in CITE_EXTS:
+            # `is_file()` is not redundant with the suffix test. os.walk puts
+            # anything that is not a directory into `filenames`, INCLUDING a
+            # broken symlink, and `read_text` calls `read_bytes` with no
+            # handler - so dropping this guard turned a skipped entry into a
+            # FileNotFoundError traceback out of `validate`. Windows junctions
+            # happen to land in `dirnames` and are safe either way; a real
+            # symlink on a Linux or WSL checkout is not.
+            if not path.is_file() or path.suffix.lower() not in CITE_EXTS:
                 continue
             relpath = path.relative_to(mod_root).as_posix()
             # splitlines(), not a newline split: the latter leaves a phantom
@@ -404,13 +416,18 @@ def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
 
     def resolve(citing: str, line_no: int, target: str, start: int, end: int | None) -> None:
         lines = texts[target]
+        # `end is not None`, not `end`, and THIS is the spelling that matters:
+        # `bc_x.txt:1-0` is a reversed range, not a range with no end, and
+        # under truthiness it fell through here silently. The same spelling in
+        # the loop below is defensive only - by the time control reaches it,
+        # end >= start >= 1, where the two spellings cannot differ. Mutating
+        # the loop alone leaves every test passing; mutating this line does
+        # not. Do not read the loop as the thing that catches `-0`.
         if end is not None and end < start:
             issues.append(
                 Issue(ERROR, citing, line_no, f"cites {target}:{start}-{end}, which runs backwards")
             )
             return
-        # `if end is not None`, not `if end`: a range ending in `-0` is reversed
-        # rather than absent, and the truthiness spelling dropped it silently.
         for number, is_range_end in [(start, False)] + ([(end, True)] if end is not None else []):
             if number < 1:
                 issues.append(

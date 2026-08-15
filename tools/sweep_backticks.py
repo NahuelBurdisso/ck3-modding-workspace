@@ -18,7 +18,7 @@ KNOWN LIMITS. The first two are also written down in that same paragraph:
   - two independent unbalanced spans on one line sum to even and hide each
     other;
   - AN UNTERMINATED FENCE SWALLOWS THE REST OF ITS FILE, in silence, and it is
-    the worst of the four: the sweep does not report less confidently below an
+    the worst of them: the sweep does not report less confidently below an
     unclosed opener, it reports nothing at all. The state machine is one
     boolean with no stack, so it cannot tell an unclosed fence from a very long
     one. Pinned by `test_an_unterminated_fence_swallows_the_rest` in
@@ -29,16 +29,32 @@ KNOWN LIMITS. The first two are also written down in that same paragraph:
     and in the before-and-after plan, quoting comments that themselves contain
     backticks - and none of them flips: the ones that report are odd before the
     strip as well. An earlier draft of this bullet said no line in the tree did
-    it, which one grep disproves.
+    it, which one grep disproves. EVERY escape on a line is stripped, not the
+    first: `sub` is called without a count, and lines carrying two escapes are
+    what makes that observable. Pinned by
+    `test_every_escape_on_a_line_is_stripped_not_only_the_first`;
+  - THE REPORT DIES ON A CHARACTER THE OUTPUT STREAM CANNOT ENCODE, and takes
+    the summary line with it. On Windows a redirected stdout - a pipe or a
+    file, which is how the acceptance count is read - falls back to cp1252,
+    and `print` then raises out of `main()` before the total is written, so
+    the run looks TRUNCATED rather than failed. A console stdout is UTF-8
+    since PEP 528 and does not have this fault, which is why the hazard is
+    stated as redirection and not as a terminal. What keeps it quiet today is
+    not that the trees are ASCII - they are not - but that the characters on
+    the lines that actually report are inside cp1252. Pinned by
+    `test_a_non_ascii_quotation_is_lost_to_a_redirected_stdout`.
 
 WHAT IS NOT A LIMIT: A MISMATCHED FENCE PAIR. 8a71ce1 shipped a KNOWN LIMITS
 bullet claiming that a block opened with three backticks and closed with three
 tildes is not recognised as a pair, and that the rest of the file is then
-swallowed. NO ORDINAL IS GIVEN FOR IT, because the bullet is gone and the list
-it sat in is rewritten every round: an earlier draft of this paragraph said
-"the third bullet above", and by the time anyone read it that position held the
-opposite claim. Citing a position in a mutable list is the same defect as
-citing a line number, written into the file that exists to prevent it.
+swallowed. NO ORDINAL IS GIVEN FOR IT. An earlier draft of this paragraph said
+"the third bullet above", and it was wrong on arrival rather than by drift:
+94c4c31 replaced that bullet and added this paragraph citing it IN ONE DIFF, so
+the citation never had a moment of being correct. What stood in the cited
+position was the unterminated-fence bullet - a different cause for the same
+swallowing, not the refutation this paragraph is making. Citing a position in a
+list is the same defect as citing a line number, and it was written into the
+file that exists to prevent it.
 
 The claim itself is false, and it hid the real hazard behind an invented one
 for two commits. `FENCE_RE` matches either marker and the toggle is
@@ -62,10 +78,10 @@ pin is a mistake this docstring made until it was corrected. What is pinned
 either side is the `is_file()` guard, which is a different case - an entry that
 os.walk offered and that is not a file.
 
-The pin for THIS paragraph is
+The pin for `AN UNREADABLE FILE IS NOT SKIPPED` is
 `test_a_file_that_cannot_be_opened_raises_out_of_the_sweep`, and it did not
 exist until round 19: widening the clause to `(UnicodeDecodeError, OSError)`,
-or to a bare `Exception`, left every test green, so the fix this paragraph
+or to a bare `Exception`, left every test green, so the fix that paragraph
 describes could have been reverted without a red anywhere.
 
 THIS FILE SPELLS ITS OWN BACKTICKS AS `\\x60`. A detector that matches on a

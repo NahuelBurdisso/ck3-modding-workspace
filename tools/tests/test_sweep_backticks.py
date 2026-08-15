@@ -144,7 +144,10 @@ class TestDocumentedLimits(SweepTestCase):
         self.assertClean()
 
     def test_an_unterminated_fence_swallows_the_rest(self) -> None:
-        # THE WORST OF THE FOUR, and the one no test covered until this one.
+        # THE WORST OF THE DOCUMENTED LIMITS, and the one no test covered
+        # until this one. No ordinal and no count: the block it belongs to is
+        # rewritten every round, and citing a position in it is the defect
+        # sweep_backticks.py's own header now records against itself.
         # `fenced` is a single boolean with no stack, so an opener that is
         # never closed leaves the flag set to the end of the file and the sweep
         # reports NOTHING below it. The silent partner is the same file with
@@ -155,7 +158,7 @@ class TestDocumentedLimits(SweepTestCase):
         self.assertEqual(self.hits(), [("shut.md", 3)])
 
     def test_a_backslash_before_a_backtick_is_read_as_an_escape(self) -> None:
-        # The fourth bullet, and the only limit in the FALSE-POSITIVE
+        # THE ESCAPE BULLET, and the only limit in the FALSE-POSITIVE
         # direction. The fixture below ends a code span with a literal
         # backslash, which is not an escape, so the line is genuinely balanced
         # and the sweep is wrong to report it. Nothing in the tree trips it; it
@@ -267,6 +270,28 @@ class TestEscapedBackticks(SweepTestCase):
         self.write("a.md", "A \\` escape and an open `BC: floor\nadmitted` here.\n")
         self.assertEqual(self.hits(), [("a.md", 1), ("a.md", 2)])
 
+    def test_every_escape_on_a_line_is_stripped_not_only_the_first(self) -> None:
+        # `sub` IS CALLED WITHOUT A COUNT, and until round 20 nothing said so.
+        # Both fixtures above carry exactly ONE escape, so a strip that stopped
+        # after the first was indistinguishable from the real one everywhere in
+        # this suite; the mutant survived every entry of the harness AND left
+        # the acceptance TOTAL unchanged, because it loses two lines of the
+        # docs tree and gains two others. Lines of the rivalry
+        # plan and the before-and-after plan carry two escapes each, so this is
+        # a live behaviour and not a hypothetical.
+        #
+        # Line 1 is balanced and carries two escapes: strip only the first and
+        # an odd count is left behind, which is noise. Line 2 is genuinely
+        # unbalanced and carries two escapes: strip only the first and the
+        # count turns EVEN, which is the miss. One fixture would have pinned
+        # only one of the two directions.
+        self.write(
+            "a.md",
+            "Two \\\x60 escapes \\\x60 and a `BC: x` span.\n"
+            "Two \\\x60 escapes \\\x60 and an open \x60BC: y span.\n",
+        )
+        self.assertEqual(self.hits(), [("a.md", 2)])
+
 
 class TestWalkCoverage(SweepTestCase):
     """What the walk offers the scanner, and what it must not offer it."""
@@ -276,6 +301,32 @@ class TestWalkCoverage(SweepTestCase):
         self.write("sub/.git/b.md", ODD_LINE)
         self.write("sub/__pycache__/c.md", ODD_LINE)
         self.assertClean()
+
+    def test_nothing_else_is_pruned(self) -> None:
+        # THE SAME SHAPE AS THE EXTENSION LITERAL BELOW, and for the same
+        # reason. Round 16's regression was a sweep that silently skipped a
+        # whole tree, and round 19 found that adding just "docs" to PRUNE left
+        # the whole suite green - markdown still reached the scanner through
+        # CLAUDE.md and templates/, so "the sweep reads markdown" did not
+        # cover it. PINNING THE SET rather than any one directory catches
+        # every widening at once, including the ones nobody would think to
+        # name: templates/ carries commentable mod script, and a test written
+        # per directory would have missed it exactly as the first attempt did.
+        self.assertEqual(S.PRUNE, {".git", "__pycache__"})
+
+    def test_an_unpruned_directory_is_descended_into(self) -> None:
+        # THE SILENT PARTNER for the assertion above, which is about a
+        # declaration and says nothing about the walk honouring it. Written
+        # over a tmpdir and not over the real checkout: the first version
+        # asserted that docs/, mods/ and tools/ each report in the shipping
+        # tree, which made the suite depend on a second, separately-versioned
+        # and gitignored checkout being present AND dirty, and made it go RED
+        # the day someone unwraps the two citation lines in validate.py - a
+        # test that fails when the tree is cleaned.
+        tops = ("docs", "mods", "templates", "tools")
+        for top in tops:
+            self.write(f"{top}/a.md", ODD_LINE)
+        self.assertEqual(self.hits(), [(f"{top}/a.md", 1) for top in tops])
 
     def test_an_unlisted_extension_is_skipped(self) -> None:
         self.write("a.json", ODD_LINE)
@@ -291,13 +342,14 @@ class TestWalkCoverage(SweepTestCase):
         self.write("b.TXT", ODD_LINE)
         self.assertEqual(self.hits(), [("A.MD", 1), ("b.TXT", 1)])
 
-    # THE SEVEN ARE WRITTEN OUT HERE, NOT READ BACK OUT OF S.EXTS. The first
+    # THE LIST IS WRITTEN OUT HERE, NOT READ BACK OUT OF S.EXTS. The first
     # version of the test below derived its fixtures AND its expectation from
     # `sorted(S.EXTS)`, which puts the same set on both sides: dropping `.mod`
     # from EXTS also dropped the fixture that would have caught it, and the
     # test stayed green. Four mutants survived the whole suite that way until
-    # round 19 wrote them. A literal is the only form in which anything here
-    # says "these seven", which is what bc_flavour.txt claims of the sweep.
+    # round 19 wrote them. NO NUMBER IS GIVEN FOR THE LENGTH of this tuple -
+    # an earlier draft said "the seven", which nothing pins and which the next
+    # extension makes false. The literal is the claim; its length is not.
     LISTED_EXTS = (".gui", ".info", ".md", ".mod", ".py", ".txt", ".yml")
 
     def test_every_listed_extension_is_actually_scanned(self) -> None:
@@ -305,12 +357,14 @@ class TestWalkCoverage(SweepTestCase):
         # this test existed only `.txt` and `.md` were covered, so dropping
         # `.yml`, `.gui`, `.info`, `.mod` or `.py` from EXTS was a silent
         # narrowing - which flatly contradicts bc_flavour.txt's claim that the
-        # sweep checks every commentable file.
-        for i, ext in enumerate(self.LISTED_EXTS):
-            self.write(f"f{i}{ext}", ODD_LINE)
+        # sweep checks every commentable file. THE STEM IS CONSTANT and the
+        # extension does the sorting; numbering the fixtures put `f10.x` ahead
+        # of `f2.x` the moment the list passed nine entries, which would fail
+        # this test for a naming reason and not a behavioural one.
+        for ext in self.LISTED_EXTS:
+            self.write(f"x{ext}", ODD_LINE)
         self.assertEqual(
-            self.hits(),
-            [(f"f{i}{ext}", 1) for i, ext in enumerate(self.LISTED_EXTS)],
+            self.hits(), [(f"x{ext}", 1) for ext in sorted(self.LISTED_EXTS)]
         )
 
     def test_the_literal_list_above_is_the_one_the_sweep_declares(self) -> None:
@@ -319,7 +373,8 @@ class TestWalkCoverage(SweepTestCase):
         # is that the literal cannot drift out of step with EXTS in either
         # direction: an extension added to the sweep without a fixture beside
         # it fails HERE, naming the line to edit, instead of being scanned by
-        # no test at all.
+        # no test at all. It is the sole killer of a WIDENING, which no other
+        # test and no mutant in the harness reaches.
         self.assertEqual(S.EXTS, set(self.LISTED_EXTS))
 
     def test_a_bom_is_not_reported_as_part_of_the_line(self) -> None:
@@ -462,18 +517,6 @@ class TestAgainstTheRealTree(unittest.TestCase):
             S.sweep(self.repo)
         self.assertLessEqual({".py", ".md", ".txt"}, opened)
 
-    def test_all_three_top_level_trees_are_swept(self) -> None:
-        # ROUND 16'S REGRESSION, PINNED DIRECTLY. Adding just "docs" to PRUNE
-        # left the whole suite green: `.md` still reaches the scanner through
-        # CLAUDE.md at the root and through templates/, so "the sweep reads
-        # markdown" does not cover it, and the harness's own PRUNE mutant only
-        # dies because it prunes three directories at once. These are the three
-        # the prose the rule governs actually lives in - docs/ the plans and
-        # specs, mods/ the script comments, tools/ the Python.
-        tops = {rel.split("/", 1)[0] for rel, _, _ in self.hits}
-        for top in ("docs", "mods", "tools"):
-            self.assertIn(top, tops, f"nothing reported anywhere under {top}/")
-
     def test_the_sweep_does_not_report_its_own_source(self) -> None:
         # sweep_backticks.py spells its backticks as escapes so that it does not
         # name itself on every run. Excluding it by name would be a carve-out of
@@ -497,17 +540,26 @@ class TestTheCommandLine(SweepTestCase):
     broken over a wrap is not a grep target.
 
     WHAT `run_main` DOES NOT EXERCISE: an encoder. `io.StringIO` accepts every
-    character, and the real stdout on the only platform this is run on does
-    not. `test_a_non_ascii_quotation_is_lost_to_a_cp1252_console` is the pin
-    for that gap, and it pins the limit rather than a fix.
+    character and a REDIRECTED stdout on Windows does not.
+    `test_a_non_ascii_quotation_is_lost_to_a_redirected_stdout` is the pin for
+    that gap, and it pins the limit rather than a fix.
     """
 
-    def run_main(self, argv: list[str]) -> str:
-        real_argv = sys.argv
-        sys.argv = ["sweep_backticks.py"] + argv
-        self.addCleanup(setattr, sys, "argv", real_argv)
+    @contextlib.contextmanager
+    def argv(self, args: list[str]):
+        """`sys.argv` for the duration, restored on the way out.
+
+        A CONTEXT MANAGER AND NOT ASSIGNMENT PLUS addCleanup, for the reason
+        given at test_an_entry_that_is_not_a_file_is_skipped: `sys` is process
+        global, and a failure between the two statements leaves every later
+        test in the run reading a fabricated command line.
+        """
+        with mock.patch.object(sys, "argv", ["sweep_backticks.py"] + args):
+            yield
+
+    def run_main(self, args: list[str]) -> str:
         buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
+        with self.argv(args), contextlib.redirect_stdout(buf):
             self.assertEqual(S.main(), 0)
         return buf.getvalue()
 
@@ -535,28 +587,47 @@ class TestTheCommandLine(SweepTestCase):
         self.assertEqual(len(body), 110)
         self.assertTrue(body.startswith("x"), repr(body[:8]))
 
-    def test_a_non_ascii_quotation_is_lost_to_a_cp1252_console(self) -> None:
+    def test_a_non_ascii_quotation_is_lost_to_a_redirected_stdout(self) -> None:
         # A LIMIT, PINNED AS ONE, NOT A FIX. Every other test in this class
         # writes into io.StringIO, which encodes nothing, so none of them says
-        # anything about a real console. The Windows default is cp1252, and
-        # `print` on a character it cannot encode raises out of main() - which
-        # loses the SUMMARY LINE as well as the hit, so the run looks truncated
-        # rather than failed. Nothing in either tree puts a non-ASCII character
-        # inside a quoted span today. This is what makes the day one appears a
-        # named failure instead of a mystery, and what has to be deleted by
-        # whoever decides to reconfigure the stream instead.
+        # anything about a real run.
         #
-        # U+2192 AND NOT AN EM DASH: cp1252 HAS the em dash, at 0x97, so a
-        # fixture built on one raises nothing and this test asserts an
-        # exception that never comes. That is what the first draft did.
+        # REDIRECTED, NOT A CONSOLE, and the distinction is the whole of the
+        # hazard. Since PEP 528 a Windows CONSOLE stdout is _WindowsConsoleIO
+        # and is UTF-8, so typing the sweep at a prompt encodes anything. It is
+        # a PIPE or a file redirect that falls back to the locale encoding,
+        # cp1252 on this box - and a pipe is how the acceptance baseline is
+        # taken, because the summary line is read with `| tail`. An earlier
+        # draft of this comment named the console, which is the one case where
+        # the fault cannot fire.
+        #
+        # `print` on a character cp1252 cannot encode raises out of main()
+        # before the summary line, so the run looks TRUNCATED rather than
+        # failed, and the count the project quotes at itself simply is not
+        # printed.
+        #
+        # WHAT KEEPS THE BASELINE WORKING is not that the trees are ASCII -
+        # they are not, and spans in the handoff and in README.md carry this
+        # very character. It is that the characters on the lines that actually
+        # REPORT are inside cp1252: most are U+2014, which cp1252 has at 0x97.
+        # That is a narrower and much more fragile invariant than "no non-ASCII
+        # in the tree", and stating the wrong one is how the first draft of
+        # this comment went wrong.
+        #
+        # U+2192 AND NOT AN EM DASH: cp1252 HAS the em dash, so a fixture built
+        # on one raises nothing and this test asserts an exception that never
+        # comes. That is what the first draft did.
         self.write("a.md", "an \x60 unbalanced \u2192 line\n")
-        real_argv = sys.argv
-        sys.argv = ["sweep_backticks.py", str(self.root)]
-        self.addCleanup(setattr, sys, "argv", real_argv)
-        console = io.TextIOWrapper(io.BytesIO(), encoding="cp1252", newline="")
-        with contextlib.redirect_stdout(console):
+        redirected = io.TextIOWrapper(io.BytesIO(), encoding="cp1252", newline="")
+        with self.argv([str(self.root)]), contextlib.redirect_stdout(redirected):
             with self.assertRaises(UnicodeEncodeError):
                 S.main()
+        redirected.flush()
+        self.assertEqual(
+            redirected.buffer.getvalue(),
+            b"",
+            "the hit line was expected to fail whole, not in part",
+        )
 
     def test_with_no_argument_it_sweeps_the_working_directory(self) -> None:
         import os as real_os

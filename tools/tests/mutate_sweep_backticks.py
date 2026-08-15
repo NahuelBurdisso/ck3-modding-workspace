@@ -41,6 +41,15 @@ sweep_backticks.py to CRLF the first time this harness ran. The working copy is
 LF, so that is a real corruption of a file the harness is supposed to leave
 alone.
 
+TWO MUTATIONS ARE DELIBERATELY ABSENT, and they are written down here so that
+their absence is a decision rather than an oversight. Deleting `filenames.sort()`
+outright survives on NTFS, which returns directory entries in name order anyway,
+so the sort is only observable on a filesystem nobody here runs; what IS pinned
+is the sort being REVERSED. And dropping `.resolve()` from `main()` survives
+because every path a test hands it is already absolute. Adding either entry
+would put a permanent survivor in this list and train the reader to skim the
+result, which is the failure the whole file is arranged against.
+
 Run it with `python tools/tests/mutate_sweep_backticks.py`. Exit 0 means every
 mutant was killed.
 """
@@ -81,6 +90,11 @@ MUTANTS = [
         "escape: count escaped backticks raw",
         'if ESCAPED_BACKTICK_RE.sub("", line).count(BACKTICK) % 2:',
         "if line.count(BACKTICK) % 2:",
+    ),
+    (
+        "escape: strip only the FIRST escaped backtick on a line",
+        'if ESCAPED_BACKTICK_RE.sub("", line).count(BACKTICK) % 2:',
+        'if ESCAPED_BACKTICK_RE.sub("", line, count=1).count(BACKTICK) % 2:',
     ),
     (
         "parity: report every line that carries a backtick",
@@ -198,10 +212,23 @@ MUTANTS = [
         'root = (Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")).resolve()',
         'root = Path(".").resolve()',
     ),
-    # ONE MUTANT PER EXTENSION, dropped singly. "walk: stop reading Python"
-    # above is not enough on its own: the test it kills used to derive both its
-    # fixtures and its expectation from S.EXTS, so shrinking EXTS shrank the
-    # fixture set with it and four of these five survived the whole suite.
+    # ONE MUTANT PER LISTED EXTENSION, dropped singly - and the header means
+    # every one of them, which the first version did not: it said "one per
+    # extension" over a block that left `.txt` and `.md` out. "walk: stop
+    # reading Python" above is not enough on its own, because the test it kills
+    # used to derive both its fixtures and its expectation from S.EXTS, so
+    # shrinking EXTS shrank the fixture set with it and every single drop but
+    # that one survived the whole suite.
+    (
+        "walk: stop reading script",
+        'EXTS = {".txt",',
+        'EXTS = {',
+    ),
+    (
+        "walk: stop reading markdown",
+        '".info", ".md",',
+        '".info",',
+    ),
     (
         "walk: stop reading loc",
         '{".txt", ".yml",',
@@ -222,24 +249,29 @@ MUTANTS = [
         '".md", ".mod",',
         '".md",',
     ),
-    # ONE MUTANT PER TOP-LEVEL TREE, pruned singly. The three-at-once mutant
-    # above dies too easily: pruning only `docs` left the suite green, because
-    # markdown still reaches the scanner through CLAUDE.md and templates/, and
-    # that is exactly the regression round 16 found by hand.
+    # PRUNE, BROKEN IN BOTH DIRECTIONS AND ONE MEMBER AT A TIME. The
+    # three-at-once mutant above dies too easily: pruning only `docs` left the
+    # suite green, because markdown still reaches the scanner through CLAUDE.md
+    # and templates/, and that is exactly the regression round 16 found by
+    # hand. NO ENTRY HERE NAMES A DIRECTORY OF THE REAL TREE ANY MORE. Naming
+    # them one at a time is a losing game - round 20 pointed out that the list
+    # had no entry for templates/, which carries commentable mod script - so
+    # the widening is represented by one arbitrary name and the SET is what the
+    # suite pins.
     (
-        "walk: prune the docs tree",
+        "walk: prune one directory more",
         'PRUNE = {".git", "__pycache__"}',
         'PRUNE = {".git", "__pycache__", "docs"}',
     ),
     (
-        "walk: prune the mods tree",
+        "walk: stop pruning .git",
         'PRUNE = {".git", "__pycache__"}',
-        'PRUNE = {".git", "__pycache__", "mods"}',
+        'PRUNE = {"__pycache__"}',
     ),
     (
-        "walk: prune the tools tree",
+        "walk: stop pruning __pycache__",
         'PRUNE = {".git", "__pycache__"}',
-        'PRUNE = {".git", "__pycache__", "tools"}',
+        'PRUNE = {".git"}',
     ),
     # THE WIDENED `except`, which is 8a71ce1's headline fix run backwards. Both
     # of these left the suite green until round 19, so the paragraph named

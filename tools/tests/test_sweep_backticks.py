@@ -353,7 +353,12 @@ class TestEscapedBackticks(SweepTestCase):
             for n in re.findall(r"count=(\d+)", harness.read_text(encoding="utf-8"))
         ]
         self.assertTrue(counts, "the harness lists no truncated-strip mutant")
-        self.assertLess(max(counts), len(self.ESCAPE_RAMP))
+        # `max`, NOT `len`. The invariant is about the ramp's WIDEST STEP, and
+        # `range(1, 9)` happens to have len == max == 8, so `len` passes today
+        # and would go on passing over a ramp that had been MOVED rather than
+        # extended - range(2, 10) has a widest step of 9 and a len of 8, and
+        # would call a count of 8 surviving when the ramp in fact beats it.
+        self.assertLess(max(counts), max(self.ESCAPE_RAMP))
 
 
 class TestWalkCoverage(SweepTestCase):

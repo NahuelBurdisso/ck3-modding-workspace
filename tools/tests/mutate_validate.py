@@ -1,13 +1,14 @@
 """Mutation harness for tools/tests/test_validate.py.
 
-WHY IT EXISTS AT ALL, given that test_citations.py has had one for rounds. The
-suite it points at was written in a single sitting, against an implementation
-that already worked, and every test in it passed the first time it ran. THAT IS
-THE WORST CASE FOR A TEST FILE, not the best: a suite written to describe code
-that already does the right thing cannot tell you whether it would notice the
-code doing the wrong one. Rounds 15 and 16 both found tests in test_citations.py
-that passed against a build with the checked behaviour deleted, and those were
-written the same way.
+WHY IT EXISTS AT ALL. Only one suite in this directory had a harness before this
+one: `mutate_sweep_backticks.py`, added in 2bc0257. `test_citations.py` still
+has none. The suite THIS file points at was written in a single sitting, against
+an implementation that already worked, and every test in it passed the first
+time it ran. THAT IS THE WORST CASE FOR A TEST FILE, not the best: a suite
+written to describe code that already does the right thing cannot tell you
+whether it would notice the code doing the wrong one. 444716d - "close the
+vacuous tests round 15 found" - is what that costs when nothing checks, and
+test_citations.py was written the same way this one was.
 
 WHAT EACH ENTRY IS. A name, an exact anchor in tools/ck3lib/validate.py, and
 what to put in its place. `mutate.py` beside this file owns the mechanism and
@@ -20,12 +21,13 @@ check firing on everything, which is the failure mode a suite of one-sided
 assertions cannot see. The version check, the two customizable-localization
 resolvers and the strict gate are all mutated both ways for that reason.
 
-WHAT IS DELIBERATELY NOT MUTATED. Anything whose break stops the module
-importing or raises inside a check: `mutate.py` counts a crash as a survivor,
-correctly, because a suite that failed without naming a test saw nothing. Two
-guards are in that class - `if not mod_root.is_dir()` and the early `return []`
-after a bad loc filename - and both are reached instead through the value they
-return, which is observable and which a test can assert on.
+A CRASH IS NOT AUTOMATICALLY A SURVIVOR, and an earlier draft of this docstring
+said it was. `mutate.py` reads a kill off `FAIL_RE`, which matches `... FAIL`
+AND `... ERROR`, so a mutation that makes a check RAISE is reported by unittest
+as an errored test, is named, and is a kill. Only a break that stops the suite
+importing - no test ever runs, none is named - reaches the CRASHED branch. Two
+mutants below are kept precisely because they raise: the early `return []` after
+a bad loc filename, and the ground guard.
 
 Run it with `python tools/tests/mutate_validate.py`. Exit 0 means every mutant
 was killed.
@@ -148,10 +150,21 @@ MUTANTS = [
         "    return list(seen)",
         "    return []",
     ),
+    # RAISES RATHER THAN REPORTS, AND IS STILL A KILL. Without the early return
+    # `name_match.group(2)` runs on None; the AttributeError is reported as an
+    # errored test, which `FAIL_RE` matches by name.
+    (
+        "loc: keep checking a file whose name CK3 will not open",
+        '        return []\n    file_lang = name_match.group(2)',
+        "    file_lang = name_match.group(2)",
+    ),
     # --- the ground partition -------------------------------------------
-    # INVERTED RATHER THAN DELETED. Deleting the guard makes `read_text` raise
-    # on a mod that has no ground file, which `mutate.py` counts as a survivor
-    # and which would say nothing about the suite either way.
+    # INVERTED RATHER THAN DELETED, and not for the reason an earlier draft
+    # gave. Inverting is STRICTLY STRONGER than deleting: a mod without the file
+    # falls through to `read_text` and raises exactly as deletion would, AND
+    # every mod that has the file now returns before a single band is read, so
+    # the whole check goes silent as well. One entry therefore covers both the
+    # guard and the body it guards.
     (
         "ground: skip every mod, not just the ones without bands",
         "    if not path.is_file():\n        return",
@@ -193,6 +206,11 @@ MUTANTS = [
         "    for name in sorted(set()):",
     ),
     # --- the whole run ---------------------------------------------------
+    (
+        "run: report the folder that does exist and scan the one that does not",
+        "    if not mod_root.is_dir():",
+        "    if mod_root.is_dir():",
+    ),
     (
         "run: return nothing for a mod folder that does not exist",
         'return [Issue(ERROR, str(mod_root), None, "mod folder does not exist")]',

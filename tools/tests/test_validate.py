@@ -484,13 +484,23 @@ class TestAgainstTheRealMod(unittest.TestCase):
         # files legitimately share one namespace and the duplicate-definition
         # check has no way to know it. The number is asserted HERE, once, so
         # that a commit message quoting it is quoting a tested fact.
+        # THE MOD FOLDER IS NOT THE ONLY THING THIS DEPENDS ON. The warning
+        # count is 2 only when the playset resolves AGOT; on a checkout with no
+        # playset `_check_ground_partition` emits its SKIPPED warning as a third
+        # and the assertion goes red for a reason that is not a regression.
+        # Both preconditions are therefore checked, and each skips rather than
+        # fails.
         from ck3lib.paths import load_config
+        from ck3lib.sources import playset_sources
 
         root = Path(__file__).resolve().parents[2]
         mod = root / "mods" / "battle_chronicles"
         if not mod.is_dir():
             self.skipTest("battle_chronicles is not in this checkout")
-        counts = V.summarize(V.validate_mod(load_config(), mod, strict=True))
+        cfg = load_config()
+        if not any((s.root / V.AGOT_TERRAIN_FILE).is_file() for s in playset_sources(cfg)):
+            self.skipTest(f"no enabled source provides {V.AGOT_TERRAIN_FILE}")
+        counts = V.summarize(V.validate_mod(cfg, mod, strict=True))
         self.assertEqual(counts[V.ERROR], 0)
         self.assertEqual(counts[V.WARN], 2)
 

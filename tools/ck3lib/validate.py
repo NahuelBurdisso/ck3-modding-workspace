@@ -9,7 +9,8 @@ Also checks: (a) `localization_key` arms in common/customizable_localization/
 resolve to a loc key owned by this mod; (b) `[scope.Custom('...')]` calls in
 the mod's localization resolve to a customizable_localization definition in
 this mod; (c) [mod-specific] the Battle Chronicles six ground bands partition
-every AGOT base terrain helper exactly once.
+every AGOT base terrain helper exactly once; (d) `file.txt:123` citations in
+comments land on a line of that file that carries content.
 """
 
 from __future__ import annotations
@@ -63,6 +64,25 @@ MOD_KEY_PREFIX = "bc_"
 # as the key and false-error on it.
 LOC_ARM_RE = re.compile(r"^\s*localization_key\s*=\s*([^\s#]+)", re.M)
 CUSTOM_CALL_RE = re.compile(r"\.Custom2?\(\s*'([^']+)'")
+
+# Comments in this workspace cite each other by `file.txt:123` and `file.txt:1-9`,
+# and continue with a bare `:456` once the file has been named in the same
+# comment block. Nothing enforced them until now, and four consecutive review
+# rounds on Battle Chronicles lost their headline finding to a citation that was
+# correct when written and silently wrong after an unrelated comment ABOVE it
+# grew: every line below a comment edit shifts, and a shifted citation still
+# points at a real line, so it reads as fine.
+#
+# WHAT THIS CHECKS IS POSITION, NOT MEANING. It can tell that a citation lands on
+# a blank line or past the end of the file; it cannot tell that `:270` now names
+# an `exists` guard where it used to name the `>=` comparison the sentence is
+# about. That failure survives this check, and the mitigation for it is not
+# mechanical: cite a named paragraph or a definition rather than a line, so the
+# reference moves with the thing it names.
+FULL_CITE_RE = re.compile(r"\b([A-Za-z0-9_]+\.(?:txt|yml|gui|info)):(\d+)(?:-(\d+))?")
+# `(?<![\w.])`: without it `bc_frag_x:0 "text"` in a loc file matches as `:0`.
+# Only ever applied to comment lines, where a key/value pair cannot appear.
+BARE_CITE_RE = re.compile(r"(?<![\w.]):(\d+)(?:-(\d+))?\b")
 
 
 @dataclass(frozen=True)
@@ -248,6 +268,84 @@ def _check_ground_partition(cfg: Config, mod_root: Path, issues: list[Issue]) ->
         )
 
 
+def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
+    """Every `file.txt:N` in a comment must land on a line that carries content.
+
+    ONLY THE MOD'S OWN FILES ARE RESOLVED. A citation into vanilla, AGOT or a
+    game log names a file this checker cannot see, and skipping it is correct -
+    but it must also stop a following bare `:N` from resolving against whatever
+    mod file was named before it, so an unresolvable name CLEARS the current
+    target rather than leaving it standing.
+
+    A basename that two mod files share is ambiguous and reported once, because
+    resolving it either way would be a guess.
+    """
+    texts: dict[str, list[str]] = {}
+    owners: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    for relpath, path in iter_files(mod_root):
+        if path.suffix.lower() not in (".txt", ".yml", ".gui", ".info"):
+            continue
+        name = path.name
+        if name in owners:
+            ambiguous.add(name)
+            continue
+        owners[name] = relpath
+        texts[name] = read_text(path).split("\n")
+
+    reported_ambiguous: set[str] = set()
+
+    def resolve(citing: str, line_no: int, target: str, numbers: list[tuple[int, bool]]) -> None:
+        lines = texts[target]
+        for number, is_range_end in numbers:
+            if number < 1 or number > len(lines):
+                issues.append(
+                    Issue(ERROR, citing, line_no, f"cites {target}:{number}, which is past the end of that file ({len(lines)} lines)")
+                )
+                continue
+            body = lines[number - 1].strip()
+            # A range may legitimately END on the `}` that closes the block it
+            # spans. A citation that STARTS there names nothing.
+            if body in ("", "#") or (body == "}" and not is_range_end):
+                issues.append(
+                    Issue(ERROR, citing, line_no, f"cites {target}:{number}, which is `{lines[number - 1]}`")
+                )
+
+    for relpath, path in iter_files(mod_root):
+        if path.name not in texts or owners[path.name] != relpath:
+            continue
+        current: str | None = None
+        for line_no, line in enumerate(texts[path.name], 1):
+            stripped = line.lstrip()
+            if not stripped.startswith("#"):
+                current = None
+                continue
+            consumed = 0
+            for match in FULL_CITE_RE.finditer(line):
+                name = match.group(1)
+                consumed = match.end()
+                if name in ambiguous:
+                    if name not in reported_ambiguous:
+                        reported_ambiguous.add(name)
+                        issues.append(Issue(WARN, relpath, line_no, f"cites `{name}`, which two files in this mod are named"))
+                    current = None
+                    continue
+                current = name if name in texts else None
+                if current is None:
+                    continue
+                numbers = [(int(match.group(2)), False)]
+                if match.group(3):
+                    numbers.append((int(match.group(3)), True))
+                resolve(relpath, line_no, current, numbers)
+            if current is None:
+                continue
+            for match in BARE_CITE_RE.finditer(line, consumed):
+                numbers = [(int(match.group(1)), False)]
+                if match.group(2):
+                    numbers.append((int(match.group(2)), True))
+                resolve(relpath, line_no, current, numbers)
+
+
 def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issue]:
     issues: list[Issue] = []
     if not mod_root.is_dir():
@@ -256,6 +354,7 @@ def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issu
     _check_descriptor(mod_root, cfg, issues)
     _check_structure(mod_root, issues)
     _check_ground_partition(cfg, mod_root, issues)
+    _check_citations(mod_root, issues)
 
     defs_by_key: dict[str, tuple[str, int]] = {}
     def_categories: list[tuple[str, str]] = []

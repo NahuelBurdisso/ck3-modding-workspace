@@ -37,7 +37,10 @@ nemesis.
 **State: `validate --strict` at the 0-errors / 2-warnings baseline; both repos
 clean; no remotes, so nothing to push.** Seven review passes; the last found no
 code defect. The six ground bands are machine-verified to partition all 23 AGOT
-terrain helpers exactly once, by `validate` itself, on every run.
+terrain helpers exactly once, by `validate` itself, on every run — as are the 68
+`file.txt:123` citations the comments make of each other, which is a check added
+after four consecutive review rounds lost their headline finding to one that had
+rotted.
 
 **The next session's job is a game run, not more code.** Nothing statically
 verifiable is left. `README.md`'s "Not yet verified in game" section is the
@@ -75,7 +78,7 @@ Tooling, all via `python tools/ck3.py <cmd>` from `D:/ck3`:
 
 | command | note |
 |---|---|
-| `validate --strict battle_chronicles` | baseline is **0 errors, 2 warnings** — both `namespace also defined in` false positives. Anything else is new. |
+| `validate --strict battle_chronicles` | baseline is **0 errors, 2 warnings** — both `namespace also defined in` false positives. Anything else is new. Also checks that comment citations (`file.txt:123`, and a bare `:456` continuing the same file) land on a line with content — position only, never meaning, so a citation that still points at a real line but the wrong one passes. |
 | `deploy battle_chronicles` | writes the `.mod` into the CK3 user dir |
 | `conflicts` | takes **no** mod argument; run bare and filter for the mod name |
 | `probe '<marker>'` | reads `debug_log` output. See §2. |

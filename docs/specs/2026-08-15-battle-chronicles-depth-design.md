@@ -41,7 +41,7 @@ early. Adding templates spreads that distribution thinner, not richer.
 The mechanism answer is the second load-bearing one, and §2 is where it is
 argued. It applies uniformly: **no localization arm ever classifies anything.**
 
-## 2. Section 1 — how a moment learns its context
+## 2. How a moment learns its context
 
 ### The two rules
 
@@ -131,8 +131,11 @@ from an ordered if-ladder over the six band triggers. Each arm carries a
 `combat.location` may not resolve — the graders already guard their memory writes
 for that reason (`bc_reputation_effects.txt:234-236`). **The guard is a chained
 `exists` in an `if`, not `?=`**, because `?=` takes no `else` and the failure
-path has to be instrumented. That is already the mod's idiom at
-`bc_aftermath_events.txt:104` and `:300`. The shape:
+path has to be instrumented.
+
+Both halves of that path are already shipped: `bc_battle_open_effect` itself
+resolves `scope:combat_side.combat` at `bc_ledger_effects.txt:100` and `:105`,
+and `combat.location` is reached at `bc_aftermath_events.txt:86`. The shape:
 
 ```
 remove_variable = bc_battle_ground              # first, so a failure cannot leave a stale band
@@ -173,13 +176,27 @@ Four things in that shape are load-bearing and none is decoration:
 an ordered if-ladder, first match wins, each arm carrying a `BC: bond <band>`
 marker:
 
-| band | test |
-|---|---|
-| `nemesis` | `bc_facing_nemesis_trigger = yes` |
-| `kin` | `var:bc_battle_foe = { is_close_family_of = scope:bc_chronicle_subject }` |
-| `countryman` | `var:bc_battle_foe = { culture = scope:bc_chronicle_subject.culture }` |
-| `heathen` | `NOT = { var:bc_battle_foe = { faith = scope:bc_chronicle_subject.faith } }` |
-| `stranger` | the outer `else` |
+| band | test | marker |
+|---|---|---|
+| `nemesis` | `bc_facing_nemesis_trigger = yes` | `BC: bond nemesis` |
+| `kin` | `var:bc_battle_foe = { is_close_family_of = scope:bc_chronicle_subject }` | `BC: bond kin` |
+| `countryman` | `var:bc_battle_foe = { culture = scope:bc_chronicle_subject.culture }` | `BC: bond countryman` |
+| `heathen` | `NOT = { var:bc_battle_foe = { faith = scope:bc_chronicle_subject.faith } }` | `BC: bond heathen` |
+| `stranger` | the **inner** `else` — a foe who matched none of the four | `BC: bond stranger` |
+| `stranger` | the **outer** `else` — no foe at all | `BC: bond nofoe` |
+
+**`stranger` is written from two sites and they are marked differently.** The
+inner `else` is not optional: without it a foe of a different culture and the
+same faith — a Reachman against a Westerman, both of the Seven, which is the
+single largest match-up class on the AGOT map — would match nothing, leave
+`bc_battle_bond` unwritten, and emit no marker at all. That is the same
+unmarked-hole failure the ground ladder gets both an inner and an outer `else`
+for, and the bond ladder gets both for the same reason.
+
+The two sites share the flag value because the prose does not need to tell them
+apart — §3's `stranger` arm must read as complete prose for a leaderless enemy
+*and* for an unrelated commander. Only the markers distinguish them, which is
+where the distinction is actually useful.
 
 **The nesting is one outer `if`, not a guard per row.** CK3 does not
 short-circuit and guarantees no evaluation order among siblings, so a
@@ -202,18 +219,31 @@ its own:
 ```
 if = {
     limit = { exists = var:bc_battle_foe }
-    <the ordered bond chain>                     # ends in else -> flag:countryman etc.
-    if = {                                       # SEPARATE. Runs on every band, nemesis included.
+
+    if / else_if × 4                             # nemesis, kin, countryman, heathen
+    else = { flag:stranger  + "BC: bond stranger" }
+
+    if = {                                       # SEPARATE CHAIN. Runs on every band,
+                                                 #   nemesis and kin included.
         limit = { NOT = { var:bc_battle_foe = { faith = scope:bc_chronicle_subject.faith } } }
         set_variable = { name = bc_battle_creed value = flag:heathen }
+        debug_log = "BC: creed heathen"
     }
-    else = { set_variable = { name = bc_battle_creed value = flag:same } }
+    else = {
+        set_variable = { name = bc_battle_creed value = flag:same }
+        debug_log = "BC: creed same"
+    }
 }
 else = {
     set_variable = { name = bc_battle_bond value = flag:stranger }
+    debug_log = "BC: bond nofoe"
     remove_variable = bc_battle_creed             # no foe, no creed. NOT a default of `same`.
 }
 ```
+
+The creed arms are marked on both sides, not only on absence. §2 rule 2 argues
+that classification lives in script *so that its distribution is measurable*;
+instrumenting only the failure would leave §6's currency split unattributable.
 
 Making creed an `else_if` arm of the bond chain would be the natural-looking
 mistake and would defeat the entire point: it would go unwritten on exactly the
@@ -247,7 +277,7 @@ scope. But every arm it feeds tests a **scratch variable**, and scratch is wiped
 at combat end. A stale subject therefore resolves to an arm's **fallback**, never
 to wrong flavour. This inverts the `bc_open_foe` hazard rather than repeating it.
 
-## 3. Section 2 — the prose fragments
+## 3. The prose fragments
 
 New file `common/customizable_localization/bc_flavour.txt`. Additive; the
 directory is vanilla (`00_journey_focus_custom_loc.txt` is the shape) and no mod
@@ -339,7 +369,7 @@ meaning-carrying saved scope — forbidden by §2 rule 1, and `scope:bc_open_foe
 the documented stale-foe hazard — or an unproven `.Var()`-into-`Custom2` form.
 The bond ladder in §2 removes the need entirely and is instrumentable besides.
 
-## 4. Section 3 — verification, with no game run
+## 4. Verification, with no game run
 
 This section is sequenced **first**, because it is what makes the rest
 statically checkable.
@@ -417,16 +447,20 @@ confirms it rendered.
 | `BC: ground desert\|open\|rough\|forest\|jungle\|winter` | 6 | the band distribution, for the mod's own choices |
 | `BC: ground NONE MATCHED` | 1 | unreachable in principle, which is why it logs |
 | `BC: ground missing` | 1 | `combat.location` did not resolve on a moment |
-| `BC: bond nemesis\|kin\|countryman\|heathen\|stranger` | 5 | the bond distribution |
+| `BC: bond nemesis\|kin\|countryman\|heathen` | 4 | the bond distribution |
+| `BC: bond stranger` | 1 | a foe who matched none of the four |
+| `BC: bond nofoe` | 1 | no enemy commander at all |
+| `BC: creed same\|heathen` | 2 | the currency split §6 pays on |
 | `BC: eve ground missing` | 1 | the §5 hole, if it is real |
 | `BC: award no creed` | 1 | a notable win graded with no creed flag — see §6 |
 
-Fifteen. They are the only instrumentation the flavour system can have, and
-between them they cover every failure path this design introduces. Nothing here
-needs a dedicated run; they accumulate in ordinary play and `probe 'BC:'` reads
-them whenever someone next looks.
+Eighteen. They are the only instrumentation the flavour system can have, and
+between them they cover **every** classification arm and every failure path this
+design introduces — which is the whole argument for classifying in script.
+Nothing here needs a dedicated run; they accumulate in ordinary play and
+`probe 'BC:'` reads them whenever someone next looks.
 
-## 5. Section 4 — the eve
+## 5. The eve
 
 `bc_chronicles.0011` today: one intro desc, a two-way `first_valid` on nemesis vs
 stranger, three options.
@@ -460,7 +494,10 @@ Everything new in the eve follows that same pattern and **nothing in it reads
   being rewritten at every raise.
 
 The write is guarded and instrumented, and **the guard is a chained `exists` in
-an `if`, not `?=`** — `?=` takes no `else`, so it cannot carry the marker:
+an `if`, not `?=`** — `?=` takes no `else`, so it cannot carry the marker. It
+sits **inside `bc_eve_offer_effect`'s own `is_ai = no` gate**, next to the
+`bc_eve_foe` save (`bc_eve_effects.txt:47-49`, `:67-70`), so
+`BC: eve ground missing` counts eves that were actually offered and not battles:
 
 ```
 if = {
@@ -520,16 +557,18 @@ Lowering it to 2 is **rate-safe** — the eve never calls
 *interrupt budget* question, not a pacing one. Recommendation: keep 3. Recorded
 here so a future reader knows the lever exists and knows it is safe.
 
-## 6. Section 5 — what a battle leaves behind
+## 6. What a battle leaves behind
 
 ### A notable win pays in the currency the foe implies
 
 **This is a new award. There is no combat-end prestige or piety grant today** —
-`add_prestige` appears only in phase events and the eve. It hangs in the graders,
-on the notable path, inside the same `side_commander ?= { if = { limit = { is_alive = yes } } }`
-block that already calls `bc_reputation_effect`, and therefore **before**
-`bc_clear_scratch_effect`, which both graders already place last and outside that
-gate for exactly this class of reason.
+`add_prestige` appears only in phase events, the moment pop-ups and the eve. It
+hangs in **`bc_chronicles.0091` only** — the winner grader; there is no notable-
+*loss* award and `.0092` is not touched — on the notable path, inside the same
+`side_commander ?= { if = { limit = { is_alive = yes } } }` block that already
+calls `bc_reputation_effect`, and therefore **before** `bc_clear_scratch_effect`,
+which both graders already place last and outside that gate for exactly this
+class of reason.
 
 It reads **two** flags, and reads them independently:
 
@@ -603,7 +642,7 @@ or none.
 Non-lethal. No `death`, no maiming. `bc_wound_effect` is not widened by this
 design; it is mid-measurement and handoff §3.1 owns it.
 
-## 7. Section 6 — new moments, designed and deferred
+## 7. New moments, designed and deferred
 
 This strand is **not implemented by this spec's plan.** It is recorded because
 the analysis is worth keeping and because deferring it is itself a decision.

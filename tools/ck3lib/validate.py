@@ -4,6 +4,12 @@ Catches the failure modes that CK3 reports badly or not at all: unbalanced
 braces (silently truncates the rest of the file), missing UTF-8 BOM on
 localization (whole file ignored), malformed loc lines, duplicate definitions,
 and descriptor mistakes.
+
+Also checks: (a) `localization_key` arms in common/customizable_localization/
+resolve to a loc key owned by this mod; (b) `[scope.Custom('...')]` calls in
+the mod's localization resolve to a customizable_localization definition in
+this mod; (c) [mod-specific] the Battle Chronicles six ground bands partition
+every AGOT base terrain helper exactly once.
 """
 
 from __future__ import annotations
@@ -42,6 +48,12 @@ LOC_EXPECTED = {"common/traits", "common/decisions", "common/character_interacti
 # A missing loc key renders as the raw key; a missing definition renders as
 # nothing at all, which is indistinguishable from an arm that did not match.
 CUSTOM_LOC_DIR = "common/customizable_localization/"
+# Namespace prefix that identifies keys this mod could plausibly own.
+# Battle-Chronicles-specific: a future multi-mod workspace will need to
+# generalise this (e.g. read it from the descriptor or a workspace config).
+# Used by both the localization_key arm check and the Custom() call check so
+# the two agree on what "owned by this mod" means.
+MOD_KEY_PREFIX = "bc_"
 # `[^\s#]+` and not `\S+`: `localization_key = bc_x# note` is a legal comment
 # with no space before it, and `\S+` would capture `bc_x# note`'s first token
 # as the key and false-error on it.
@@ -273,8 +285,10 @@ def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issu
             for line, key in _scan_matches(path, CUSTOM_CALL_RE):
                 custom_calls.append((relpath, line, key))
 
+    # Only this mod's own keys. A localization_key arm naming a vanilla or
+    # dependency loc key is legitimate and unresolvable from the mod root alone.
     for relpath, line, key in custom_loc_arms:
-        if key not in loc_keys:
+        if key.startswith(MOD_KEY_PREFIX) and key not in loc_keys:
             issues.append(
                 Issue(ERROR, relpath, line, f"`localization_key = {key}` has no loc entry in this mod")
             )
@@ -283,7 +297,7 @@ def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issu
     # definition is legitimate and unresolvable from the mod root alone.
     custom_loc_defs = {key for category, key in def_categories if category.rstrip("/") == CUSTOM_LOC_DIR.rstrip("/")}
     for relpath, line, key in custom_calls:
-        if key.startswith("bc_") and key not in custom_loc_defs:
+        if key.startswith(MOD_KEY_PREFIX) and key not in custom_loc_defs:
             issues.append(
                 Issue(ERROR, relpath, line, f"`Custom('{key}')` has no customizable_localization definition in this mod")
             )

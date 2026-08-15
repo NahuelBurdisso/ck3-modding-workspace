@@ -1030,6 +1030,27 @@ being reported. Read what changed and why before continuing.
 **A game restart costs about seven minutes. This run must answer every question below.** Read
 the whole task before launching.
 
+> **RUN RESULT (2026-08-14) — INCONCLUSIVE, AND THIS TASK STAYS OPEN.** The run was
+> taken (batched with plan 5 task 11) and landed exactly on the first row of step 4's
+> table: **`BC: moment decisive` at its shipped line fired 0 times**, so `BC: wound` was
+> 0 for the only reason that carries no information. **Nothing about family 3 was
+> tested.**
+>
+> Two traps this run walked into, recorded so the next one does not:
+>
+> 1. **Step 1 was not honoured.** `debug.log` was not cleared, so the sweep read a
+>    cumulative log spanning several sessions. That is survivable for ratios but fatal
+>    for this task, whose every question is an absolute count.
+> 2. **The one `BC: moment decisive` in the log is from a PREVIOUS BUILD.** It is logged
+>    at `bc_ledger_effects.txt:258`; the current build logs it at `:273`. Without the
+>    line number it would have read as a decisive moment that failed to wound — the
+>    opposite conclusion. **When a log spans builds, the file:line in a `probe` line is
+>    the only thing that says which build wrote it.**
+>
+> The next attempt must clear the logs first, and must reach a battle of **5+ moments**
+> with a losing swing — `decisive` needs `var:bc_battle_moments >= 5`, which is a long
+> battle, and none occurred.
+
 - [ ] **Step 1: Clear the logs, with the game NOT running**
 
 ```bash

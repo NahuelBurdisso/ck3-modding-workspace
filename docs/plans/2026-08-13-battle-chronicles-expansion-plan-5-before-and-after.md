@@ -1574,13 +1574,37 @@ Expected: all exit 0.
 **This is the runtime checkpoint.** A game restart costs about seven minutes, so this run
 must answer everything it can.
 
-- [ ] **Step 1: Clear the logs — game closed**
+> **RUN RESULT (2026-08-14) — BOTH FEATURES FAILED, AND THE MARKERS DIAGNOSED BOTH.**
+> Whole-log counts: 5,623 `BC:` hits, 96 distinct markers, 169 combat ends per side,
+> 137 notable wins and 137 notable losses.
+>
+> **The eve.** `BC: eve fired` **68**, `BC: eve side` **136**, `BC: eve commander` **0**.
+> 136 is exactly 2×68, so the `scope = combat` event and `every_combat_side` both worked
+> and `side_commander` produced nobody 136 times out of 136. It is not a broken link —
+> the same `side_commander` reached a commander **385** times in the same log via
+> `BC: chronicle mark commander`. **No commander is assigned to a combat side at
+> `on_combat_start`.** That also retires DIAG Q2: `combat_attacker`/`combat_defender`
+> were probably never the problem, there was nobody there to find. No routing fixes it,
+> so the eve moved into the battle — see the amendment under step 4.
+>
+> **The dead-knight toast.** `BC: dead knights` **0** over 274 notable grader runs.
+> Vanilla kills knights on `enemy_side` only, inside `combat_event.1001` (AGOT
+> `combat_events.txt:849`), raised from `on_combat_end_winner` — see the amendment under
+> step 5.
+>
+> **`BC: wipe`** fired **38** times on each side. Symmetric, which is the pass shape
+> step 5 asks for.
+>
+> **Closed as a bonus:** `BC: floor admitted` fired **5** times, retiring the checkpoint
+> run's "inconclusive, not a failure" note on plan 2's cooldown floor.
+
+- [x] **Step 1: Clear the logs — game closed**
 
 Delete everything in `D:\Documents\Paradox Interactive\Crusader Kings III\logs`. `probe`
 globs **every** `*.log` in that directory, so a stale `debug.log` will produce hits from a
 previous session and there is no way to tell them apart.
 
-- [ ] **Step 2: Confirm the eve exists before fighting anything**
+- [x] **Step 2: Confirm the eve exists before fighting anything**
 
 Load a save and open the character screen of any commander. Nothing to see yet — the point of
 this step is that the game **loaded**. A `scope = combat` event with a bad declaration is the
@@ -1593,7 +1617,7 @@ cd /d/ck3/tools && python ck3.py probe "eve"
 Expected: **exit 1** at this point. Anything here before a battle means the hook is firing on
 something other than a combat.
 
-- [ ] **Step 3: Fight something large**
+- [x] **Step 3: Fight something large**
 
 The eve needs **5000 total troops**, the dead-knight toast needs a **notable** battle with at
 least one dead knight, and the wipe rows need an **annihilation**, which is rare.
@@ -1605,7 +1629,7 @@ it, so a small-battle session can still answer the dead-knight half.
 **A wipe cannot be arranged and should not be waited for.** Its three consumers are verified
 statically in task 10; this run confirms the marker fires *if* one happens.
 
-- [ ] **Step 4: Sweep the eve**
+- [x] **Step 4: Sweep the eve**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "BC: eve"
@@ -1618,12 +1642,21 @@ cd /d/ck3/tools && python ck3.py probe "BC: eve"
 | **nothing at all** | either no battle reached 5000, or the `scope = combat` event does not fire. Check for `BC: eve fired` on a battle you know was large before concluding anything |
 | `BC: eve offered` without `BC: eve fired` above it | impossible as written; if you see it, something else is calling the offer effect |
 
+> **RUN CORRECTION — THIS TABLE IS RETIRED, AND SO IS `BC: eve fired`.** The run landed
+> in a row the table does not have: `BC: eve fired` **and** `BC: eve side` **without**
+> `BC: eve commander`. The table assumed the iteration was the doubtful part; the
+> iteration was fine and the commander did not exist yet. `bc_chronicles.0010` and the
+> whole `on_combat_start` route are gone. The opening is now raised from the end of
+> `bc_battle_open_effect`, which is already proven to run on the side commander, and the
+> only two markers left are `BC: eve offered` (gate passed) and `BC: eve popup 0011`
+> (event opened). A future run reads those two and nothing else.
+
 **If the pop-up opened, read its second paragraph.** It must say either that the man across
 the field is a stranger or name him. **A blank name in the nemesis branch means
 `scope:bc_eve_foe` did not survive the `trigger_event`** — that is the one thing in the eve
 no static check can prove.
 
-- [ ] **Step 5: Sweep the dead and the wipe**
+- [x] **Step 5: Sweep the dead and the wipe**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "BC: dead knights"
@@ -1639,11 +1672,29 @@ cd /d/ck3/tools && python ck3.py probe "BC: wipe"
 | `BC: wipe` **once** | the two sides disagree about `scope:wipe`, which contradicts AGOT `combat_on_actions.txt:13` and `:527`. **This is a real failure** and it means the notability bar is asymmetric on wipes |
 | no `BC: wipe` | expected. Wipes are rare and this is not a failure. It also does not prove the trigger works — task 10 is what proves that |
 
+> **RUN CORRECTION — THE "TWICE FOR ONE BATTLE" PASS SHAPE WAS NEVER POSSIBLE.** The
+> table's top two rows assume each side loses its own knights. It does not work that way:
+> `combat_event.1001` (AGOT `combat_events.txt:849`) does its killing inside
+> `enemy_side = { every_side_knight = { ... } }` and is raised from
+> `on_combat_end_winner`, while `:846` walks the winner's own knights only to write
+> battle history. **The dead of any battle are the loser's, and they are made dead on the
+> winner's hook.** So `.0092` could never be ordered after the killing, and `.0091` was
+> reading a side on which nobody dies. Zero hits over 274 notable grader runs was the
+> only possible outcome.
+>
+> The copy in `.0092` is gone. `.0091` now reaches across to `enemy_side` and addresses
+> the loser's commander — which is who the loc string always described. That needs our
+> grader to dispatch after `combat_event.1001`, so the on_action file is renamed
+> `zz_bc_on_actions.txt`. **The new pass shape is `BC: dead knights` ONCE per notable
+> battle, on the winner's hook.** The row "twice for one battle" now means a bug.
+>
+> The `BC: wipe` rows of the table are unaffected and passed: 38 on each side.
+
 **If the dead-knight toast fired, confirm the toast was actually seen.** A marker proves the
 block ran; it does not prove `bc_addressed_toast_effect` routed anywhere. The toast should be
 red rather than green — that is what `TYPE` was made a parameter for.
 
-- [ ] **Step 6: Error sweep**
+- [x] **Step 6: Error sweep**
 
 ```bash
 cd /d/ck3/tools && python ck3.py probe "bc_"
@@ -1657,7 +1708,7 @@ Plan 1's three-row pass condition, unchanged. **Watch specifically for:**
 - anything naming `combat_attacker` or `combat_defender` — these are the mod's first uses of
   either, and a scope path that does not resolve logs on every large battle in the world
 
-- [ ] **Step 7: Record and commit**
+- [x] **Step 7: Record and commit**
 
 Write into `README.md`:
 - **whether `BC: eve fired` appeared** — this is Q2 re-confirmed under real conditions rather

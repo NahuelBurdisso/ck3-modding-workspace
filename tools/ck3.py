@@ -10,6 +10,7 @@
     python tools/ck3.py conflicts               mod-vs-mod file collisions
     python tools/ck3.py new "My Mod" --agot     scaffold a mod
     python tools/ck3.py validate my_mod         static checks
+    python tools/ck3.py reflow FILE LINE        rewrap one comment paragraph
     python tools/ck3.py deploy my_mod           write the <user>/mod pointer
     python tools/ck3.py playset list|add|remove|move|audit
     python tools/ck3.py sync-workshop 3664900993
@@ -29,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ck3lib import index as idx  # noqa: E402
 from ck3lib import launch as run  # noqa: E402
 from ck3lib import playset as ps  # noqa: E402
-from ck3lib import scaffold, validate  # noqa: E402
+from ck3lib import reflow, scaffold, validate  # noqa: E402
 from ck3lib.paths import load_config  # noqa: E402
 from ck3lib.scaffold import slugify  # noqa: E402
 from ck3lib.sources import playset_sources, workspace_mods  # noqa: E402
@@ -161,6 +162,36 @@ def cmd_validate(cfg, args) -> int:
         print(f"  {counts[validate.ERROR]} errors, {counts[validate.WARN]} warnings")
         worst = max(worst, 1 if counts[validate.ERROR] else 0)
     return worst
+
+
+def cmd_reflow(cfg, args) -> int:
+    # WRITES BYTES, NOT TEXT. `Path.write_text` translates `\n` to `\r\n` on
+    # Windows, so a tool that reads a file, changes four lines and writes it back
+    # would rewrite every line ending in the file and produce a diff nobody can
+    # review. The BOM is carried through for the same reason - the loc files have
+    # one, and dropping it is invisible in a diff and fatal to the game.
+    path = Path(args.path)
+    raw = path.read_bytes()
+    bom = b"\xef\xbb\xbf" if raw.startswith(b"\xef\xbb\xbf") else b""
+    text = raw.decode("utf-8-sig")
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = text.splitlines()
+    start, end = reflow.find_paragraph(lines, args.line)
+    was = lines[start:end]
+    now = reflow.reflow(was, width=args.width)
+    where = f"{path}:{start + 1}-{end}"
+    if now == was:
+        print(f"{where}: already reflowed at width {args.width}")
+        return 0
+    if args.check:
+        print(f"{where}: would reflow, {len(was)} -> {len(now)} lines")
+        return 1
+    body = newline.join(lines[:start] + now + lines[end:])
+    if text.endswith(("\n", "\r")):
+        body += newline
+    path.write_bytes(bom + body.encode("utf-8"))
+    print(f"{where}: reflowed, {len(was)} -> {len(now)} lines")
+    return 0
 
 
 def cmd_deploy(cfg, args) -> int:
@@ -329,6 +360,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--strict", action="store_true", help="also flag definitions with no localization")
     p.add_argument("-v", "--verbose", action="store_true")
     p.set_defaults(func=cmd_validate)
+
+    p = sub.add_parser("reflow", help="rewrap the comment paragraph around a line")
+    p.add_argument("path")
+    p.add_argument("line", type=int, help="any 1-based line inside the paragraph")
+    p.add_argument("--width", type=int, default=reflow.DEFAULT_WIDTH)
+    p.add_argument("--check", action="store_true", help="report and exit 1 rather than write")
+    p.set_defaults(func=cmd_reflow)
 
     p = sub.add_parser("deploy", help="write <user>/mod/<slug>.mod")
     p.add_argument("mods", nargs="+")

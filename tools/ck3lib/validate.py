@@ -10,7 +10,9 @@ resolve to a loc key owned by this mod; (b) `[scope.Custom('...')]` calls in
 the mod's localization resolve to a customizable_localization definition in
 this mod; (c) [mod-specific] the Battle Chronicles six ground bands partition
 every AGOT base terrain helper exactly once; (d) `file.txt:123` citations in
-comments land on a line of that file that carries content.
+comments land on a line of that file that carries content; (e) every
+customizable_localization definition has an unguarded `text` arm and, unless it
+is `random_valid`, has it last.
 """
 
 from __future__ import annotations
@@ -21,7 +23,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .paths import Config, version_matches
-from .pdxscript import brace_report, has_bom, parse_descriptor, parse_loc, read_text, top_level_defs
+from .pdxscript import (
+    brace_report,
+    has_bom,
+    parse_descriptor,
+    parse_loc,
+    read_text,
+    tokenize,
+    top_level_defs,
+)
 from .sources import SCAN_DIRS, iter_files, playset_sources
 
 ERROR = "error"
@@ -516,6 +526,102 @@ def _check_citations(mod_root: Path, issues: list[Issue]) -> None:
                 resolve(relpath, line_no, current, int(match.group(2)), int(match.group(3)) if match.group(3) else None)
 
 
+@dataclass
+class _Arm:
+    line: int
+    guarded: bool
+
+
+@dataclass
+class _Definition:
+    name: str
+    line: int
+    random_valid: bool
+    arms: list[_Arm]
+
+
+def _definitions(text: str) -> list[_Definition]:
+    """Every top-level definition in a custom-loc file, with its `text` arms.
+
+    TOKENS AND NOT A REGEX, and the difference is the whole check. The hand-run
+    version of this test asked whether the substring `trigger` appeared in an
+    arm's body, which is true of a `trigger` nested three blocks down inside a
+    `limit` - so an arm that was in fact unguarded read as guarded, and the
+    definition read as having a fallback it does not have. Depth is the only
+    thing that tells the two apart, and depth is what a tokenizer knows.
+    """
+    out: list[_Definition] = []
+    depth = 0
+    # The last word seen AT EACH DEPTH, because the key of a block is read when
+    # its `{` arrives and by then the tokens between them are gone.
+    last_word: dict[int, str] = {}
+    current: _Definition | None = None
+    arm: _Arm | None = None
+    for token in tokenize(text):
+        if token.kind == "word":
+            last_word[depth] = token.value
+            if depth == 1 and current is not None and token.value == "random_valid":
+                current.random_valid = True
+            elif depth == 2 and arm is not None and token.value == "trigger":
+                arm.guarded = True
+        elif token.kind == "open":
+            if depth == 0:
+                current = _Definition(last_word.get(0, "?"), token.line, False, [])
+            elif depth == 1 and current is not None and last_word.get(1) == "text":
+                arm = _Arm(token.line, False)
+            depth += 1
+        elif token.kind == "close":
+            depth -= 1
+            if depth == 1 and arm is not None and current is not None:
+                current.arms.append(arm)
+                arm = None
+            elif depth == 0 and current is not None:
+                out.append(current)
+                current = None
+    return out
+
+
+def _check_arm_shape(relpath: str, text: str, issues: list[Issue]) -> None:
+    """Every custom-loc definition needs one unguarded arm, and it must be last.
+
+    THE TWO HALVES FAIL IN OPPOSITE DIRECTIONS. Without an unguarded arm the
+    definition renders as the empty string whenever no trigger matches, which is
+    byte-identical to a definition that does not exist and to a clause correctly
+    choosing to say nothing - so the mod writes its "nothing to say" case as an
+    unguarded arm with an empty key rather than leaving a gap. Below an
+    unguarded arm nothing renders at all: CK3 takes the first match, an
+    unguarded arm always matches, and every arm after it is dead prose that
+    still reads as shipped.
+
+    `random_valid = yes` POOLS THE VALID ARMS instead of taking the first, so
+    there is no dead arm to report and the order rule is suspended. The fallback
+    rule is not: an empty pool still renders nothing.
+    """
+    for definition in _definitions(text):
+        unguarded = [i for i, arm in enumerate(definition.arms) if not arm.guarded]
+        if not unguarded:
+            issues.append(
+                Issue(
+                    ERROR,
+                    relpath,
+                    definition.line,
+                    f"`{definition.name}` has no unguarded `text` arm, so it renders nothing when no trigger matches",
+                )
+            )
+            continue
+        if definition.random_valid:
+            continue
+        for arm in definition.arms[unguarded[0] + 1 :]:
+            issues.append(
+                Issue(
+                    ERROR,
+                    relpath,
+                    arm.line,
+                    f"`text` arm is unreachable: `{definition.name}` has an unguarded arm above it",
+                )
+            )
+
+
 def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issue]:
     issues: list[Issue] = []
     if not mod_root.is_dir():
@@ -540,6 +646,7 @@ def validate_mod(cfg: Config, mod_root: Path, strict: bool = False) -> list[Issu
 
         if ext in (".txt", ".gui", ".gfx", ".asset", ".info"):
             if relpath.startswith(CUSTOM_LOC_DIR):
+                _check_arm_shape(relpath, read_text(path), issues)
                 for line, key in _scan_matches(path, LOC_ARM_RE):
                     custom_loc_arms.append((relpath, line, key))
             for key, line in _check_script_file(relpath, path, issues):

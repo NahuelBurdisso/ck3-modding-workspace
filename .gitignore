@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 .vscode/.cwtools/
 mods/
+
+# visual brainstorming companion scratch
+.superpowers/

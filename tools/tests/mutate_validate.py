@@ -398,6 +398,51 @@ MUTANTS = [
         "    if vanilla_overrides:",
         "    if False:",
     ),
+    # --- the custom-loc arm shape ----------------------------------------
+    # THE GUARD IS A DEPTH QUESTION, not a substring one. The hand-run version
+    # of this check asked whether `trigger` appeared anywhere in the arm body,
+    # which reads a `trigger` nested inside a `trigger_if`'s `limit` as the
+    # arm's own guard - and every arm of bc_banner_falls_ground is that shape.
+    (
+        "arms: count a trigger at any depth as the arm's guard",
+        '            elif depth == 2 and arm is not None and token.value == "trigger":',
+        '            elif arm is not None and token.value == "trigger":',
+    ),
+    (
+        "arms: stop noticing that an arm is guarded",
+        "                arm.guarded = True",
+        "                arm.guarded = arm.guarded",
+    ),
+    (
+        "arms: read a block named anything at all as an arm",
+        '            elif depth == 1 and current is not None and last_word.get(1) == "text":',
+        "            elif depth == 1 and current is not None:",
+    ),
+    (
+        "arms: stop requiring an unguarded arm",
+        "        if not unguarded:",
+        "        if False:",
+    ),
+    (
+        "arms: report a dead arm under random_valid too",
+        "        if definition.random_valid:\n            continue",
+        "        if False:\n            continue",
+    ),
+    (
+        "arms: stop reading random_valid, so the pool rule never applies",
+        "                current.random_valid = True",
+        "                current.random_valid = False",
+    ),
+    (
+        "arms: measure the dead run from the LAST unguarded arm",
+        "        for arm in definition.arms[unguarded[0] + 1 :]:",
+        "        for arm in definition.arms[unguarded[-1] + 1 :]:",
+    ),
+    (
+        "arms: shape-check every script file, not the custom-loc directory",
+        "            if relpath.startswith(CUSTOM_LOC_DIR):\n                _check_arm_shape(relpath, read_text(path), issues)",
+        "            if True:\n                _check_arm_shape(relpath, read_text(path), issues)",
+    ),
     # --- the counts every commit message quotes --------------------------
     (
         "summarize: start from an empty dict",

@@ -506,6 +506,123 @@ class TestValidateMod(ValidateTestCase):
         )
         self.assertNoneMatching(self.validate(), "localization_key")
 
+    def test_a_definition_with_no_unguarded_arm_is_an_error(self) -> None:
+        # THE FAILURE THIS CATCHES IS SILENT AT BOTH ENDS. If every arm is
+        # guarded and no trigger matches, CK3 renders the definition as the
+        # empty string - which is exactly what a definition that does not exist
+        # renders as, and exactly what a correct optional clause renders as. The
+        # mod's convention is therefore an unguarded LAST arm, empty if the
+        # clause is meant to be optional, so that "nothing to say" is written
+        # down rather than inferred from a gap.
+        self.write(
+            "common/customizable_localization/c.txt",
+            "bc_there = {\n\ttype = character\n"
+            "\ttext = {\n\t\ttrigger = { always = yes }\n\t\tlocalization_key = bc_p\n\t}\n}\n",
+        )
+        self.write("localization/english/a_l_english.yml", BOM + 'l_english:\n bc_p:0 "Here"\n')
+        self.assertOneMatching(self.validate(), "`bc_there` has no unguarded `text` arm")
+
+    def test_a_definition_whose_unguarded_arm_is_last_is_silent(self) -> None:
+        self.write(
+            "common/customizable_localization/c.txt",
+            "bc_there = {\n\ttype = character\n"
+            "\ttext = {\n\t\ttrigger = { always = yes }\n\t\tlocalization_key = bc_p\n\t}\n"
+            "\ttext = {\n\t\tlocalization_key = bc_p\n\t}\n}\n",
+        )
+        self.write("localization/english/a_l_english.yml", BOM + 'l_english:\n bc_p:0 "Here"\n')
+        self.assertNoneMatching(self.validate(), "arm")
+
+    def test_an_arm_below_the_unguarded_arm_is_unreachable(self) -> None:
+        # CK3 takes the FIRST matching arm, and an unguarded arm matches always,
+        # so everything below it is dead. Dead prose in this mod is worse than
+        # dead code: the comments are the design record, and an arm nobody can
+        # ever see still reads as shipped.
+        self.write(
+            "common/customizable_localization/c.txt",
+            "bc_there = {\n\ttype = character\n"
+            "\ttext = {\n\t\tlocalization_key = bc_p\n\t}\n"
+            "\ttext = {\n\t\ttrigger = { always = yes }\n\t\tlocalization_key = bc_p\n\t}\n}\n",
+        )
+        self.write("localization/english/a_l_english.yml", BOM + 'l_english:\n bc_p:0 "Here"\n')
+        self.assertOneMatching(self.validate(), "unreachable: `bc_there` has an unguarded arm above it")
+
+    def test_random_valid_suspends_the_order_rule_and_not_the_fallback_rule(self) -> None:
+        # BOTH HALVES IN ONE TEST because the pair is the behaviour. Under
+        # `random_valid = yes` CK3 pools every valid arm instead of taking the
+        # first, so no arm is dead and the ordering complaint would be wrong.
+        # The fallback rule survives regardless: an empty pool still renders
+        # nothing, and that is what the unguarded arm is there to prevent.
+        self.write(
+            "common/customizable_localization/c.txt",
+            "bc_pooled = {\n\ttype = character\n\trandom_valid = yes\n"
+            "\ttext = {\n\t\tlocalization_key = bc_p\n\t}\n"
+            "\ttext = {\n\t\ttrigger = { always = yes }\n\t\tlocalization_key = bc_p\n\t}\n}\n"
+            "bc_empty_pool = {\n\ttype = character\n\trandom_valid = yes\n"
+            "\ttext = {\n\t\ttrigger = { always = yes }\n\t\tlocalization_key = bc_p\n\t}\n}\n",
+        )
+        self.write("localization/english/a_l_english.yml", BOM + 'l_english:\n bc_p:0 "Here"\n')
+        found = self.validate()
+        self.assertNoneMatching(found, "unreachable")
+        self.assertOneMatching(found, "`bc_empty_pool` has no unguarded `text` arm")
+
+    def test_a_trigger_nested_below_the_arm_is_not_the_arm_s_guard(self) -> None:
+        # `trigger` appears inside arms for a second reason - as the key of a
+        # nested block such as `trigger_if` fields, or inside a `limit` - and a
+        # substring test on the arm body reads those as guards. That reading
+        # turns the fallback rule off for exactly the arms most likely to be
+        # complicated, which is the wrong half to stop checking. Only a
+        # `trigger` at the arm's OWN depth guards it.
+        self.write(
+            "common/customizable_localization/c.txt",
+            "bc_there = {\n\ttype = character\n"
+            "\ttext = {\n\t\tlocalization_key = bc_p\n"
+            "\t\tfoo = { trigger = { always = yes } }\n\t}\n}\n",
+        )
+        self.write("localization/english/a_l_english.yml", BOM + 'l_english:\n bc_p:0 "Here"\n')
+        self.assertNoneMatching(self.validate(), "arm")
+
+    def test_two_unguarded_arms_kill_everything_below_the_first_of_them(self) -> None:
+        # THE SHAPE A SECOND FALLBACK ACTUALLY TAKES. Nobody writes two
+        # fallbacks on purpose; one arrives when a guarded arm is edited and its
+        # trigger goes with it, and the arms between the two then look fine from
+        # either end. The dead run starts at the FIRST unguarded arm, so the
+        # second fallback is itself dead - measuring from the last one reports
+        # nothing at all on the one file where the mistake is easiest to make.
+        self.write(
+            "common/customizable_localization/c.txt",
+            "bc_there = {\n\ttype = character\n"
+            "\ttext = {\n\t\tlocalization_key = bc_p\n\t}\n"
+            "\ttext = {\n\t\ttrigger = { always = yes }\n\t\tlocalization_key = bc_p\n\t}\n"
+            "\ttext = {\n\t\tlocalization_key = bc_p\n\t}\n}\n",
+        )
+        self.write("localization/english/a_l_english.yml", BOM + 'l_english:\n bc_p:0 "Here"\n')
+        found = [issue for issue in self.validate() if "unreachable" in issue]
+        self.assertEqual(len(found), 2, found)
+
+    def test_a_block_that_is_not_a_text_arm_is_not_counted_as_one(self) -> None:
+        # A definition may carry depth-1 blocks that are not arms, and counting
+        # one as an arm makes the verdict depend on a key the check never
+        # examined: here it would call a block BELOW the fallback a dead arm,
+        # which is a complaint about the wrong thing in the wrong place.
+        self.write(
+            "common/customizable_localization/c.txt",
+            "bc_there = {\n\ttype = character\n"
+            "\ttext = {\n\t\tlocalization_key = bc_p\n\t}\n"
+            "\tsome_other_block = {\n\t\ttrigger = { always = yes }\n\t}\n}\n",
+        )
+        self.write("localization/english/a_l_english.yml", BOM + 'l_english:\n bc_p:0 "Here"\n')
+        self.assertNoneMatching(self.validate(), "arm")
+
+    def test_a_definition_outside_the_custom_loc_directory_is_not_shape_checked(self) -> None:
+        # The rule is a property of customizable_localization, not of the word
+        # `text`. A scripted effect with a guarded `text` block in it is not a
+        # definition with a missing fallback.
+        self.write(
+            "common/scripted_effects/e.txt",
+            "bc_effect = {\n\ttext = {\n\t\ttrigger = { always = yes }\n\t}\n}\n",
+        )
+        self.assertNoneMatching(self.validate(), "arm")
+
     def test_the_missing_localization_warning_is_strict_only(self) -> None:
         # BOTH SIDES IN ONE TEST because the pair IS the behaviour: the same
         # tree has to be silent without --strict and loud with it. Split in two,

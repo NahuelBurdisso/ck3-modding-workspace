@@ -60,6 +60,7 @@ all. Those are different bets and only one of them is worth taking without a run
 | custom-loc arms resolve | a `localization_key` naming a loc key that was never written |
 | `bc_` `Custom()` calls resolve | a toast calling a definition that does not exist, or a typo either side |
 | ground partition complete | not used by this plan, but a break in it invalidates every ground arm |
+| custom-loc arm shape | a definition with no unguarded fallback arm, or with arms stranded below one. Added after tasks 2-4; it is the check tasks 5-14 lean on hardest, because those write about twenty more definitions to rule 2's shape and a missing fallback renders as the empty string — identical in game to a definition that does not exist |
 
 Neither of the first two existed when the mod shipped its first custom loc. Without them, a typo in one of 110 keys shows in game as the raw key printed into the sentence — or, if the typo is on a `Custom()` call rather than a `localization_key`, as nothing at all — and in the toolchain as nothing at all either way.
 

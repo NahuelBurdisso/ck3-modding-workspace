@@ -74,10 +74,12 @@ class MutateTestCase(unittest.TestCase):
             (SUITE_HEAD + "".join(bodies) + SUITE_TAIL).encode("utf-8")
         )
 
-    def run_mutants(self, mutants: list[tuple[str, str, str]]) -> tuple[int, str]:
+    def run_mutants(
+        self, mutants: list[tuple[str, str, str]], timeout: float = mutate.DEFAULT_TIMEOUT
+    ) -> tuple[int, str]:
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            code = mutate.run_mutants(self.target, self.suite, mutants)
+            code = mutate.run_mutants(self.target, self.suite, mutants, timeout)
         return code, buf.getvalue()
 
 
@@ -276,6 +278,67 @@ class TestBytecodeIsNotCached(MutateTestCase):
         self.assertIn("killed    first", out)
         self.assertIn("SURVIVED  second", out)
         self.assertFalse((self.root / "__pycache__").exists())
+
+
+class TestTimeout(MutateTestCase):
+    """A suite that will never finish must not take the run down with it."""
+
+    # THREE SECONDS, NOT THE DEFAULT TWO MINUTES. Every test in this class waits
+    # out its own timeout, so the budget is the runtime; it only has to be long
+    # enough that a green synthetic suite - one file, one test, no imports beyond
+    # the target - finishes inside it on a loaded machine.
+    SHORT = 3.0
+
+    # `double` is called by every suite below, so the loop is entered by the test
+    # and not by the import: the driver must distinguish "no test finished" from
+    # "no test ran", and only the first of those is what a timeout means.
+    HANG = ("hang", "    return n * 2", "    while True:\n        pass")
+
+    def test_a_mutant_that_hangs_is_reported_and_counted_as_a_survivor(self) -> None:
+        # NOT A KILL, deliberately. Nothing named a test, so nothing objected -
+        # what the suite did was fail to finish. Reporting it as a kill would
+        # certify a mutation no test can grade.
+        self.write_suite(BOTH_CHECKED)
+        code, out = self.run_mutants([self.HANG], timeout=self.SHORT)
+        self.assertEqual(code, 1)
+        self.assertIn("TIMED OUT hang", out)
+        self.assertIn("1 SURVIVING MUTANT(S):", out)
+        self.assertNotIn("killed", out)
+
+    def test_the_target_is_restored_after_a_mutant_hangs(self) -> None:
+        # THE REGRESSION THIS CLASS WAS OPENED FOR. Before the timeout the run
+        # blocked forever, so the `finally` that puts the file back never ran,
+        # and the only way out was killing the process - which is exactly the
+        # thing that skips the restore. A tracked file was left mutated on disk.
+        self.write_suite(BOTH_CHECKED)
+        before = self.target.read_bytes()
+        self.run_mutants([self.HANG], timeout=self.SHORT)
+        self.assertEqual(self.target.read_bytes(), before)
+
+    def test_a_run_continues_grading_after_one_mutant_times_out(self) -> None:
+        self.write_suite(BOTH_CHECKED)
+        code, out = self.run_mutants([self.HANG, KILL_TRIPLE], timeout=self.SHORT)
+        self.assertEqual(code, 1)
+        self.assertIn("TIMED OUT hang", out)
+        self.assertIn("killed    kill triple", out)
+
+    def test_a_baseline_that_never_finishes_mutates_nothing(self) -> None:
+        # A red baseline and a hung baseline are both "do not start", but they
+        # print differently because the operator's next move differs: one is a
+        # broken test to fix, the other is a suite that has to be interrupted
+        # before anything here can be believed.
+        self.write_suite(
+            "    def test_double(self):\n"
+            "        while True:\n"
+            "            pass\n"
+        )
+        before = self.target.read_bytes()
+        code, out = self.run_mutants([KILL_DOUBLE], timeout=self.SHORT)
+        self.assertEqual(code, 1)
+        self.assertIn("BASELINE TIMED OUT", out)
+        self.assertNotIn("BASELINE IS RED", out)
+        self.assertNotIn("baseline: green", out)
+        self.assertEqual(self.target.read_bytes(), before)
 
 
 if __name__ == "__main__":

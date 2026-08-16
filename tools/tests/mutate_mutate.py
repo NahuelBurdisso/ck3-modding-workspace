@@ -25,6 +25,15 @@ iteration - so a mutant swapping them can only survive, and it did before it
 was removed. Telling them apart needs both faults at once, and the restore has
 a mutant of its own. No test in test_mutate.py claims to pin the difference.
 
+NEITHER IS THE `timeout=timeout` PASSED TO `subprocess.run`, and that one is a
+mutant this file cannot afford rather than one it does not want. Removing it is
+the whole defect the timeout was added for, so the suite would hang - and the
+run grading it would then sit on its OWN timeout, which is the same default,
+for a verdict of TIMED OUT: a survivor either way, bought with two minutes. The
+question it would ask is asked cheaply instead by the DEFAULT_TIMEOUT mutant
+below, which proves the budget is read, and by the TimeoutExpired mutant, which
+proves what is done when it fires.
+
 Run it with `python tools/tests/mutate_mutate.py`. Exit 0 means every mutant
 was killed. It is slower than its siblings because every mutant runs a suite
 that itself spawns a subprocess per case.
@@ -72,8 +81,8 @@ MUTANTS = [
     ),
     (
         "verdict: never report a survivor",
-        "        if passed:",
-        "        if False:",
+        "        elif passed:",
+        "        elif False:",
     ),
     (
         "verdict: exit 0 with survivors on the list",
@@ -95,8 +104,33 @@ MUTANTS = [
     ),
     (
         "hazard: leave the last mutant on disk",
-        "        try:\n            passed, red = run_suite(suite)\n        finally:\n            target.write_bytes(original)",
-        "        try:\n            passed, red = run_suite(suite)\n        finally:\n            pass",
+        "        try:\n            passed, red, timed_out = run_suite(suite, timeout)\n        finally:\n            target.write_bytes(original)",
+        "        try:\n            passed, red, timed_out = run_suite(suite, timeout)\n        finally:\n            pass",
+    ),
+    # --- the third hazard: a mutant that never finishes --------------------
+    (
+        "hazard: read a timed-out suite as an ordinary failure",
+        "        return False, set(), True",
+        "        return False, set(), False",
+    ),
+    (
+        "hazard: score a suite that never finished as a kill",
+        '            print(f"TIMED OUT {name} - the suite did not finish in {timeout}s")\n            survivors.append(name)',
+        '            print(f"TIMED OUT {name} - the suite did not finish in {timeout}s")',
+    ),
+    (
+        "hazard: start mutating over a baseline that never finished",
+        '    if timed_out:\n        print(f"BASELINE TIMED OUT',
+        '    if False:\n        print(f"BASELINE TIMED OUT',
+    ),
+    # A BUDGET TOO SMALL DOES NOT FAIL SAFE. It reports a suite that was
+    # merely slow as one that will never finish, which is a false survivor -
+    # the same wrong answer as having no timeout at all, arrived at from the
+    # other side.
+    (
+        "hazard: set a budget no real suite can finish inside",
+        "DEFAULT_TIMEOUT = 120",
+        "DEFAULT_TIMEOUT = 0.001",
     ),
     # --- anchors ----------------------------------------------------------
     (

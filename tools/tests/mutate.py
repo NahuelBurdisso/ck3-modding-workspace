@@ -17,6 +17,14 @@ THE TWO HAZARDS IT EXISTS TO CONTAIN, both found the hard way:
     length written inside one filesystem timestamp resolution reuse the first
     one's cached `.pyc`, and the second reports a false OK - a survivor read as
     a kill, which is the one error a mutation run must not make quietly.
+  - A MUTANT CAN HANG, AND AN UNTIMED RUN HANGS WITH IT. `pdxscript.tokenize`
+    carries a guard whose only job is to advance the scanner past a character
+    that can neither start a word nor an operator; a mutant removing it loops
+    forever, so the suite never returns, so the `finally` below never runs and
+    the BROKEN MODULE IS LEFT ON DISK - a tracked file, silently corrupted,
+    while the operator is looking at a terminal that appears merely slow. The
+    only way out of that state is killing the run, which is exactly the thing
+    that skips the restore. Every suite therefore runs under a timeout.
 
 A NON-ZERO EXIT IS NOT A KILL BY ITSELF. A mutant that stops the suite importing
 also exits non-zero, and counting it teaches the harness to accept a mutation no
@@ -64,20 +72,37 @@ Mutant = tuple[str, str, str]
 FAIL_RE = re.compile(r"^(?:FAIL|ERROR): (test_\w+) \(", re.M)
 
 
-def run_suite(suite: Path) -> tuple[bool, set[str]]:
-    """Run one suite. Returns (passed, names of the tests that did not)."""
+# GENEROUS ON PURPOSE. The slowest suite in this directory is test_mutate, which
+# spawns a subprocess per case and takes about three seconds; the budget only has
+# to separate "running" from "never going to finish", and a timeout that fires on
+# a slow machine reports a false survivor.
+DEFAULT_TIMEOUT = 120
+
+
+def run_suite(suite: Path, timeout: float = DEFAULT_TIMEOUT) -> tuple[bool, set[str], bool]:
+    """Run one suite. Returns (passed, the tests that did not, timed out)."""
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
-    proc = subprocess.run(
-        [sys.executable, str(suite)], capture_output=True, text=True, env=env
-    )
-    return proc.returncode == 0, set(FAIL_RE.findall(proc.stdout + proc.stderr))
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(suite)], capture_output=True, text=True, env=env, timeout=timeout
+        )
+    except subprocess.TimeoutExpired:
+        # KILLED BY `subprocess.run` ITSELF before this is raised, so the child
+        # is gone by the time the caller's `finally` restores the target. A
+        # timeout that left the process alive would leave it importing the file
+        # being rewritten underneath it.
+        return False, set(), True
+    return proc.returncode == 0, set(FAIL_RE.findall(proc.stdout + proc.stderr)), False
 
 
-def run_mutants(target: Path, suite: Path, mutants: list[Mutant]) -> int:
+def run_mutants(target: Path, suite: Path, mutants: list[Mutant], timeout: float = DEFAULT_TIMEOUT) -> int:
     """Break `target` one anchor at a time and report what `suite` noticed."""
     original = target.read_bytes()
 
-    passed, red = run_suite(suite)
+    passed, red, timed_out = run_suite(suite, timeout)
+    if timed_out:
+        print(f"BASELINE TIMED OUT after {timeout}s - nothing was mutated")
+        return 1
     if not passed:
         print("BASELINE IS RED - fix that before mutating:", sorted(red))
         return 1
@@ -95,10 +120,18 @@ def run_mutants(target: Path, suite: Path, mutants: list[Mutant]) -> int:
             continue
         target.write_bytes(text.replace(old, new, 1).encode("utf-8"))
         try:
-            passed, red = run_suite(suite)
+            passed, red, timed_out = run_suite(suite, timeout)
         finally:
             target.write_bytes(original)
-        if passed:
+        if timed_out:
+            # A SURVIVOR, and deliberately not a kill. Nothing named a test, so
+            # nothing objected; what the suite did was fail to finish. Some
+            # mutations - removing a loop's only advance - can be detected no
+            # other way, and the honest report is that this list holds a mutant
+            # no test can grade rather than that the suite caught it.
+            print(f"TIMED OUT {name} - the suite did not finish in {timeout}s")
+            survivors.append(name)
+        elif passed:
             print(f"SURVIVED  {name}")
             survivors.append(name)
         elif not red:

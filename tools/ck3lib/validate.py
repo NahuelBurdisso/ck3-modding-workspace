@@ -11,8 +11,8 @@ the mod's localization resolve to a customizable_localization definition in
 this mod; (c) [mod-specific] the Battle Chronicles six ground bands partition
 every AGOT base terrain helper exactly once; (d) `file.txt:123` citations in
 comments land on a line of that file that carries content; (e) every
-customizable_localization definition has an unguarded `text` arm and, unless it
-is `random_valid`, has it last.
+customizable_localization definition that is NOT `random_valid` has an unguarded
+`text` arm and has it last.
 """
 
 from __future__ import annotations
@@ -593,11 +593,24 @@ def _check_arm_shape(relpath: str, text: str, issues: list[Issue]) -> None:
     unguarded arm always matches, and every arm after it is dead prose that
     still reads as shipped.
 
-    `random_valid = yes` POOLS THE VALID ARMS instead of taking the first, so
-    there is no dead arm to report and the order rule is suspended. The fallback
-    rule is not: an empty pool still renders nothing.
+    `random_valid = yes` POOLS THE VALID ARMS instead of taking the first, and
+    SUSPENDS BOTH HALVES. The order half is obvious: with no first-match there
+    is no dead arm below anything. The fallback half is not, and the earlier
+    version of this check got it wrong - it demanded the unguarded arm here too.
+    Under pooling an unguarded arm is valid on EVERY render, so it does not sit
+    out of the way waiting for a gap; it competes with the real prose and wins
+    its 1-in-n share, which for the mod's empty-string fallback means silently
+    deleting a clause that was available. The rule as written therefore mandated
+    a defect. There is no static substitute: whether a pooled definition can go
+    empty depends on whether its guards cover their own domain, which is a
+    question about the variable's value set and not about this file. That
+    obligation moves to the mod, which writes the complement as a bare
+    `trigger_if` (true when its limit is false) so the fallback arm is valid on
+    exactly the absent and unknown-value paths.
     """
     for definition in _definitions(text):
+        if definition.random_valid:
+            continue
         unguarded = [i for i, arm in enumerate(definition.arms) if not arm.guarded]
         if not unguarded:
             issues.append(
@@ -608,8 +621,6 @@ def _check_arm_shape(relpath: str, text: str, issues: list[Issue]) -> None:
                     f"`{definition.name}` has no unguarded `text` arm, so it renders nothing when no trigger matches",
                 )
             )
-            continue
-        if definition.random_valid:
             continue
         for arm in definition.arms[unguarded[0] + 1 :]:
             issues.append(

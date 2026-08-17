@@ -424,7 +424,7 @@ MUTANTS = [
         "        if False:",
     ),
     (
-        "arms: report a dead arm under random_valid too",
+        "arms: apply the first-match arm rules to a pooled definition too",
         "        if definition.random_valid:\n            continue",
         "        if False:\n            continue",
     ),

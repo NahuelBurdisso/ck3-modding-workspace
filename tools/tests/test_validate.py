@@ -546,24 +546,47 @@ class TestValidateMod(ValidateTestCase):
         self.write("localization/english/a_l_english.yml", BOM + 'l_english:\n bc_p:0 "Here"\n')
         self.assertOneMatching(self.validate(), "unreachable: `bc_there` has an unguarded arm above it")
 
-    def test_random_valid_suspends_the_order_rule_and_not_the_fallback_rule(self) -> None:
+    def test_random_valid_suspends_both_halves_of_the_arm_rule(self) -> None:
         # BOTH HALVES IN ONE TEST because the pair is the behaviour. Under
         # `random_valid = yes` CK3 pools every valid arm instead of taking the
         # first, so no arm is dead and the ordering complaint would be wrong.
-        # The fallback rule survives regardless: an empty pool still renders
-        # nothing, and that is what the unguarded arm is there to prevent.
+        #
+        # THE FALLBACK HALF IS SUSPENDED TOO, and this is the part that was
+        # wrong until 2026-08-17. An unguarded arm under pooling is not a
+        # fallback: it is valid on every render, so it competes with the real
+        # prose and takes its 1-in-n share. Demanding one - which is what the
+        # earlier rule did - mandates a defect, because the mod's fallback arm
+        # is the EMPTY string and winning the pool with it deletes a clause that
+        # was available. `bc_all_guarded` below is the shape the mod ships and
+        # it must be silent; its guards cover their own domain by construction
+        # (the last arm is the complement of the rest, written as a bare
+        # `trigger_if`), and that is not a property this file can see.
         self.write(
             "common/customizable_localization/c.txt",
             "bc_pooled = {\n\ttype = character\n\trandom_valid = yes\n"
             "\ttext = {\n\t\tlocalization_key = bc_p\n\t}\n"
             "\ttext = {\n\t\ttrigger = { always = yes }\n\t\tlocalization_key = bc_p\n\t}\n}\n"
-            "bc_empty_pool = {\n\ttype = character\n\trandom_valid = yes\n"
+            "bc_all_guarded = {\n\ttype = character\n\trandom_valid = yes\n"
             "\ttext = {\n\t\ttrigger = { always = yes }\n\t\tlocalization_key = bc_p\n\t}\n}\n",
         )
         self.write("localization/english/a_l_english.yml", BOM + 'l_english:\n bc_p:0 "Here"\n')
         found = self.validate()
         self.assertNoneMatching(found, "unreachable")
-        self.assertOneMatching(found, "`bc_empty_pool` has no unguarded `text` arm")
+        self.assertNoneMatching(found, "unguarded")
+
+    def test_the_fallback_rule_still_bites_without_random_valid(self) -> None:
+        # The guard against over-reading the change above: suspending the rule
+        # for pooled definitions must not suspend it for the first-match ones,
+        # which are still the overwhelming majority of the file.
+        self.write(
+            "common/customizable_localization/c.txt",
+            "bc_pooled = {\n\ttype = character\n\trandom_valid = yes\n"
+            "\ttext = {\n\t\ttrigger = { always = yes }\n\t\tlocalization_key = bc_p\n\t}\n}\n"
+            "bc_first_match = {\n\ttype = character\n"
+            "\ttext = {\n\t\ttrigger = { always = yes }\n\t\tlocalization_key = bc_p\n\t}\n}\n",
+        )
+        self.write("localization/english/a_l_english.yml", BOM + 'l_english:\n bc_p:0 "Here"\n')
+        self.assertOneMatching(self.validate(), "`bc_first_match` has no unguarded `text` arm")
 
     def test_a_trigger_nested_below_the_arm_is_not_the_arm_s_guard(self) -> None:
         # `trigger` appears inside arms for a second reason - as the key of a

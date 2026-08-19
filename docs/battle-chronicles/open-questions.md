@@ -3,6 +3,32 @@
 Everything the mod does that no run has yet proven. This is the agenda for the
 next run.
 
+## FIRST: there is an unrecorded run, and it answers some of the list below
+
+`logs/debug.log` holds a session nobody wrote up: **2026-08-17, 15:02:28 to
+15:22:05**, one startup, in-game year 7955, clean exit to `autosave_exit` as
+Lord Tywin. It is the last time the game was started. The "Content session,
+2026-08-17 (no run - static verification only)" heading in the batch ledger is
+true about the *session that wrote the batches* - those commits start at 22:54
+that night - and false as a claim about the day.
+
+What it measured, from `probe`:
+
+| marker | count | what it settles |
+|---|---|---|
+| `BC: fired` | 478, across **10 distinct templates** | the ten originals. It predates every one of the 434 templates added that night and the next day, so it says nothing about them |
+| `BC: wound` | 13 | **the wound fires.** The list below still says it never has. That entry is stale |
+| `BC: nickname awarded` | 1 | **the award landed under its real gate.** Also stale below |
+| `BC: nemesis new` | 62 | the rivalry path runs at volume |
+| `BC: dk deferred` / `dk deferred fired` / `dk found dead` | 75 / **0** / 0 | by this file's own verdict table: the `combat_side` did not survive the day. The deferral does not work and the dead-knight read has to be re-hung on the commander character |
+| `BC: ground missing` | 0 | `combat.location` resolves at a phase event |
+
+`error.log` for that run is 416,554 lines across the 45-mod stack and contains
+**zero** lines naming `bc_` or `battle_chronicles`.
+
+Nothing below has been re-edited to account for this. Read the two together, and
+trust the markers over the prose.
+
 ## Not yet verified in game
 
 - The shieldbrother memory rendering, and that `[shieldbrother.GetFullName]`

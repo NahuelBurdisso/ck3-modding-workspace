@@ -114,12 +114,13 @@ flags below only matter for re-firing moments inside a battle.
 Every throttle in the mod is a character flag, so all of them clear in one line
 on the character you are playing:
 
-    effect = { remove_character_flag = bc_eve_cooldown remove_character_flag = bc_toast_cooldown remove_character_flag = bc_chronicle_recent remove_character_flag = bc_popup_cooldown }
+    effect = { remove_character_flag = bc_eve_cooldown remove_character_flag = bc_toast_cooldown remove_character_flag = bc_toast_cooldown_high remove_character_flag = bc_chronicle_recent remove_character_flag = bc_popup_cooldown }
 
 | flag | days | what it gates |
 |---|---|---|
 | `bc_chronicle_recent` | 15, size-scaled on commanders | whether any moment may fire for that character |
 | `bc_toast_cooldown` | 10 | whether the RECIPIENT is shown a toast |
+| `bc_toast_cooldown_high` | 20 | whether a major or decisive moment may speak OVER `bc_toast_cooldown`. Set only by an actual preemption. **Clearing `bc_toast_cooldown` alone leaves this one holding**, and a session that forgets it will measure zero preemptions and conclude the feature is dead |
 | `bc_popup_cooldown` | 60 | whether a moment escalates to a full pop-up |
 | `bc_eve_cooldown` | 90 | whether the eve is offered |
 

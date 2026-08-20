@@ -152,13 +152,31 @@ the moment count in the log is the control.
 ## 5. Measuring the depth escalator
 
 Both ladders escalate on ledger depth instead of being capped by it. Rungs are
-**11 and 16** as of 2026-08-19, the third pair in one day - 4/6 measured 41%
-decisive, 8/13 measured 18%, against ~7.5 moments per commander.
+**9 and 13** as of 2026-08-20, the fourth pair. Every pair measured so far:
+
+| rungs | moments/side | minor | major | decisive | verdict |
+|---|---|---|---|---|---|
+| 4 / 6 | 6.3 | 40% | 19% | 41% | top rung below the mean |
+| 8 / 13 | 7.5 | 61% | 21% | 18% | still hot |
+| 11 / 16 | 6.14 | 83.9% | 11.6% | 4.5% | **regression, under the 5% floor** |
+| **9 / 13** | — | *73.2%* | *17.1%* | *9.7%* | predicted, unrun |
+
+**THE MEAN IS NOT A CONSTANT OF THE MOD — RE-READ IT EVERY RUN.** This is what
+broke 11/16. It was fitted against the 7.5 mean measured at rungs 8/13; the next
+run's mean was 6.14, an 18% drop, so the same rungs sat far further out on the
+tail than the fit assumed and decisive collapsed to 4.5%. The rungs did not change
+behaviour, the battle sample did. A rung pair is only meaningful next to the mean
+it was fitted against, so always quote the two together.
+
+9/13 is fitted to the 11/16 run's own two points - `P(d>=11) = 0.161` and
+`P(d>=16) = 0.045` give `r = 0.775` per step. Two points cannot tell a geometric
+tail from a heavier one, so this is the best available estimate, not a settled
+number.
 
 **The top rung is not aimed at the 5% in the table below.** The tail fit puts 5%
-near depth 21; 16 aims at ~10% on purpose, because `bc_wound_effect` and style
-RANK 3 hang off `decisive` and nothing else, and 5% starves them back toward the
-three runs of zero the ledger already documents. Judge the next run against
+near depth 21; the top rung aims at ~10% on purpose, because `bc_wound_effect` and
+style RANK 3 hang off `decisive` and nothing else, and 5% starves them back toward
+the three runs of zero the ledger already documents. Judge the next run against
 **~72 / ~18 / ~10**, and treat a decisive share under 5% as a regression, not a win.
 
     python tools/ck3.py probe 'BC: momentum depth'
@@ -239,12 +257,18 @@ so it would need bucket markers beside the increment in
 
 ### The wound follows the top two rungs
 
-`BC: wound gates passed` reads **96 at the 4/6 rungs and 55 at 8/13**, after three
-runs of zero - the arm is alive, and it is already falling as designed. It hangs
-off the decisive and major arms only, needs `SWING = down`, and is capped at one
-per battle by `var:bc_battle_wounded`. Raising the rungs makes those arms rarer,
-so **expect this number to keep falling**; if it returns to 0 the rungs went too
-far. Judge the 11/16 run against **nonzero and below 55**.
+`BC: wound gates passed` reads **96 at 4/6, 55 at 8/13, and 24 at 11/16**, after
+three runs of zero - the arm is alive, and it is already falling as designed. It
+hangs off the decisive and major arms only, needs `SWING = down`, and is capped at
+one per battle by `var:bc_battle_wounded`. Raising the rungs makes those arms
+rarer, so **expect this number to keep falling**; if it returns to 0 the rungs went
+too far.
+
+24 at 11/16 was the second reading agreeing that those rungs overshot - the series
+96 → 55 → 24 is closing on the 0 that means the arm is dead. **9/13 lowers the
+rungs, so this number should now RISE**, and a rise is the expected direction for
+the first time in the series. Judge the 9/13 run against **comfortably above 24**;
+if it does not move, the rung change did not reach the wound arm.
 
 This line read **62** until 2026-08-20, which was neither run: it was a
 mid-session read of the 4/6 run, whose final log says 96. Scored against 62, a

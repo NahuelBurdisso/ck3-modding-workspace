@@ -1072,6 +1072,17 @@ places; it is seven lines across four logical sites, and they must all agree:
 Plus a **comment** at `bc_scripted_triggers.txt:10900` quoting `>= 11` as its example,
 which must be updated with them or it becomes the next stale number.
 
+### Re-fit APPLIED 2026-08-20 — mod commit `62f9e7a`
+
+All eight sites moved to 9/13 together and verified: `grep -rn "bc_battle_moments >="`
+now returns 9, 13, 9 / 13, 9 / 9, 13 plus the comment, and a grep for the old constants
+returns 0 across every file in `common/scripted_effects/` and `common/scripted_triggers/`.
+`validate --strict` 0 errors, and `_planrehearse.py` still reports **0 failing checks**,
+so Tasks 2-6's anchors survived the re-fit and this plan remains executable as written.
+
+**Task 1 must now be repeated at 9/13.** `p` and `high` are re-derived from that run, not
+carried over from this one — the 0.161 above belongs to the 11/16 sample.
+
 ### Untouched and still suspect
 
 The template `is_valid` depth gates at `bc_commander_phase_events.txt:4074` (`>= 3`),

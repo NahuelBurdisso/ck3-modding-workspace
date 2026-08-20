@@ -20,6 +20,19 @@ constant in Task 5. Skipping it and guessing the constant means stacking two
 unmeasured changes onto one measurement, which is the exact failure
 `docs/battle-chronicles/bench.md` §5 was rewritten to prevent.
 
+**Pre-flight, run it before Task 2 and it costs nothing:**
+
+```bash
+cd /d/ck3 && python tools/_planrehearse.py
+```
+
+It parses this file's own `Old:`/`New:` blocks, applies all eleven to scratch copies
+of the real files, and runs every count assertion in Tasks 2-6 against the result.
+Expected: `all edits applied cleanly`, `0 failing check(s)`. A failure here means an
+anchor has drifted — fix the plan, not the mod. **The script is meaningless once the
+edits have landed** (the anchors will no longer match) and should be deleted then.
+It already caught two anchors that spanned into a line the source continues past.
+
 Both repos are separate: `D:/ck3` is the workspace, `D:/ck3/mods/battle_chronicles`
 is the mod, and `mods/` is gitignored by the workspace. **Script edits commit in the
 mod repo; doc, plan and tool edits commit in the workspace repo.** Each task below
@@ -242,16 +255,19 @@ Expected: `0`.
 
 - [ ] **Step 2: Write the rank in the decisive arm**
 
-Insert one line after `debug_log = "BC: moment decisive"`, i.e. **above** the
+Insert after `debug_log = "BC: moment decisive"`, i.e. **above** the
 `# Family 3 hangs here` comment block and above `bc_wound_effect`.
+
+**Do not extend the anchor down into the `# Family 3 hangs here` line.** That line
+continues `... ONLY here. This arm IS the effective tier: it is`, so an anchor ending
+at `ONLY here.` followed by a newline matches nothing. The two lines below are
+sufficient and unique — `RANK = 3` occurs once in the file.
 
 Old:
 
 ```
 		bc_write_style_effect = { RANK = 3 KIND = $KIND$ }
 		debug_log = "BC: moment decisive"
-
-		# Family 3 hangs here and ONLY here.
 ```
 
 New:
@@ -271,19 +287,19 @@ New:
 		# decisive" that caused it; appending here would silently break that
 		# ordering and the ratio the two counts are read as.
 		set_variable = { name = bc_last_moment_rank value = 3 }
-
-		# Family 3 hangs here and ONLY here.
 ```
 
 - [ ] **Step 3: Write the rank in the major arm**
+
+Same rule as Step 2 — the `# THE MAJOR ARM WOUNDS TOO` line continues into `, AND IT
+IS THE ARM THAT DOES THE WORK.`, so keep the anchor to the two lines below.
+`RANK = 2` occurs once in the file.
 
 Old:
 
 ```
 		bc_write_style_effect = { RANK = 2 KIND = $KIND$ }
 		debug_log = "BC: moment major"
-
-		# THE MAJOR ARM WOUNDS TOO
 ```
 
 New:
@@ -295,8 +311,6 @@ New:
 		# See the decisive arm above for why this is here and why it is above the
 		# wound call.
 		set_variable = { name = bc_last_moment_rank value = 2 }
-
-		# THE MAJOR ARM WOUNDS TOO
 ```
 
 - [ ] **Step 4: Write the rank in the else arm**

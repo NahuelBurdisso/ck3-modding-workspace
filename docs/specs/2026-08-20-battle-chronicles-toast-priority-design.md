@@ -103,9 +103,8 @@ comment, across three script files**:
 | `bc_scripted_triggers.txt` | `bc_can_toast_trigger` (4.2) |
 | `bc_scripted_effects.txt` | `bc_start_toast_cooldown_effect` (4.3) |
 
-Two non-script artefacts are also part of this change and not follow-up work:
-`docs/battle-chronicles/bench.md` and the workspace memory file
-`project_battle_chronicles.md`. See 4.6.
+One non-script artefact is also part of this change and not follow-up work:
+`docs/battle-chronicles/bench.md`, which must learn the new flag. See 4.6.
 
 ## 4. The mechanism
 
@@ -348,11 +347,13 @@ the criterion already written in `bench.md` §5 — `grep -cF` over the final
 counted off the archived final logs; `bench.md` §5 says to expect it to keep
 falling as the rungs rise, with 0 meaning they went too far.
 
-> **`bench.md:226` and `project_battle_chronicles.md:229` both say 62, and 62 is
-> wrong.** It is a mid-session read of run 2, whose final log says 96 — the same
-> undercount trap that had already forced one rung re-fit that day. Correct both
-> as part of this change (4.6). A Run 1 scored against 62 would read a *rise* from
-> 55 to 56-61 as the expected fall and pass a regression.
+> **Both `bench.md` and the workspace memory used to say 62, and 62 is wrong.** It
+> is a mid-session read of run 2, whose final log says 96 — the same undercount
+> trap that had already forced one rung re-fit that day. Both were corrected in
+> `3b52fb6`, ahead of this design and independent of it, so **Run 1 can be scored
+> off the bench as it now stands**. Recorded here because a Run 1 scored against
+> 62 would read a *rise* from 55 to 56-61 as the expected fall and pass a
+> regression; if a future edit reintroduces 62, that is the reason it is wrong.
 
 Plus one number this design needs:
 

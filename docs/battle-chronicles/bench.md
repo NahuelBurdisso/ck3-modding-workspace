@@ -169,14 +169,26 @@ For shares, count the whole log instead:
 
     grep -cF "BC: moment decisive" "<user dir>/logs/debug.log"
 
-Wanted, on the tier list: ~72% minor / ~23% major / ~5% decisive.
+Wanted, on the tier list: **~72% minor / ~18% major / ~10% decisive** - the same
+figures as the paragraph above, and not the ~23/~5 this line carried until
+2026-08-20. The 5% was the spec's inherited target and was deliberately abandoned
+for the reason given above; a bench that states both cannot judge the run it
+drives.
+
+**EVERY RUN-2 FIGURE IN THE REST OF THIS SECTION WAS A MID-SESSION READ AND WAS
+WRONG UNTIL 2026-08-20.** The log is written live, and the counts below were taken
+while `ck3.exe` was still running - they undercounted by roughly half. They have
+been replaced with counts from `logs/archive-20260819-run2/debug.log`, taken after
+the process left `tasklist`. The one figure that was always right is `:155`'s 41%
+decisive for the 4/6 rungs. This is the third time this trap has put a wrong
+number into a document; read counts only after the game has exited.
 
 ### Do NOT read a divergence between the two lists as a scope bug
 
 The previous revision of this section said the two lists must track each other
 and that **divergence means one escalator reads `var:bc_battle_moments` on the
-wrong scope**. The 2026-08-19 run diverged hard - depth 79/8/13 against tier
-37/18/45 - and that diagnosis was **wrong**. There is a third cause, and it is
+wrong scope**. The 2026-08-19 run diverged hard - depth 80/7/13 against tier
+40/19/41 - and that diagnosis was **wrong**. There is a third cause, and it is
 the likelier one:
 
 **The momentum call is gated at the template and the tier call is not.** 420 of
@@ -185,11 +197,11 @@ the templates wrap their momentum call in a settled-gate, while
 `bc_record_moment_effect` (`bc_ledger_effects.txt:260`), one line after the
 increment. So the tier list has one entry per moment and the momentum list has
 one entry per *grant*. **The two totals are not comparable and the two shares are
-not comparable.** In that run: 888 moments, 236 momentum calls.
+not comparable.** In that run: 1175 moments, 329 momentum calls.
 
 Order of elimination when they disagree:
 
-1. **Totals far apart** (236 vs 888) - the gate is refusing calls. Expected to
+1. **Totals far apart** (329 vs 1175) - the gate is refusing calls. Expected to
    some degree; it is only a fault if `depth none` also dominates, because that
    means the calls that do get through are all a battle's first moment.
 2. **Tier shares wrong but internally smooth** - the rungs are mistuned against
@@ -207,27 +219,36 @@ commander, and every knight's moment on that side increments it too.
 
 Measure it as **moments ÷ commander-sides**:
 
-    grep -cF "BC: fired" debug.log                 # moments      888
-    grep -cF "BC: combat end cleanup" debug.log    # sides        128
+    grep -cF "BC: fired" debug.log                 # moments      1175
+    grep -cF "BC: combat end cleanup" debug.log    # sides         186
 
-888 ÷ 128 = **~6.9 per commander**. The old top rung of 6 therefore sat *below*
-the mean, which is why 45% of all moments resolved decisive. A rung pair is only
+1175 ÷ 186 = **~6.3 per commander**. The old top rung of 6 therefore sat *below*
+the mean, which is why 41% of all moments resolved decisive. A rung pair is only
 sane if the lower one is above the mean.
 
-8 and 13 are fitted to that run's three buckets - P(depth<4)=0.37, P(4-5)=0.18,
-P(>=6)=0.45 - by fitting a declining tail to `P(N>=d)` and solving for the 72/5
-points. **That is a model, not a census.** The honest way to settle it is a
+8 and 13 were fitted to that run's three buckets **as they were read
+mid-session** - P(depth<4)=0.37, P(4-5)=0.18, P(>=6)=0.45 - by fitting a
+declining tail to `P(N>=d)` and solving for the 72/5 points. The final log says
+those buckets were **0.40 / 0.19 / 0.41**. The two are close enough that 8/13 was
+not a bad pair for the wrong reason, but the fit was made against numbers nobody
+had yet earned the right to use. **That is a model, not a census.** The honest way
+to settle it is a
 depth histogram, which does not exist today; `debug_log` cannot print a variable,
 so it would need bucket markers beside the increment in
 `bc_record_moment_effect`.
 
 ### The wound follows the top two rungs
 
-`BC: wound gates passed` read **62** in the 2026-08-19 run, after three runs of
-zero - the arm is alive. It hangs off the decisive and major arms only, needs
-`SWING = down`, and is capped at one per battle by `var:bc_battle_wounded`.
-Raising the rungs makes those arms rarer, so **expect this number to fall**; if
-it returns to 0 the rungs went too far.
+`BC: wound gates passed` reads **96 at the 4/6 rungs and 55 at 8/13**, after three
+runs of zero - the arm is alive, and it is already falling as designed. It hangs
+off the decisive and major arms only, needs `SWING = down`, and is capped at one
+per battle by `var:bc_battle_wounded`. Raising the rungs makes those arms rarer,
+so **expect this number to keep falling**; if it returns to 0 the rungs went too
+far. Judge the 11/16 run against **nonzero and below 55**.
+
+This line read **62** until 2026-08-20, which was neither run: it was a
+mid-session read of the 4/6 run, whose final log says 96. Scored against 62, a
+rise from 55 to 56-61 would have been recorded as the expected fall.
 
 ---
 

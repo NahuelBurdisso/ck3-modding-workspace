@@ -1,3 +1,15 @@
+# Proves the invariant the toast-priority design rests on: in every phase-event
+# template, bc_record_moment_effect precedes the bc_can_toast_trigger gate, and the
+# toast `if` sits exactly one brace deeper - i.e. inside the same enclosing scope.
+# That is what lets the gate read var:bc_last_moment_rank with no parameter.
+# Re-run after any bulk edit to the phase-event files.
+#
+# TWO KNOWN LIMITS:
+#   1. The SIDE constant is dead. It was going to check the knight wrapper
+#      explicitly and the depth check subsumed it; it is left as documentation of
+#      what the depth column is really measuring.
+#   2. Brace counting does not strip comments, so an unbalanced brace inside a
+#      comment would skew the depth column. No template currently has one.
 import re, sys
 
 files = [

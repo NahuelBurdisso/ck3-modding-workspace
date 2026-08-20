@@ -152,7 +152,14 @@ the moment count in the log is the control.
 ## 5. Measuring the depth escalator
 
 Both ladders escalate on ledger depth instead of being capped by it. Rungs are
-**8 and 13** as of 2026-08-19; they were 4 and 6 for exactly one run.
+**11 and 16** as of 2026-08-19, the third pair in one day - 4/6 measured 41%
+decisive, 8/13 measured 18%, against ~7.5 moments per commander.
+
+**The top rung is not aimed at the 5% in the table below.** The tail fit puts 5%
+near depth 21; 16 aims at ~10% on purpose, because `bc_wound_effect` and style
+RANK 3 hang off `decisive` and nothing else, and 5% starves them back toward the
+three runs of zero the ledger already documents. Judge the next run against
+**~72 / ~18 / ~10**, and treat a decisive share under 5% as a regression, not a win.
 
     python tools/ck3.py probe 'BC: momentum depth'
     python tools/ck3.py probe 'BC: moment '

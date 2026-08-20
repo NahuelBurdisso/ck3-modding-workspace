@@ -88,17 +88,24 @@ templates that scope is the `scope:combat_side.side_commander ?= { ... }` wrappe
 so the rank is written on, and read from, the toast's recipient. That script sits
 in `tools/` with the other `_bc*` scanners and is tracked rather than scratch,
 because it guards an invariant this design depends on; re-run it after any bulk
-edit to the phase-event files. Two known limits to note in the plan that promotes
-it to a tracked guard: its `SIDE` constant is dead, and its brace counting does
-not strip comments, so a stray unbalanced brace inside a comment would skew the
-depth column.
+edit to the phase-event files. It is already tracked; the outstanding ask is only
+to document its two limits in its own header — its `SIDE` constant is dead, and
+its brace counting does not strip comments, so an unbalanced brace inside a
+comment would skew the depth column.
 
 Because the rank is on the scope the gate already evaluates on, the gate needs no
-parameter, and **no template is edited.** Four *definitions* change, in **three**
-script files — `bc_ledger_effects.txt` carries three of them, since
-`bc_clear_scratch_effect` is at `:560` of that same file. A fourth artefact,
-`docs/battle-chronicles/bench.md`, is also part of this change and not an
-afterthought; see 4.6.
+parameter, and **no template is edited.** The change is **four definitions and one
+comment, across three script files**:
+
+| file | what changes |
+|---|---|
+| `bc_ledger_effects.txt` | `bc_record_effective_tier_effect` (4.1), `bc_clear_scratch_effect` (4.4), and a stale comment at `:271` (4.5) |
+| `bc_scripted_triggers.txt` | `bc_can_toast_trigger` (4.2) |
+| `bc_scripted_effects.txt` | `bc_start_toast_cooldown_effect` (4.3) |
+
+Two non-script artefacts are also part of this change and not follow-up work:
+`docs/battle-chronicles/bench.md` and the workspace memory file
+`project_battle_chronicles.md`. See 4.6.
 
 ## 4. The mechanism
 
@@ -243,16 +250,37 @@ the new flag. Three edits, all required before Run 2 can be trusted:
   that failed to clear it.
 - **`bench.md:226`**: `BC: wound gates passed` 62 → **96 at the 4/6 rungs, 55 at
   8/13**, per Section 7.
-- **`bench.md` §5 is internally inconsistent about the 4/6 run** and none of its
-  figures match the archived log: `:156` says 41% decisive, `:178` and `:213` say
-  37/18/45 and 888 ÷ 128 = 6.9, while `archive-20260819-run2/debug.log` gives
-  40/19/41 and 1175 ÷ 186 = 6.3. Every stale figure is a mid-session read. Replace
-  them with the archived counts.
+- **`bench.md:172`** wants "~72% minor / ~23% major / ~5% decisive", contradicting
+  `:162`'s "~72 / ~18 / ~10" eleven lines above. §5 must not disagree with itself
+  during the run it drives. `:162` is the intended target; `:172` is the
+  superseded 5% figure Section 7 explains was deliberately abandoned.
+- **`bench.md` §5's run-2 figures are mid-session throughout.** Every number below
+  is a read taken while `ck3.exe` was still writing. Replace with the archived
+  final counts from `logs/archive-20260819-run2/debug.log`:
 
-All four wrong numbers in that file share one cause — the log was read while
+  | line | reads | should read |
+  |---|---|---|
+  | `:179` | tier `37/18/45` | `40/19/41` (473 / 223 / 478) |
+  | `:179` | depth `79/8/13` | `80/7/13` (263 / 24 / 42) |
+  | `:188`, `:192` | "888 moments, 236 momentum calls" | **1175** moments, **329** momentum calls |
+  | `:210-211` | `# moments 888`, `# sides 128` | `# moments 1175`, `# sides 186` |
+  | `:213` | `888 ÷ 128 = ~6.9` | `1175 ÷ 186 = ~6.3` |
+  | `:214` | "45% of all moments resolved decisive" | 41% |
+  | `:217` | `P(depth<4)=0.37, P(4-5)=0.18, P(>=6)=0.45` | `0.40 / 0.19 / 0.41` |
+
+  **`:155`'s "4/6 measured 41% decisive" is already correct** (478 ÷ 1175 = 40.7%)
+  and must be left alone, as must `:156`'s 18% and 7.5. The inconsistency in §5 is
+  between `:155` and the block at `:179-217`, with `:155` on the right side of it.
+
+- **Workspace memory `project_battle_chronicles.md:229`** carries the same 62.
+  Correct it there too, or the next session re-imports the wrong baseline — which
+  is exactly how 62 reached `bench.md` in the first place.
+
+Every wrong number listed above shares one cause: the log was read while
 `ck3.exe` was still running. §5 already warns about this and was itself written
-from an undercount. Whatever plan implements this should state the correction as
-"counts taken from the archived final logs" so the provenance survives.
+from an undercount, which is the third occurrence of the same trap. The plan
+should state the correction as "counts taken from the archived final logs" so the
+provenance survives the next reader.
 
 ## 5. Rejected alternatives
 
@@ -291,9 +319,19 @@ preemption also runs the unconditional `add_character_flag = { flag =
 bc_toast_cooldown days = 10 }`, resetting the ordinary clock — so an interruption
 costs the player a later routine toast. Keep it that way: moving the base write
 into an `else` would "restore independence" and raise the ceiling to the full
-additive bound, which is a real volume change dressed up as a tidy-up. A walked
-30-day timeline gives 3 ordinary + 2 preemptions = **5**, under the additive
-bound of 6.
+additive bound, which is a real volume change dressed up as a tidy-up.
+
+Both fits, over a 30-day battle:
+
+| fit | additive bound | walked timeline |
+|---|---|---|
+| `high = 10` | 3 + 3 = 6 | 3 ordinary + 2 preemptions = **5** |
+| `high = 20` | 3 + 1.5 = 4.5 | 3 ordinary + 1 preemption = **4** |
+
+At the 72/18/10 target p = 0.28, so Section 7 selects `high = 20` and the expected
+outcome is 4-5. **Section 8's band of 6 is retained across both fits** — it is the
+worse case's bound, so it stays valid if Run 1 measures p below 0.20 and the fit
+drops to `high = 10`. It is a ceiling, not a prediction.
 
 At the 11/16 rungs' *target* split of 72/18/10, rank-2+ is 28% of moments, so the
 player's side sees ~2.1 preemption candidates per 30-day battle against a cap of
@@ -330,11 +368,11 @@ the criterion already written in `bench.md` §5 — `grep -cF` over the final
 counted off the archived final logs; `bench.md` §5 says to expect it to keep
 falling as the rungs rise, with 0 meaning they went too far.
 
-> **`bench.md:226` and the workspace memory both say 62, and 62 is wrong.** It is
-> a mid-session read of run 2, whose final log says 96 — the same undercount trap
-> that had already forced one rung re-fit that day. Correct both as part of this
-> change (4.6). A Run 1 scored against 62 would read a *rise* from 55 to 56-61 as
-> the expected fall and pass a regression.
+> **`bench.md:226` and `project_battle_chronicles.md:229` both say 62, and 62 is
+> wrong.** It is a mid-session read of run 2, whose final log says 96 — the same
+> undercount trap that had already forced one rung re-fit that day. Correct both
+> as part of this change (4.6). A Run 1 scored against 62 would read a *rise* from
+> 55 to 56-61 as the expected fall and pass a regression.
 
 Plus one number this design needs:
 

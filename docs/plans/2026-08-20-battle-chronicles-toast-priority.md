@@ -245,7 +245,7 @@ cd /d/ck3 && git add docs/plans/2026-08-20-battle-chronicles-toast-priority.md &
 toast, not the ledger — and without 4.4 it accumulates as a permanent save variable on
 every character who has ever commanded.
 
-- [ ] **Step 1: Record the before-state**
+- [x] **Step 1: Record the before-state**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -c "bc_last_moment_rank" common/scripted_effects/bc_ledger_effects.txt
@@ -253,7 +253,7 @@ cd /d/ck3/mods/battle_chronicles && grep -c "bc_last_moment_rank" common/scripte
 
 Expected: `0`.
 
-- [ ] **Step 2: Write the rank in the decisive arm**
+- [x] **Step 2: Write the rank in the decisive arm**
 
 Insert after `debug_log = "BC: moment decisive"`, i.e. **above** the
 `# Family 3 hangs here` comment block and above `bc_wound_effect`.
@@ -289,7 +289,7 @@ New:
 		set_variable = { name = bc_last_moment_rank value = 3 }
 ```
 
-- [ ] **Step 3: Write the rank in the major arm**
+- [x] **Step 3: Write the rank in the major arm**
 
 Same rule as Step 2 — the `# THE MAJOR ARM WOUNDS TOO` line continues into `, AND IT
 IS THE ARM THAT DOES THE WORK.`, so keep the anchor to the two lines below.
@@ -313,7 +313,7 @@ New:
 		set_variable = { name = bc_last_moment_rank value = 2 }
 ```
 
-- [ ] **Step 4: Write the rank in the else arm**
+- [x] **Step 4: Write the rank in the else arm**
 
 Old:
 
@@ -339,7 +339,7 @@ New:
 	}
 ```
 
-- [ ] **Step 5: Clear it at combat end**
+- [x] **Step 5: Clear it at combat end**
 
 In `bc_clear_scratch_effect`, add the remove **and fix the count in BOTH comments
 that state it** — each says "nine" and this makes it ten. Leaving either would plant
@@ -400,7 +400,7 @@ New:
 }
 ```
 
-- [ ] **Step 6: Verify def/use counts**
+- [x] **Step 6: Verify def/use counts**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -c "bc_last_moment_rank" common/scripted_effects/bc_ledger_effects.txt
@@ -415,7 +415,7 @@ cd /d/ck3/mods/battle_chronicles && grep -c "Six of the nine" common/scripted_ef
 Expected: `0`. **Unanchored on purpose** — the string occurs twice, at `:27` and
 `:542`, and an anchored grep would silently pass with one of them still stale.
 
-- [ ] **Step 7: Static gate**
+- [x] **Step 7: Static gate**
 
 ```bash
 cd /d/ck3 && python tools/ck3.py validate battle_chronicles --strict
@@ -426,7 +426,7 @@ Expected: 0 errors, 2 known `namespace` warnings. This edit adds lines to
 into this file that has shifted will surface here. (At time of writing no script
 comment cites `bc_ledger_effects.txt:NNN`, so none is expected.)
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add common/scripted_effects/bc_ledger_effects.txt && git commit -m "feat: record the effective moment rank on the toast recipient
@@ -447,7 +447,7 @@ every AI commander in the world, not just the player."
 Separate commit because it is a documentation fix that happens to live in a script
 file, and mixing it into Task 2 would hide it.
 
-- [ ] **Step 1: Confirm the arithmetic before writing it**
+- [x] **Step 1: Confirm the arithmetic before writing it**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -c "bc_record_moment_effect = {" common/combat_phase_events/bc_commander_phase_events.txt common/combat_phase_events/bc_knight_phase_events.txt events/bc_events.txt
@@ -457,7 +457,7 @@ Expected: `238`, `206`, `21` — summing to 465. Note `bc_events.txt` lives in t
 top-level `events/`, not `common/events/`. If any count differs, use the measured
 numbers, not the ones written below.
 
-- [ ] **Step 2: Find every site, not just the one the spec cites**
+- [x] **Step 2: Find every site, not just the one the spec cites**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -n "Eight of the eighteen" common/scripted_effects/bc_ledger_effects.txt
@@ -467,7 +467,7 @@ Expected: **two** hits, `:224` and `:271`. The spec cites only `:271`; fixing th
 one alone leaves the identical stale count six screens above it, which is how this
 number survived the 434-template batch in the first place. Both get fixed.
 
-- [ ] **Step 3: Fix `:224` — a top-level comment, NO indentation**
+- [x] **Step 3: Fix `:224` — a top-level comment, NO indentation**
 
 Old:
 
@@ -487,7 +487,7 @@ New:
 # lives in bc_battle_open_effect instead.
 ```
 
-- [ ] **Step 4: Fix `:271` — inside the effect body, EVERY LINE STARTS WITH A TAB**
+- [x] **Step 4: Fix `:271` — inside the effect body, EVERY LINE STARTS WITH A TAB**
 
 The two lines below are tab-indented in the file. Copy the leading tab; an
 unindented `old_string` will not match, and an unindented `new_string` would land
@@ -514,7 +514,7 @@ New:
 **The substance of the warning must survive the edit** — the sentence continues into
 `bc_battle_size removed by bc_clear_scratch_effect`, and that is still correct.
 
-- [ ] **Step 5: Verify no stale shape remains and the warning survived**
+- [x] **Step 5: Verify no stale shape remains and the warning survived**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -c "Eight of the eighteen" common/scripted_effects/bc_ledger_effects.txt
@@ -532,7 +532,7 @@ Expected: `1` — the warning survived. `-A8`, not `-A2`: the replacement commen
 six lines long, so a narrower window returns `0` and reads as "the warning was
 destroyed" on a correct edit.
 
-- [ ] **Step 6: Static gate and commit**
+- [x] **Step 6: Static gate and commit**
 
 ```bash
 cd /d/ck3 && python tools/ck3.py validate battle_chronicles --strict
@@ -555,7 +555,7 @@ immediately. **That is a real behaviour change on its own** — it is Task 5 tha
 it a budget rather than a hole. Land Tasks 4 and 5 back to back; do not run the game
 between them.
 
-- [ ] **Step 1: Replace the trigger body**
+- [x] **Step 1: Replace the trigger body**
 
 Old:
 
@@ -585,7 +585,7 @@ bc_can_toast_trigger = {
 }
 ```
 
-- [ ] **Step 2: Add the header note above the trigger**
+- [x] **Step 2: Add the header note above the trigger**
 
 Insert immediately above `bc_can_toast_trigger = {`, after the existing header:
 
@@ -612,7 +612,7 @@ Insert immediately above `bc_can_toast_trigger = {`, after the existing header:
 # this codebase.
 ```
 
-- [ ] **Step 3: Verify the shape mechanically**
+- [x] **Step 3: Verify the shape mechanically**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -c "bc_toast_cooldown_high" common/scripted_triggers/bc_scripted_triggers.txt
@@ -628,7 +628,7 @@ cd /d/ck3/mods/battle_chronicles && grep -A12 "^bc_can_toast_trigger = {" common
 Expected: `2` — the sibling and the `trigger_if` limit. **A `1` here is the bug the
 first draft of this design shipped**; go back to Step 1.
 
-- [ ] **Step 4: Static gate**
+- [x] **Step 4: Static gate**
 
 ```bash
 cd /d/ck3 && python tools/ck3.py validate battle_chronicles --strict
@@ -640,7 +640,7 @@ inside the same file — both are far above the edit point at `:584`, so neither
 shifts. If `validate` reports a citation failure anyway, fix the citation rather
 than reverting.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add common/scripted_triggers/bc_scripted_triggers.txt && git commit -m "feat: let a major or decisive moment speak over a minor moment's cooldown"
@@ -656,7 +656,7 @@ cd /d/ck3/mods/battle_chronicles && git add common/scripted_triggers/bc_scripted
 **Uses the `high` value chosen in Task 1 Step 10.** Substitute the number; do not
 leave a placeholder.
 
-- [ ] **Step 1: Replace the effect body**
+- [x] **Step 1: Replace the effect body**
 
 Old:
 
@@ -724,7 +724,7 @@ bc_start_toast_cooldown_effect = {
 }
 ```
 
-- [ ] **Step 2: Verify the placeholder is gone and the flag is written exactly once**
+- [x] **Step 2: Verify the placeholder is gone and the flag is written exactly once**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -c "<HIGH>" common/scripted_effects/bc_scripted_effects.txt
@@ -738,7 +738,7 @@ cd /d/ck3/mods/battle_chronicles && grep -c "bc_toast_cooldown_high" common/scri
 
 Expected: `1`.
 
-- [ ] **Step 3: Verify the high write is INSIDE the preemption branch**
+- [x] **Step 3: Verify the high write is INSIDE the preemption branch**
 
 This is the one check that catches the fatal wiring error.
 
@@ -749,7 +749,7 @@ cd /d/ck3/mods/battle_chronicles && grep -B4 "flag = bc_toast_cooldown_high" com
 Expected: `1`. A `0` means the high flag is being set outside the preemption branch —
 **stop and fix; the feature is dead if this ships.**
 
-- [ ] **Step 4: Static gate**
+- [x] **Step 4: Static gate**
 
 ```bash
 cd /d/ck3 && python tools/ck3.py validate battle_chronicles --strict
@@ -759,7 +759,7 @@ Expected: 0 errors, 2 known `namespace` warnings. `bc_scripted_effects.txt:231-2
 is cited from `bc_flavour.txt:2304`; this edit is at `:353` and below, so that
 citation does not shift.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git add common/scripted_effects/bc_scripted_effects.txt && git commit -m "feat: give preemptive toasts a scarcer budget of their own
@@ -783,7 +783,7 @@ the remainder of the test session, producing exactly the `preempt 0` reading Tas
 instructs the reader to revert on — the feature would be reverted on the strength of
 a bench that failed to clear it.
 
-- [ ] **Step 1: Add the flag to the clear line**
+- [x] **Step 1: Add the flag to the clear line**
 
 Old:
 
@@ -797,7 +797,7 @@ New:
     effect = { remove_character_flag = bc_eve_cooldown remove_character_flag = bc_toast_cooldown remove_character_flag = bc_toast_cooldown_high remove_character_flag = bc_chronicle_recent remove_character_flag = bc_popup_cooldown }
 ```
 
-- [ ] **Step 2: Add the row to the table**
+- [x] **Step 2: Add the row to the table**
 
 Insert after the `bc_toast_cooldown` row, using the `high` value from Task 1:
 
@@ -805,7 +805,7 @@ Insert after the `bc_toast_cooldown` row, using the `high` value from Task 1:
 | `bc_toast_cooldown_high` | <HIGH> | whether a major or decisive moment may speak OVER `bc_toast_cooldown`. Set only by an actual preemption. **Clearing `bc_toast_cooldown` alone leaves this one holding**, and a session that forgets it will measure zero preemptions and conclude the feature is dead |
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 ```bash
 cd /d/ck3 && grep -c "bc_toast_cooldown_high" docs/battle-chronicles/bench.md
@@ -819,7 +819,7 @@ cd /d/ck3 && grep -c "<HIGH>" docs/battle-chronicles/bench.md
 
 Expected: `0`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /d/ck3 && git add docs/battle-chronicles/bench.md && git commit -m "docs: bench must clear bc_toast_cooldown_high or it measures zero preemptions"
@@ -836,7 +836,7 @@ The spec leans on this script's output as proof that the record call always prec
 the toast gate in the same scope. Its limits belong in its own header, where the next
 person to run it will see them.
 
-- [ ] **Step 1: Add a header comment at the top of the file**
+- [x] **Step 1: Add a header comment at the top of the file**
 
 Insert above `import re, sys`:
 
@@ -855,7 +855,7 @@ Insert above `import re, sys`:
 #      comment would skew the depth column. No template currently has one.
 ```
 
-- [ ] **Step 2: Verify the script still runs and still reports clean**
+- [x] **Step 2: Verify the script still runs and still reports clean**
 
 ```bash
 cd /d/ck3 && python tools/_bcorder.py
@@ -877,7 +877,7 @@ bc_knight_phase_events.txt
 **Any nonzero in either zero column invalidates Task 2's parameterless approach** —
 stop and surface it, do not proceed to Task 8.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /d/ck3 && git add tools/_bcorder.py && git commit -m "docs: record _bcorder.py's dead SIDE constant and comment-brace limit"

@@ -991,3 +991,89 @@ not in git; no commit.
 - **No new physical moments are written.** That is the larger and better idea, and it
   is deferred rather than dismissed: a new major moment competing for a slot allocated
   by a timer is a new major moment nobody sees. This is its precondition.
+
+---
+
+## Run 1 results — 2026-08-20, rungs 11/16
+
+Session 15:24-17:10. Preconditions all verified before the read: mod tree clean
+(`git status --short` empty), `bc_last_moment_rank` count 0 in all three target files,
+rungs confirmed `11 / 16 / 11`, `validate --strict` 0 errors + the 2 known `namespace`
+warnings, `_bcorder.py` all four zero columns zero, `Battle Chronicles` at playset
+slot 36 (loads last). `ck3.exe` had left `tasklist` before `debug.log` was counted.
+Logs archived to `D:/ck3/logs/archive-20260820-run4/` (142 MB).
+
+| marker | count |
+|---|---|
+| `BC: moment minor` | 1493 |
+| `BC: moment major` | 206 |
+| `BC: moment decisive` | 80 |
+| `BC: fired` | 1794 |
+| `BC: combat end cleanup` | 292 |
+| `BC: wound gates passed` | 24 |
+
+- **`p` = (206 + 80) ÷ 1779 = 0.161** → Step 10 selects **`high` = 10 days**.
+- **Moments per commander-side = 1794 ÷ 292 = 6.14.**
+- Shares: **83.9 / 11.6 / 4.5**.
+- `BC: fired` 1794 exceeds the tier total 1779 by 15. `bc_record_effective_tier_effect`
+  runs one line after the increment inside `bc_record_moment_effect`, so these should be
+  equal. 15 of 1794 (0.8%) is unexplained and is logged here rather than rounded away.
+
+### Step 9 verdict: REGRESSION — do not proceed to Task 2
+
+**Decisive share is 4.5%, under the 5% floor.** Step 9 row 2 applies verbatim: "the
+rungs overshot; re-fit and re-run, do not proceed". `BC: wound gates passed` = 24 reads
+as row 4 ("nonzero and below 55 — expected"), but the series is now **96 → 55 → 24** and
+row 3 makes 0 a hard failure, so 24 is closing on the floor rather than sitting
+comfortably under it. The two readings agree: the rungs bite too hard.
+
+### Why: the mean moved, and 11/16 was fitted against a mean it no longer has
+
+| rungs | moments/side | minor | major | decisive |
+|---|---|---|---|---|
+| 4 / 6 | 6.3 | 40% | 19% | 41% |
+| 8 / 13 | 7.5 | 61% | 21% | 18% |
+| **11 / 16** | **6.14** | **83.9%** | **11.6%** | **4.5%** |
+
+11/16 was fitted against the **7.5** mean measured at rungs 8/13. This run's mean is
+**6.14** — an 18% drop — so the same rungs sit far further out on the tail than the fit
+assumed. The rungs did not change behaviour; the battle sample did. **The mean is not a
+constant of the mod and must be re-read every run**, which no previous fit did.
+
+### Proposed re-fit: 9 / 13
+
+Fitting a geometric tail to this run's own two measured points, `P(d>=11) = 0.161` and
+`P(d>=16) = 0.045`, gives ratio `r = (0.045/0.161)^(1/5) = 0.775` per step, so
+`P(d>=n) = 0.161 · 0.775^(n-11)`. Solving for the 72/18/10 target:
+
+- `P(d>=R1) = 0.28` → R1 = 8.8 → **9**, giving 26.8%
+- `P(d>=R2) = 0.10` → R2 = 12.9 → **13**, giving 9.7%
+
+Predicted split **73.2 / 17.1 / 9.7**. Sanity check against run 2: this curve puts
+`P(d>=8)` at 0.346 for a 6.14 mean, and run 2 measured 0.39 at the higher 7.5 mean —
+consistent in direction and magnitude.
+
+**Caveat, stated because the last fit failed for exactly this reason:** the fit is
+anchored to a sample whose mean has already moved once between runs (6.3, 7.5, 6.14).
+Two measured points cannot distinguish a geometric tail from a heavier one, so treat
+9/13 as the best available estimate, not a settled number.
+
+### Where the constants live — SEVEN live lines, three files
+
+Confirmed by `grep -rn "bc_battle_moments >=" common/ events/`. Memory said four
+places; it is seven lines across four logical sites, and they must all agree:
+
+| file | lines | site |
+|---|---|---|
+| `common/scripted_effects/bc_ledger_effects.txt` | 336 (`11`), 340 (`16`), 364 (`11`) | `bc_record_effective_tier_effect`, both arms — asymmetric, three lines is correct |
+| `common/scripted_effects/bc_scripted_effects.txt` | 61 (`16`), 66 (`11`) | `bc_add_momentum_effect` |
+| `common/scripted_triggers/bc_scripted_triggers.txt` | 10907 (`11`), 10915 (`16`) | `bc_depth_rung_one_trigger` / `bc_depth_rung_two_trigger` |
+
+Plus a **comment** at `bc_scripted_triggers.txt:10900` quoting `>= 11` as its example,
+which must be updated with them or it becomes the next stale number.
+
+### Untouched and still suspect
+
+The template `is_valid` depth gates at `bc_commander_phase_events.txt:4074` (`>= 3`),
+`:4089` (`>= 5`) and `bc_knight_phase_events.txt:3049` (`>= 4`) were fitted to the stale
+4.2 mean and are unreviewed against 6.14.

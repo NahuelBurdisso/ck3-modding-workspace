@@ -1083,6 +1083,84 @@ so Tasks 2-6's anchors survived the re-fit and this plan remains executable as w
 **Task 1 must now be repeated at 9/13.** `p` and `high` are re-derived from that run, not
 carried over from this one — the 0.161 above belongs to the 11/16 sample.
 
+---
+
+## Run 1b results — 2026-08-20, rungs 9/13 (THIS is the Task 1 measurement)
+
+3 battles, personally commanded. `ck3.exe` confirmed gone from `tasklist` before the
+read (it was still resident at 11.9 GB on the first attempt; the count was refused and
+retried). Mod `Enabled` at slot 36, `Compiling source` count 0.
+
+| marker | count |
+|---|---|
+| `BC: moment minor` | 348 |
+| `BC: moment major` | 60 |
+| `BC: moment decisive` | 57 |
+| `BC: fired` | 465 |
+| `BC: combat end cleanup` | 80 |
+| `BC: wound gates passed` | 8 |
+| `BC: momentum depth none / one / two` | 137 / 14 / 15 |
+
+- **`p` = (60 + 57) ÷ 465 = 0.2516** → Step 10 selects **`high` = 20 days.**
+  The 11/16 run gave `p` = 0.161 and would have selected 10. **The re-run changed the
+  constant** — the block on Task 5 was load-bearing, not ceremony.
+- **Moments per commander-side = 465 ÷ 80 = 5.81.**
+- Shares **74.8 / 12.9 / 12.3** against a 72 / 18 / 10 target.
+- `BC: fired` **equals** the tier total exactly (465 = 348+60+57). The 15-line
+  discrepancy seen at 11/16 did not reproduce.
+
+### Step 9 verdict: PASS — proceed
+
+Decisive is **12.3%**, clear of the 5% floor that failed 11/16, and
+`BC: wound gates passed` is nonzero. The regression is fixed.
+
+### The wound count fell to 8 and that is a RISE — my previous guidance was wrong
+
+`bench.md` said to judge this run against "comfortably above 24". **That instruction was
+wrong and it was written in this plan's own session.** It compares an absolute count
+across runs of wildly different length: 465 moments here against 1794 at 11/16, a
+quarter of the size. Normalised, the arm did exactly what was predicted:
+
+| rungs | moments | wound | per moment |
+|---|---|---|---|
+| 4 / 6 | 1175 | 96 | 8.17% |
+| 8 / 13 | 1432 | 55 | 3.84% |
+| 11 / 16 | 1794 | 24 | 1.34% |
+| **9 / 13** | **465** | **8** | **1.72%** |
+
+First rise in the series, +29% per moment. **`BC: wound gates passed` is never
+comparable raw — always divide by `BC: fired`.** Same class of error as the 62-vs-96
+mid-session read, in a doc written to prevent it.
+
+### The mean moved a third time
+
+6.3 → 7.5 → 6.14 → **5.81**. Four runs, four means, no two alike. The tail is also
+heavier than the fit assumed: measured `P(d>=9) = 0.2516` and `P(d>=13) = 0.1226` give
+`r = 0.836` per step, against the 0.775 predicted from the 11/16 points. That is the
+caveat written before this run landing exactly as written.
+
+A further micro-fit to **8 / 14** would put the split near 72/18/10. **Not recommended:**
+it chases a 5-point major/decisive imbalance across a mean that has moved every single
+run, at the cost of another play session, when both upper arms are already healthy and
+neither is starving. Recorded as an option, deliberately declined.
+
+### Sample-size caveat
+
+465 moments / 80 sides / 3 battles, about a quarter of the 11/16 run. Decisive n=57 and
+major n=60 are adequate; the per-arm shares are not precise to the point unit.
+
+### Pre-existing defect found, NOT caused by the re-fit
+
+`error.log` carries 395 × `Failed to fetch variable for 'bc_battle_moments' due to not
+being set`. The 11/16 run has **3918** of the same in its archive, so this predates the
+re-fit and is in fact lower per moment now (0.85 vs 2.18). Cause is the documented
+no-short-circuit trap at unguarded read sites — `bc_this_has_been_a_long_afternoon`
+(`bc_commander_phase_events.txt:4074`) reads `var:bc_battle_moments >= 3` bare in
+`is_valid` with no `exists` sibling, and again at `:4089` inside `chance`. The knight
+gate at `bc_knight_phase_events.txt:3049` is correctly guarded and is not at fault.
+Harmless to behaviour (the row reads false) but it is 12,545 lines of log noise.
+**Out of scope for this plan** — filed for follow-up.
+
 ### Untouched and still suspect
 
 The template `is_valid` depth gates at `bc_commander_phase_events.txt:4074` (`>= 3`),

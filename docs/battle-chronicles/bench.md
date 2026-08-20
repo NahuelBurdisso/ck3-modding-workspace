@@ -257,18 +257,25 @@ so it would need bucket markers beside the increment in
 
 ### The wound follows the top two rungs
 
-`BC: wound gates passed` reads **96 at 4/6, 55 at 8/13, and 24 at 11/16**, after
-three runs of zero - the arm is alive, and it is already falling as designed. It
-hangs off the decisive and major arms only, needs `SWING = down`, and is capped at
-one per battle by `var:bc_battle_wounded`. Raising the rungs makes those arms
-rarer, so **expect this number to keep falling**; if it returns to 0 the rungs went
-too far.
+**NEVER COMPARE `BC: wound gates passed` RAW ACROSS RUNS. ALWAYS DIVIDE BY
+`BC: fired`.** This line previously said to judge the 9/13 run against "comfortably
+above 24". That was wrong, and it was wrong in the same session that wrote it: the
+9/13 run is 465 moments against the 11/16 run's 1794, a quarter of the length, so
+its raw 8 looks like a collapse and is in fact the first RISE in the series. Same
+class of error as the 62-vs-96 mid-session read that this file already documents
+twice.
 
-24 at 11/16 was the second reading agreeing that those rungs overshot - the series
-96 → 55 → 24 is closing on the 0 that means the arm is dead. **9/13 lowers the
-rungs, so this number should now RISE**, and a rise is the expected direction for
-the first time in the series. Judge the 9/13 run against **comfortably above 24**;
-if it does not move, the rung change did not reach the wound arm.
+| rungs | moments | wound | per moment |
+|---|---|---|---|
+| 4 / 6 | 1175 | 96 | 8.17% |
+| 8 / 13 | 1432 | 55 | 3.84% |
+| 11 / 16 | 1794 | 24 | 1.34% |
+| 9 / 13 | 465 | 8 | **1.72%** |
+
+The arm hangs off the decisive and major arms only, needs `SWING = down`, and is
+capped at one per battle by `var:bc_battle_wounded`. Raising the rungs makes those
+arms rarer, so the per-moment rate falls as the rungs rise and rises as they fall.
+If it reaches 0 the rungs went too far.
 
 This line read **62** until 2026-08-20, which was neither run: it was a
 mid-session read of the 4/6 run, whose final log says 96. Scored against 62, a

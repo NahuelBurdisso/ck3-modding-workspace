@@ -102,7 +102,7 @@ measured are 40/19/41 (rungs 4/6) and 61/21/18 (rungs 8/13). If the true rank-2+
 share lands near 18%, preemption fires rarely enough to read as dead; if the rungs
 undershoot, it fires constantly. The constant in Task 5 is chosen from this number.
 
-- [ ] **Step 1: Confirm the working tree is clean and carries no code from this design**
+- [x] **Step 1: Confirm the working tree is clean and carries no code from this design**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && git status --short
@@ -117,7 +117,7 @@ cd /d/ck3/mods/battle_chronicles && grep -c "bc_last_moment_rank" common/scripte
 
 Expected: `0` for all three files.
 
-- [ ] **Step 2: Confirm the rungs really are 11 and 16**
+- [x] **Step 2: Confirm the rungs really are 11 and 16**
 
 ```bash
 cd /d/ck3/mods/battle_chronicles && grep -n "bc_battle_moments >=" common/scripted_effects/bc_ledger_effects.txt
@@ -129,7 +129,7 @@ construction, so three is correct and four would be wrong: the decisive arm is
 `major OR (minor AND >=11)`. If any line reads `8` or `13`, the 11/16 change was
 never committed and this whole plan is premature — stop and surface it.
 
-- [ ] **Step 3: Static gate**
+- [x] **Step 3: Static gate**
 
 ```bash
 cd /d/ck3 && python tools/ck3.py validate battle_chronicles --strict
@@ -138,7 +138,7 @@ cd /d/ck3 && python tools/ck3.py validate battle_chronicles --strict
 Expected: 0 errors, and the 2 known `namespace` warnings. Anything else, fix before
 spending a run.
 
-- [ ] **Step 4: Confirm the mod is deployed and in the playset**
+- [x] **Step 4: Confirm the mod is deployed and in the playset**
 
 ```bash
 cd /d/ck3 && python tools/ck3.py deploy battle_chronicles && python tools/ck3.py playset list | grep -i "battle chronicles"
@@ -151,7 +151,7 @@ workspace mod silently falls out
 of `dlc_load.json` whenever the Paradox launcher runs, and a run against a build that
 does not contain the mod looks exactly like a run where nothing fired.
 
-- [ ] **Step 5: Archive the existing logs, then launch**
+- [x] **Step 5: Archive the existing logs, then launch**
 
 ```bash
 cd /d/ck3 && mv "/d/Documents/Paradox Interactive/Crusader Kings III/logs" "/d/Documents/Paradox Interactive/Crusader Kings III/logs-archive-$(date +%Y%m%d-%H%M)"
@@ -163,7 +163,7 @@ Then:
 cd /d/ck3 && python tools/ck3.py launch --clear-logs
 ```
 
-- [ ] **Step 6: Confirm the mod is live and compiled, before playing**
+- [x] **Step 6: Confirm the mod is live and compiled, before playing**
 
 Once the main menu is up, in another shell:
 
@@ -180,7 +180,7 @@ cd /d/ck3 && python tools/ck3.py probe 'Compiling source'
 Expected: **no `bc_` symbol listed.** Any `bc_` name here means that effect failed to
 compile and every one of its call sites is dead — the run would measure nothing.
 
-- [ ] **Step 7: Play**
+- [x] **Step 7: Play**
 
 Personally command at least three long battles. `type = commander` roots on the
 commander, so `is_ai = no` means the player is commanding in person, not merely
@@ -193,7 +193,7 @@ tasklist | grep -i ck3.exe
 
 Expected: no output before proceeding.
 
-- [ ] **Step 8: Count the shares**
+- [x] **Step 8: Count the shares**
 
 ```bash
 cd "/d/Documents/Paradox Interactive/Crusader Kings III/logs" && for m in "BC: moment minor" "BC: moment major" "BC: moment decisive" "BC: fired" "BC: combat end cleanup" "BC: wound gates passed"; do printf "%-28s %s\n" "$m" "$(grep -cF "$m" debug.log)"; done
@@ -205,7 +205,7 @@ Record all six numbers. Then compute:
 - **moments per commander-side = `BC: fired` ÷ `BC: combat end cleanup`** — the
   denominator; the rungs are fitted per COMMANDER, not per battle.
 
-- [ ] **Step 9: Judge the run**
+- [x] **Step 9: Judge the run**
 
 | reading | verdict |
 |---|---|
@@ -219,11 +219,11 @@ Record all six numbers. Then compute:
 memory until `3b52fb6`; it was a mid-session read. A run scored against 62 would read
 a *rise* from 55 to 56-61 as the expected fall and pass a regression.
 
-- [ ] **Step 10: Choose the constant**
+- [x] **Step 10: Choose the constant**
 
 > **p ≥ 0.20 → `high = 20` days. p < 0.20 → `high = 10` days.**
 
-- [ ] **Step 11: Record the results in this plan and commit**
+- [x] **Step 11: Record the results in this plan and commit**
 
 Append a `## Run 1 results` section to the bottom of this file containing: the date,
 the six counts, `p`, moments per commander-side, and the chosen `high` value. Task 8

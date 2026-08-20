@@ -34,7 +34,13 @@ This is the cheap one and it answers most of what the eve needs answering.
 (`bc_eve_foe`, `bc_eve_ground`) is `exists`-guarded, so raising it outside a
 battle renders the guarded fallback arms instead of failing.
 
-    effect = { trigger_event = bc_chronicles.0011 }
+    event bc_chronicles.0011
+
+**Use `event`, not `effect`.** `effect = { trigger_event = ... }` was written here
+from the API dump and never run; the console answers **`effect is empty`** to it
+and nothing reaches script - no log line either, so the failure is silent in
+`error.log`. Verified 2026-08-19. `event` also bypasses `bc_eve_offer_effect`
+entirely, so there is no cooldown to clear between raises.
 
 Fire it ten to fifteen times, dismissing each. What to look for:
 
@@ -52,15 +58,31 @@ it is thickest / hold the ends`. Options d-k will not show: they gate on a
 ground scope, a foe scope, dread or stress, and only the last two are reachable
 outside a battle.
 
-Then:
+**Judge this one on screen, not from the log.** The three variant markers are at
+`bc_eve_events.txt:502`, `:532` and `:563`, which are the `:option` effects of
+each variant's **first option only** - so a marker means "the player clicked
+option A of variant N", never "variant N was rolled". An earlier revision of this
+section claimed three roughly equal `probe` lines were the pass; that can only
+happen if you pick the first option on every single eve, and dismissing is what
+the section tells you to do.
 
     python tools/ck3.py probe 'BC: eve variant'
+    python tools/ck3.py probe 'BC: eve popup 0011'
 
-Three lines at roughly equal counts is the pass. **One line, or two, means the
-`random_list` or `bc_eve_variant_trigger`'s guard failed** - and those are two
-different fixes, which is why the marker is per variant.
+So read it as: `eve popup 0011` is the true raise count, the variant lines are a
+subset bounded by how many eves you answered, and **a missing variant line is not
+evidence of anything** unless you answered its first option. To measure the roll
+itself a marker would have to go next to the `random_list` in `immediate`
+(`:450-453`); there is none today.
 
-`BC: eve popup 0011` counts every raise and is the denominator.
+RUN 2026-08-19: 12 raises, all 5 titles and all 3 trios seen on screen - the
+`random_list`, `var:bc_eve_variant` and all three arms of
+`bc_eve_variant_trigger` PASS. The log showed variant 2 twice and variant 3 once,
+which is just the three eves that were answered.
+
+Also seen: the dread option renders **truncated** to one line
+(`... across that fiel ...`). CK3 clips option text rather than wrapping it, so
+long option strings are a real cosmetic defect, unrelated to the variant work.
 
 ---
 
@@ -82,6 +104,12 @@ is not a "player is watching" test.
 ---
 
 ## 3. Clearing the cooldowns to re-fire
+
+**The exact `effect` console syntax below is still unverified** - the form
+`effect = { ... }` failed with `effect is empty` in §1 on 2026-08-19, and the
+alternatives (`effect remove_character_flag = X`, or the braces with no inner
+spaces) have not been tried. `event` covers the eve without any of this; the
+flags below only matter for re-firing moments inside a battle.
 
 Every throttle in the mod is a character flag, so all of them clear in one line
 on the character you are playing:
@@ -123,33 +151,76 @@ the moment count in the log is the control.
 
 ## 5. Measuring the depth escalator
 
-New on 2026-08-19 and **never run**. Both ladders now escalate on ledger depth
-instead of being capped by it, and the two markers below are the only readout.
+Both ladders escalate on ledger depth instead of being capped by it. Rungs are
+**8 and 13** as of 2026-08-19; they were 4 and 6 for exactly one run.
 
     python tools/ck3.py probe 'BC: momentum depth'
     python tools/ck3.py probe 'BC: moment '
 
-Expected, against a measured mean of 4.2 moments per battle:
+`probe` groups by `args#` hash, so it will split each marker across call sites.
+For shares, count the whole log instead:
 
-| marker | expected share |
-|---|---|
-| `momentum depth none` / `moment minor` | ~72% |
-| `momentum depth one` / `moment major` | ~23% |
-| `momentum depth two` / `moment decisive` | ~5% |
+    grep -cF "BC: moment decisive" "<user dir>/logs/debug.log"
 
-The two lists should track each other closely - they read the same
-`var:bc_battle_moments` at the same two rungs, 4 and 6. **If they diverge, one
-of the two escalators is reading the variable on the wrong scope**, which is the
-failure this pairing exists to catch.
+Wanted, on the tier list: ~72% minor / ~23% major / ~5% decisive.
 
-`depth none` at 100% means `var:bc_battle_moments` did not exist where
-`bc_add_momentum_effect` ran - the guard fell through to the else arm, not that
-battles were short. Check `BC: fired` in the same run: a run with moments and no
-depth is the scope bug, a run with few moments of either is just short battles.
+### Do NOT read a divergence between the two lists as a scope bug
 
-`BC: wound` should stop reading zero for the first time. It hangs off the
-decisive and major arms only, needs `SWING = down`, and is capped at one per
-battle by `var:bc_battle_wounded`.
+The previous revision of this section said the two lists must track each other
+and that **divergence means one escalator reads `var:bc_battle_moments` on the
+wrong scope**. The 2026-08-19 run diverged hard - depth 79/8/13 against tier
+37/18/45 - and that diagnosis was **wrong**. There is a third cause, and it is
+the likelier one:
+
+**The momentum call is gated at the template and the tier call is not.** 420 of
+the templates wrap their momentum call in a settled-gate, while
+`bc_record_effective_tier_effect` is called unconditionally from inside
+`bc_record_moment_effect` (`bc_ledger_effects.txt:260`), one line after the
+increment. So the tier list has one entry per moment and the momentum list has
+one entry per *grant*. **The two totals are not comparable and the two shares are
+not comparable.** In that run: 888 moments, 236 momentum calls.
+
+Order of elimination when they disagree:
+
+1. **Totals far apart** (236 vs 888) - the gate is refusing calls. Expected to
+   some degree; it is only a fault if `depth none` also dominates, because that
+   means the calls that do get through are all a battle's first moment.
+2. **Tier shares wrong but internally smooth** - the rungs are mistuned against
+   the current moment volume. Re-fit, do not go looking for a scope.
+3. **`depth none` at or near 100% with a healthy total** - now suspect the scope.
+   The else arm of `bc_add_momentum_effect` fires when `var:bc_battle_moments`
+   does not exist where it ran.
+
+### The rungs are fitted to moments per COMMANDER, not per battle
+
+This is what went wrong in the first run. 4 and 6 were fitted to "4.2 moments per
+battle", a figure the 434-template batch had already invalidated, and the rungs
+are not read per battle anyway - `bc_battle_moments` accumulates on the
+commander, and every knight's moment on that side increments it too.
+
+Measure it as **moments ÷ commander-sides**:
+
+    grep -cF "BC: fired" debug.log                 # moments      888
+    grep -cF "BC: combat end cleanup" debug.log    # sides        128
+
+888 ÷ 128 = **~6.9 per commander**. The old top rung of 6 therefore sat *below*
+the mean, which is why 45% of all moments resolved decisive. A rung pair is only
+sane if the lower one is above the mean.
+
+8 and 13 are fitted to that run's three buckets - P(depth<4)=0.37, P(4-5)=0.18,
+P(>=6)=0.45 - by fitting a declining tail to `P(N>=d)` and solving for the 72/5
+points. **That is a model, not a census.** The honest way to settle it is a
+depth histogram, which does not exist today; `debug_log` cannot print a variable,
+so it would need bucket markers beside the increment in
+`bc_record_moment_effect`.
+
+### The wound follows the top two rungs
+
+`BC: wound gates passed` read **62** in the 2026-08-19 run, after three runs of
+zero - the arm is alive. It hangs off the decisive and major arms only, needs
+`SWING = down`, and is capped at one per battle by `var:bc_battle_wounded`.
+Raising the rungs makes those arms rarer, so **expect this number to fall**; if
+it returns to 0 the rungs went too far.
 
 ---
 
@@ -166,7 +237,10 @@ exist on characters that have been PLAYED - `bc_eve_offer_effect` gates
 gate leaked.
 
 Note `debug_show_variables` **is not a CK3 console command** despite appearing
-in an old plan. `effect` is the one that exists.
+in an old plan. `effect` is the one that exists - but see §3: the `= { ... }`
+spelling used above is the one the console rejected on 2026-08-19, so confirm the
+working form before trusting a zero-hit sweep from this line. A silent parse
+failure and a clean leak check look identical.
 
 ---
 

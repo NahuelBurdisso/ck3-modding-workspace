@@ -11,9 +11,21 @@ Companion documents: `../battle-chronicles/open-questions.md` (the agenda),
 
 The mod's player-facing bandwidth is tiny and it is allocated by a timer.
 
-444 templates exist. A commander's side averages **7.5 moments per battle**
-(1175 moments ÷ 186 sides, run 2026-08-19), and the player sees about **4 toasts**
-per 30-day battle after the flood cap shipped that same day. Which 4 is decided
+444 templates exist. A commander's side averages **7.5 moments per battle** —
+that is the 2026-08-19 run 3 figure, at the 8/13 rungs; the run before it, at
+4/6, measured 6.3. Both are `moments ÷ BC: combat end cleanup`, and Run 1 in
+Section 7 re-measures it at 11/16, so treat 7.5 as the working figure and not a
+constant.
+
+The player sees about **4 toasts** per 30-day battle after the flood cap shipped
+that same day — and that figure is the weakest number in this document. **There is
+no marker for a toast**; `bc_start_toast_cooldown_effect` runs only for the
+player, so its count is single-digit and nothing in any log records what reached
+the screen. The 4 is one player's on-screen count of one battle on 2026-08-19,
+n = 1, against `bench.md` §4's *prediction* of "about three". Section 8 treats it
+as an order of magnitude, never as a baseline to fit against.
+
+Which 4 is decided
 by two things, neither of which is importance:
 
 - `bc_toast_cooldown`, a 10-day character flag on the recipient, first-come
@@ -25,7 +37,7 @@ read fired three days earlier. The depth escalator shipped on 2026-08-19 raises 
 moment's effective rung as a battle deepens, and the player has no way to
 perceive that, because the rung has no influence on whether the moment is spoken.
 
-The content is not the bottleneck. 434 of the 448 templates are batch-generated
+The content is not the bottleneck. 434 of the 444 templates are batch-generated
 context reads and 437 of 444 request `TIER = minor`; that is honest, and
 `2026-08-15-battle-chronicles-depth-design.md` argues at length why promoting
 them is the wrong fix. What is wrong is that the escalation the mod computes is
@@ -58,23 +70,35 @@ post-escalation rank in three mutually exclusive arms and writes only a
 inside `bc_record_moment_effect`.
 
 **The record call always precedes the toast gate, in the same scope.** Checked
-across all 444 sites with `D:/ck3/_bcorder.py`:
+across all 444 sites with `D:/ck3/tools/_bcorder.py`:
 
-    bc_commander_phase_events.txt   pairs: 238   out-of-order: 0   depth mismatches: 0
-    bc_knight_phase_events.txt      pairs: 206   out-of-order: 0   depth mismatches: 0
+    bc_commander_phase_events.txt
+      pairs: 238  events: 476
+      out-of-order pairs: 0
+      depth mismatches: 0
+    bc_knight_phase_events.txt
+      pairs: 206  events: 412
+      out-of-order pairs: 0
+      depth mismatches: 0
 
 Every `bc_record_moment_effect = { ... }` is followed by exactly one
 `limit = { bc_can_toast_trigger = yes }`, and the toast `if` block sits exactly
 one brace level deeper — i.e. inside the same enclosing scope. In knight
 templates that scope is the `scope:combat_side.side_commander ?= { ... }` wrapper,
-so the rank is written on, and read from, the toast's recipient. That script is
-kept at the workspace root beside the other `_bc*` scanners because it guards an
-invariant this design depends on; re-run it after any bulk edit to the phase-event
-files.
+so the rank is written on, and read from, the toast's recipient. That script sits
+in `tools/` with the other `_bc*` scanners and is tracked rather than scratch,
+because it guards an invariant this design depends on; re-run it after any bulk
+edit to the phase-event files. Two known limits to note in the plan that promotes
+it to a tracked guard: its `SIDE` constant is dead, and its brace counting does
+not strip comments, so a stray unbalanced brace inside a comment would skew the
+depth column.
 
 Because the rank is on the scope the gate already evaluates on, the gate needs no
-parameter, and **no template is edited.** Four files change, all of them
-definitions.
+parameter, and **no template is edited.** Four *definitions* change, in **three**
+script files — `bc_ledger_effects.txt` carries three of them, since
+`bc_clear_scratch_effect` is at `:560` of that same file. A fourth artefact,
+`docs/battle-chronicles/bench.md`, is also part of this change and not an
+afterthought; see 4.6.
 
 ## 4. The mechanism
 
@@ -86,6 +110,12 @@ existing `debug_log`:
     set_variable = { name = bc_last_moment_rank value = 3 }   # decisive arm
     set_variable = { name = bc_last_moment_rank value = 2 }   # major arm
     set_variable = { name = bc_last_moment_rank value = 1 }   # else arm
+
+In the decisive and major arms the new line goes **above** `bc_wound_effect`, not
+appended to the arm. `bc_ledger_effects.txt:352-356` records that the wound call
+is last on purpose, so `BC: wound` can only ever appear after the
+`BC: moment decisive` that caused it, and the pairing stays legible in a
+500k-line log. Appending would silently break that ordering.
 
 ### 4.2 Let the gate read it — `bc_scripted_triggers.txt`
 
@@ -113,31 +143,56 @@ missing variable. `bc_record_moment_effect`'s own header at
 `bc_depth_rung_one_trigger` is the shipped example of the correct shape. The
 first draft of this design got it wrong.
 
-`is_ai = no` stays the first row. Nothing below it evaluates for an AI commander.
+The `exists` sibling is load-bearing in a second way: a `trigger_if` whose
+`limit` is false evaluates to **true**, so without the sibling the `AND` would
+pass vacuously whenever the variable is absent — a rank-less toast would preempt.
+
+`is_ai = no` stays the first row because it is the cheapest rejection and reads
+as the gate's headline. **It does not make the rest conditional.** CK3 evaluates
+every sibling regardless of order, so the guard above is required for AI
+recipients too, and any argument of the form "row 1 already excluded that case"
+is invalid in this codebase.
 
 ### 4.3 Spend the budget, and mark the preemption — `bc_scripted_effects.txt`
 
     bc_start_toast_cooldown_effect = {
-    	# BEFORE the flag is set, so the OLD state is still readable. If the base
-    	# cooldown is already held at this instant, the gate can only have passed
-    	# through the high arm — so this is an exact preemption counter, and the
-    	# only one obtainable. A trigger cannot log.
+    	# READ BEFORE WRITE, so the OLD flag state is still visible. Every one of
+    	# the 444 call sites is the first statement inside a bc_can_toast_trigger
+    	# gate, so "base held at entry" is equivalent to "passed through the high
+    	# arm while base was held" — i.e. this branch IS the preemption, exactly.
+    	# It is also the only obtainable counter: a trigger cannot log.
     	if = {
     		limit = { has_character_flag = bc_toast_cooldown }
     		debug_log = "BC: toast preempt"
+    		add_character_flag = { flag = bc_toast_cooldown_high days = <fitted, Section 7> }
     	}
     	add_character_flag = { flag = bc_toast_cooldown days = 10 }
+
+    	# Denominator for the Section 8 table: how often a rank-2+ moment spoke at
+    	# all, by either arm. Not a budget, just a count.
     	if = {
     		limit = { exists = var:bc_last_moment_rank }
     		if = {
     			limit = { var:bc_last_moment_rank >= 2 }
-    			add_character_flag = { flag = bc_toast_cooldown_high days = <fitted, Section 7> }
-    			debug_log = "BC: toast high"
+    			debug_log = "BC: toast rank2"
     		}
     	}
     }
 
 The nested `if` rather than two rows in one `limit`, for the reason in 4.2.
+
+**THE HIGH FLAG IS SET ONLY BY A PREEMPTION, NEVER BY AN ORDINARY RANK-2+ TOAST,
+AND THE FEATURE DIES IF THAT IS GOT WRONG.** The obvious alternative — set it
+whenever the rank is 2+, including on toasts that took a free base slot — is
+self-defeating in exactly the case this design exists to serve. Past rung 16
+every moment is rank 3, so every toast would refresh a 20-day high flag while the
+10-day base expires under it, the high arm could never pass again, and preemption
+would become structurally impossible for the rest of the battle. It would also
+make the Section 8 diagnostics undecidable: "preempt 0 with rank-2 toasts
+counting" would be produced both by a feature that is unnecessary and by a
+correctly wired one that over-refreshed itself, and the table would advise
+reverting a working change. The high budget pays for **interruptions**, so only an
+interruption spends it.
 
 ### 4.4 Clear the scratch — `bc_clear_scratch_effect`
 
@@ -149,15 +204,55 @@ read, so the gate always sees the current moment's rank. It is needed because
 `bc_record_effective_tier_effect` runs for **every AI commander in the world** —
 `is_ai = no` gates the toast, not the ledger — so without the clear,
 `bc_last_moment_rank` accumulates as a permanent variable on every character who
-has ever commanded.
+has ever commanded. `bc_clear_scratch_effect` is invoked under
+`side_commander ?=` and **outside** the aftermath gate at
+`bc_aftermath_events.txt:321` and `:443`, i.e. on both sides of every combat in
+the world, so it does reap that accumulation.
+
+One residue survives it, and is accepted. A pop-up option answered *after* combat
+end calls `bc_record_moment_effect` again — the leak already documented at
+`bc_ledger_effects.txt:271-276` — and so rewrites `bc_last_moment_rank` after the
+clear. It is harmless: Section 3's ordering proof means the next battle's first
+moment overwrites the value before any gate reads it, and it affects only the 21
+`bc_events.txt` sites, which never toast. It is the same accepted-leak class as
+`var:bc_eve_variant`.
 
 ### 4.5 Fix a stale number while in the file
 
 `bc_ledger_effects.txt:271` reads "Eight of the eighteen call sites are pop-up
-options." The real count is **465** — 238 commander + 206 knight + 21 in
-`bc_events.txt`. The comment predates the 434-template batch. Correct it. A wrong
-number in a design header is how the stale 4.2-moment mean survived three
-separate rung fits.
+options." **Both numbers are wrong.** The corrected sentence is *"Twenty-one of
+the four hundred and sixty-five call sites are pop-up options"* — 465 = 238
+commander + 206 knight + 21 in `bc_events.txt`, and all 21 of the `bc_events.txt`
+sites sit inside `option` blocks while no phase-event site does. Fixing only the
+denominator would put a fresh wrong number in the same header. The comment
+predates the 434-template batch; the substance of the warning it introduces (a
+pop-up option answered after combat end has had `bc_battle_size` cleared) is
+still correct and must survive the edit.
+
+### 4.6 Update the bench — this is a deliverable, not documentation debt
+
+Run 2 is driven from the console via `bench.md`, and the bench does not know about
+the new flag. Three edits, all required before Run 2 can be trusted:
+
+- **`bench.md:117`** is the single line the bench tells you to paste to re-fire
+  moments inside a battle, and **§3's flag table at :119-124 claims to enumerate
+  every throttle in the mod.** Add `bc_toast_cooldown_high` to both. A 20-day flag
+  that survives a cooldown clear makes preemption impossible for the rest of the
+  test session — producing exactly the `preempt 0` reading Section 8 tells the
+  reader to revert on. The feature would be reverted on the strength of a bench
+  that failed to clear it.
+- **`bench.md:226`**: `BC: wound gates passed` 62 → **96 at the 4/6 rungs, 55 at
+  8/13**, per Section 7.
+- **`bench.md` §5 is internally inconsistent about the 4/6 run** and none of its
+  figures match the archived log: `:156` says 41% decisive, `:178` and `:213` say
+  37/18/45 and 888 ÷ 128 = 6.9, while `archive-20260819-run2/debug.log` gives
+  40/19/41 and 1175 ÷ 186 = 6.3. Every stale figure is a mid-session read. Replace
+  them with the archived counts.
+
+All four wrong numbers in that file share one cause — the log was read while
+`ck3.exe` was still running. §5 already warns about this and was itself written
+from an undercount. Whatever plan implements this should state the correction as
+"counts taken from the archived final logs" so the provenance survives.
 
 ## 5. Rejected alternatives
 
@@ -185,12 +280,24 @@ precondition.
 
 ## 6. Volume, bounded honestly
 
-Phase events roll every `COMBAT_EVENT_DAYS = 5`. With a separate high budget the
-ceiling inside one high-cooldown window rises from 1 toast to 2.
+Phase events roll every `COMBAT_EVENT_DAYS = 5`. Because 4.3 spends the high
+budget only on interruptions, the ceiling is **at most** `battle_days ÷ 10`
+ordinary toasts plus `battle_days ÷ high_days` preemptions. It is not "2 per
+window" — at `high = 20` a 20-day window already permits 2 base toasts, so that
+framing double-counts.
+
+**The two budgets are sub-additive, not independent, and that is deliberate.** A
+preemption also runs the unconditional `add_character_flag = { flag =
+bc_toast_cooldown days = 10 }`, resetting the ordinary clock — so an interruption
+costs the player a later routine toast. Keep it that way: moving the base write
+into an `else` would "restore independence" and raise the ceiling to the full
+additive bound, which is a real volume change dressed up as a tidy-up. A walked
+30-day timeline gives 3 ordinary + 2 preemptions = **5**, under the additive
+bound of 6.
 
 At the 11/16 rungs' *target* split of 72/18/10, rank-2+ is 28% of moments, so the
 player's side sees ~2.1 preemption candidates per 30-day battle against a cap of
-`30 / high_days`. Expected outcome at `high = 20`: **+1 per battle**, total ~5
+`30 ÷ high_days`. Expected outcome at `high = 20`: **+1 per battle**, total ~5
 against a measured 4.
 
 Two second-order effects, both accepted:
@@ -198,10 +305,11 @@ Two second-order effects, both accepted:
 - **Volume is per-day, not per-battle.** A 60-day battle allows ~6 base and ~3
   high, so ~9 toasts. Long battles get proportionally more, by design.
 - **Crescendo.** Depth escalates monotonically within a battle, so past rung 16
-  *every* moment is rank 3 and the high budget becomes the binding constraint.
-  The last toasts of a long battle will all be top-rank. This is thematically
-  right, and it means "decisive" is a per-moment share, not a per-toast one — a
-  long battle will feel decisive throughout, and should.
+  *every* moment is rank 3. Both budgets then run flat out — one ordinary toast
+  per 10 days and one interruption per `high_days` — and every toast the player
+  sees late in a long battle is top-rank. This is thematically right, and it
+  means "decisive" is a per-moment share, not a per-toast one: a long battle will
+  feel decisive throughout, and should.
 
 ## 7. Sequencing — this ships second, and the reason is not caution
 
@@ -217,8 +325,18 @@ measurement, which is the failure `bench.md` §5 was rewritten to prevent.
 So: **Run 1 first, with no code from this design in the build.** Run 1's job is
 the criterion already written in `bench.md` §5 — `grep -cF` over the final
 `debug.log` for `BC: moment minor|major|decisive` at ~72/~18/~10, moments ÷
-`BC: combat end cleanup` for the denominator, `BC: wound gates passed` nonzero
-and near 55 — plus one number this design needs:
+`BC: combat end cleanup` for the denominator, and `BC: wound gates passed`
+**nonzero and below 55**. The series is 96 at the 4/6 rungs and 55 at 8/13, both
+counted off the archived final logs; `bench.md` §5 says to expect it to keep
+falling as the rungs rise, with 0 meaning they went too far.
+
+> **`bench.md:226` and the workspace memory both say 62, and 62 is wrong.** It is
+> a mid-session read of run 2, whose final log says 96 — the same undercount trap
+> that had already forced one rung re-fit that day. Correct both as part of this
+> change (4.6). A Run 1 scored against 62 would read a *rise* from 55 to 56-61 as
+> the expected fall and pass a regression.
+
+Plus one number this design needs:
 
 > **p = (major + decisive) ÷ total moments.**
 > Rank-2+ moments per side per battle ≈ 7.5 × p, capped by `battle_days ÷ high_days`.
@@ -231,16 +349,16 @@ mid-session read undercounts.
 
 | reading | verdict |
 |---|---|
-| `BC: toast preempt` > 0, screen shows 4-6 toasts per 30-day battle | **pass** |
+| `BC: toast preempt` > 0, screen shows **up to 6** toasts per 30-day battle | **pass**. 6 is Section 6's ceiling, not a fitted band — the pre-change baseline is an n = 1 on-screen count and cannot support a lower bound |
 | preempt 0, and `BC: moment major` + `decisive` also ~0 | not this feature — the rungs undershot. Re-fit and re-run 1 |
-| preempt 0, `BC: toast high` > 0 | the base budget never collides. The feature is unnecessary, not broken — revert it |
-| preempt 0, `BC: toast high` 0, moment counts healthy | the rank is not reaching the gate scope. Re-run `_bcorder.py` first |
-| screen shows > 8 toasts per 30-day battle | `high` is too short. Turn `high` only, never the base |
+| preempt 0, `BC: toast rank2` > 0 | rank-2+ moments spoke, but always into a free slot — the base budget never collides. The feature is unnecessary, not broken; revert it. **This reading is only decisive because 4.3 spends the high budget on preemptions alone**; had an ordinary rank-2+ toast been allowed to refresh the high flag, an over-refreshed working feature would print the same thing |
+| preempt 0, `BC: toast rank2` 0, world-wide `BC: moment major`+`decisive` healthy | the rank is not reaching the gate scope. Re-run `tools/_bcorder.py` first. Note this row crosses a **world-wide** count against **player-only** counters: at the three-long-battle floor below, the expected player rank-2 count is ~6, so a 0 here is meaningful rather than merely small |
+| screen shows **7 or more** toasts per 30-day battle | above Section 6's ceiling of 6, so the volume model is wrong, not merely mistuned. Diagnose before turning anything; if it is only mistuned, turn `high` and never the base |
 
 **Run 2's counts will be tiny, and this must be planned for rather than
 discovered.** `is_ai = no` is the first row of the gate, so
 `bc_start_toast_cooldown_effect` never runs for AI. Unlike every other `BC:`
-marker, which counts the whole world, `BC: toast preempt` and `BC: toast high`
+marker, which counts the whole world, `BC: toast preempt` and `BC: toast rank2`
 are **player-only** and will be single digits. A zero is weak evidence. Run 2 is
 readable only if the player personally commands **at least three long battles**.
 

@@ -236,51 +236,31 @@ predates the 434-template batch; the substance of the warning it introduces (a
 pop-up option answered after combat end has had `bc_battle_size` cleared) is
 still correct and must survive the edit.
 
-### 4.6 Update the bench — this is a deliverable, not documentation debt
+### 4.6 Teach the bench the new flag
 
-Run 2 is driven from the console via `bench.md`, and the bench does not know about
-the new flag. Three edits, all required before Run 2 can be trusted:
+**Prerequisite, already done — not a task.** `bench.md` §5's run-2 figures were
+mid-session reads throughout and undercounted by roughly half (888 moments / 236
+momentum calls / 128 sides against a true 1175 / 329 / 186; `BC: wound gates
+passed` 62 against a true 96). They were replaced with counts from
+`logs/archive-20260819-run2/debug.log` in `3b52fb6`, and the same 62 was corrected
+in the workspace memory. Sections 7 and 8 below are written against the corrected
+bench; if a future reader finds them disagreeing, the bench is the one to trust,
+because it now carries the provenance.
 
-- **`bench.md:117`** is the single line the bench tells you to paste to re-fire
-  moments inside a battle, and **§3's flag table at :119-124 claims to enumerate
-  every throttle in the mod.** Add `bc_toast_cooldown_high` to both. A 20-day flag
-  that survives a cooldown clear makes preemption impossible for the rest of the
-  test session — producing exactly the `preempt 0` reading Section 8 tells the
-  reader to revert on. The feature would be reverted on the strength of a bench
-  that failed to clear it.
-- **`bench.md:226`**: `BC: wound gates passed` 62 → **96 at the 4/6 rungs, 55 at
-  8/13**, per Section 7.
-- **`bench.md:172`** wants "~72% minor / ~23% major / ~5% decisive", contradicting
-  `:162`'s "~72 / ~18 / ~10" eleven lines above. §5 must not disagree with itself
-  during the run it drives. `:162` is the intended target; `:172` is the
-  superseded 5% figure Section 7 explains was deliberately abandoned.
-- **`bench.md` §5's run-2 figures are mid-session throughout.** Every number below
-  is a read taken while `ck3.exe` was still writing. Replace with the archived
-  final counts from `logs/archive-20260819-run2/debug.log`:
+**The one bench edit this design owes**, and it must land with the code, not
+before it, because the flag does not exist until then:
 
-  | line | reads | should read |
-  |---|---|---|
-  | `:179` | tier `37/18/45` | `40/19/41` (473 / 223 / 478) |
-  | `:179` | depth `79/8/13` | `80/7/13` (263 / 24 / 42) |
-  | `:188`, `:192` | "888 moments, 236 momentum calls" | **1175** moments, **329** momentum calls |
-  | `:210-211` | `# moments 888`, `# sides 128` | `# moments 1175`, `# sides 186` |
-  | `:213` | `888 ÷ 128 = ~6.9` | `1175 ÷ 186 = ~6.3` |
-  | `:214` | "45% of all moments resolved decisive" | 41% |
-  | `:217` | `P(depth<4)=0.37, P(4-5)=0.18, P(>=6)=0.45` | `0.40 / 0.19 / 0.41` |
+- **`bench.md:117`** is the single line the bench tells you to paste to clear the
+  cooldowns and re-fire moments inside a battle, and **§3's flag table claims to
+  enumerate every throttle in the mod** — it currently lists exactly the four `bc_`
+  flags that exist, so it is complete today and becomes wrong the moment 4.3
+  ships. Add `bc_toast_cooldown_high` to the clear line and the table.
 
-  **`:155`'s "4/6 measured 41% decisive" is already correct** (478 ÷ 1175 = 40.7%)
-  and must be left alone, as must `:156`'s 18% and 7.5. The inconsistency in §5 is
-  between `:155` and the block at `:179-217`, with `:155` on the right side of it.
-
-- **Workspace memory `project_battle_chronicles.md:229`** carries the same 62.
-  Correct it there too, or the next session re-imports the wrong baseline — which
-  is exactly how 62 reached `bench.md` in the first place.
-
-Every wrong number listed above shares one cause: the log was read while
-`ck3.exe` was still running. §5 already warns about this and was itself written
-from an undercount, which is the third occurrence of the same trap. The plan
-should state the correction as "counts taken from the archived final logs" so the
-provenance survives the next reader.
+That edit is load-bearing for the verification, not tidiness. A 20-day flag that
+survives the bench's cooldown clear makes preemption impossible for the remainder
+of the test session, producing exactly the `preempt 0` reading Section 8 instructs
+the reader to revert on — the feature would be reverted on the strength of a bench
+that failed to clear it.
 
 ## 5. Rejected alternatives
 

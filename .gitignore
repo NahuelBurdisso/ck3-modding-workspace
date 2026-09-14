@@ -7,3 +7,9 @@ mods/
 
 # visual brainstorming companion scratch
 .superpowers/
+
+# scratch: extracted saves, query dumps, screenshots, playset backups
+_gamestate
+_*.json
+_*.png
+_*.txt

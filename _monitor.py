@@ -34,7 +34,7 @@ PATCH_FILES = ("07_dlc_ep3_scripted_effects", "hud.gui", "color_lists",
                "scripted_illustrations/ingame.txt", "agot_d_kingsguard",
                "agot_kingsguard.gui", "season_events", "agot_coa_events",
                "00_agot_kingsguard_triggers", "00_agot_the_seven",
-               "agot_silent_sisters_events")
+               "agot_silent_sisters_events", "window_travel_route_edit")
 
 while time.time() - t0 < DEADLINE:
     el = int(time.time() - t0)

@@ -43,6 +43,33 @@ def _descriptor_of(mod_root: Path, mod_file: Path | None) -> Path | None:
     return mod_file if mod_file and mod_file.is_file() else None
 
 
+def _descriptor_meta(
+    descriptor: Path | None,
+    mod_file: Path,
+    stub: dict,
+) -> dict:
+    """Version metadata, preferring the mod's own `descriptor.mod` over the stub.
+
+    The launcher writes a pointer file per enabled mod into `<user>/mod/`, and
+    that stub carries a *copy* of the mod's descriptor fields. Steam updates the
+    workshop folder without rewriting the stub, so after an update the stub can
+    claim `supported_version="1.16.*.*"` while the mod itself already declares
+    1.19. The game loads the real files, so the inner descriptor is the truth.
+    """
+    if descriptor is None or descriptor == mod_file:
+        return stub
+    try:
+        inner = parse_descriptor(read_text(descriptor))
+    except OSError:
+        return stub
+    merged = dict(stub)
+    for key in ("version", "supported_version"):
+        value = inner.get(key)
+        if isinstance(value, str) and value:
+            merged[key] = value
+    return merged
+
+
 def read_mod_file(cfg: Config, mod_file: Path, order: int) -> Source | None:
     """Turn a `<user>/mod/*.mod` pointer file into a Source."""
     if not mod_file.is_file():
@@ -56,15 +83,17 @@ def read_mod_file(cfg: Config, mod_file: Path, order: int) -> Source | None:
         root = cfg.user_dir / raw_path
     remote = data.get("remote_file_id")
     kind = WORKSHOP if remote else LOCAL
+    descriptor = _descriptor_of(root, mod_file)
+    meta = _descriptor_meta(descriptor, mod_file, data)
     return Source(
         kind=kind,
         name=str(data.get("name") or mod_file.stem),
         root=root,
         order=order,
         mod_id=str(remote) if remote else None,
-        descriptor=_descriptor_of(root, mod_file),
-        version=str(data.get("version") or ""),
-        supported_version=str(data.get("supported_version") or ""),
+        descriptor=descriptor,
+        version=str(meta.get("version") or ""),
+        supported_version=str(meta.get("supported_version") or ""),
     )
 
 

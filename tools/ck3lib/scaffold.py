@@ -135,16 +135,16 @@ def create_mod(
     )
     write_lf(
         mod_root / "common" / "scripted_triggers" / f"{slug}_scripted_triggers.txt",
-        f"# {name} - scripted triggers\n"
+        f"{BOM}# {name} - scripted triggers\n"
         f"# Prefix every key with `{slug}_` so it can never collide with vanilla or another mod.\n",
     )
     write_lf(
         mod_root / "common" / "scripted_effects" / f"{slug}_scripted_effects.txt",
-        f"# {name} - scripted effects\n",
+        f"{BOM}# {name} - scripted effects\n",
     )
     write_lf(
         mod_root / "events" / f"{slug}_events.txt",
-        f"namespace = {slug}\n\n"
+        f"{BOM}namespace = {slug}\n\n"
         f"# {slug}.0001 = {{\n"
         f"#     type = character_event\n"
         f"#     title = {slug}.0001.t\n"

@@ -16,7 +16,7 @@ del 2026-08-18.
                             │ el ORDEN de la lista ES el orden de carga
                             │ (el último gana los conflictos)
                             ▼
-      [1] AGOT ──► [2..43] submods, parches, Carnalitas... ──► [44] Battle Chronicles
+      [1] AGOT ──► [2..43] submods, parches... ──► [44] Battle Chronicles
                                                                         │
                                                                         ▼
                                                      mod/battle_chronicles.mod
